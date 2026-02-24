@@ -1,0 +1,214 @@
+/* ============================================
+   RESPONSIVE STYLES FOR AUTHENTICATION PAGES
+   ============================================ */
+
+/* Large Desktop */
+@media (max-width: 1440px) {
+    .auth-container {
+        max-width: 1000px;
+    }
+}
+
+/* Desktop */
+@media (max-width: 1200px) {
+    .auth-container {
+        max-width: 900px;
+    }
+    
+    .features-panel {
+        padding: var(--space-xl);
+    }
+    
+    .form-panel {
+        padding: var(--space-lg);
+    }
+}
+
+/* Tablet */
+@media (max-width: 992px) {
+    .auth-card {
+        flex-direction: column;
+        max-width: 700px;
+        margin: 0 auto;
+    }
+    
+    .features-panel {
+        padding: var(--space-lg);
+        min-height: 400px;
+    }
+    
+    .form-panel {
+        padding: var(--space-xl);
+    }
+    
+    .features-panel::before {
+        top: -50px;
+        right: -50px;
+        width: 200px;
+        height: 200px;
+    }
+}
+
+/* Small Tablet */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .radio-card-group {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .step-indicators {
+        gap: var(--space-md);
+    }
+    
+    .step-line {
+        left: 35px;
+        right: -15px;
+    }
+    
+    .otp-inputs {
+        gap: var(--space-sm);
+    }
+    
+    .otp-input {
+        width: 45px;
+        height: 55px;
+        font-size: var(--text-xl);
+    }
+}
+
+/* Mobile */
+@media (max-width: 576px) {
+    body {
+        padding: var(--space-sm);
+    }
+    
+    .auth-card {
+        border-radius: var(--radius-md);
+    }
+    
+    .features-panel {
+        padding: var(--space-lg);
+        min-height: 350px;
+    }
+    
+    .form-panel {
+        padding: var(--space-lg);
+    }
+    
+    .auth-header h2 {
+        font-size: var(--text-2xl);
+    }
+    
+    .auth-header p {
+        font-size: var(--text-sm);
+    }
+    
+    .radio-card-group {
+        grid-template-columns: 1fr;
+    }
+    
+    .step-indicators {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-md);
+    }
+    
+    .step {
+        width: 100%;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: var(--space-sm);
+    }
+    
+    .step-number {
+        margin-bottom: 0;
+    }
+    
+    .step-line {
+        display: none;
+    }
+    
+    .form-buttons {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .otp-inputs {
+        gap: var(--space-xs);
+    }
+    
+    .otp-input {
+        width: 40px;
+        height: 50px;
+        font-size: var(--text-lg);
+    }
+    
+    .auth-logo {
+        gap: var(--space-sm);
+    }
+    
+    .auth-logo-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+    }
+    
+    .auth-logo-text h1 {
+        font-size: var(--text-xl);
+    }
+}
+
+/* Extra Small Mobile */
+@media (max-width: 400px) {
+    .features-list li {
+        padding: var(--space-sm);
+        font-size: var(--text-sm);
+    }
+    
+    .testimonial {
+        padding: var(--space-md);
+    }
+    
+    .otp-input {
+        width: 35px;
+        height: 45px;
+        font-size: var(--text-base);
+    }
+    
+    .demo-credentials {
+        padding: var(--space-md);
+    }
+    
+    .modal-content {
+        padding: var(--space-lg);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .features-panel {
+        display: none;
+    }
+    
+    .auth-card {
+        box-shadow: none;
+    }
+    
+    .btn {
+        display: none;
+    }
+    
+    .form-control {
+        border: 1px solid #000;
+        background: none;
+    }
+}

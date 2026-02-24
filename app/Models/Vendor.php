@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Vendor extends Model
+{
+    protected $fillable = [
+        'vendor_type_id',
+        'name',
+        'contact_person',
+        'email',
+        'phone',
+        'address',
+        'is_active',
+    ];
+
+    public function vendorType()
+    {
+        return $this->belongsTo(VendorType::class);
+    }
+
+    public function rawMaterialPurchases()
+    {
+        return $this->hasMany(VendorRawMaterialPurchase::class);
+    }
+
+    public function inventoryStocks()
+    {
+        return $this->hasMany(InventoryStock::class);
+    }
+
+    public function inventoryTransactions()
+    {
+        return $this->hasMany(InventoryTransaction::class);
+    }
+}

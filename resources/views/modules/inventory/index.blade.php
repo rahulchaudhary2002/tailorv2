@@ -1,0 +1,565 @@
+@extends('layouts.app')
+
+@section('title', 'Inventory Management')
+
+@section('content')
+<div class="page-header">
+    <div class="page-title">
+        <h1 class="text-dark">Inventory Management</h1>
+        <p>Track stock-in, stock-out, transfer, and adjustments with location, vendor, and variant-level consistency.</p>
+    </div>
+</div>
+
+<div class="stats-grid" style="margin-bottom: 16px;">
+    <div class="stat-card">
+        <div class="stat-content">
+            <div class="stat-number">{{ $stats['locations_count'] }}</div>
+            <div class="stat-label">Locations</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-content">
+            <div class="stat-number">{{ $stats['products_in_stock'] }}</div>
+            <div class="stat-label">Products in Stock</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-content">
+            <div class="stat-number">{{ number_format((float) $stats['total_quantity'], 2) }}</div>
+            <div class="stat-label">On Hand Qty</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-content">
+            <div class="stat-number">{{ $stats['open_low_stock_alerts'] }}</div>
+            <div class="stat-label">Low Stock Alerts</div>
+        </div>
+    </div>
+</div>
+
+@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product, variant SKU, or location...', 'reporting' => $reporting])
+
+<div class="app-tabs" role="tablist" aria-label="Inventory sections">
+    <button type="button" class="app-tab-button js-page-tab is-active" data-tab-target="transaction" aria-selected="true">Transaction</button>
+    <button type="button" class="app-tab-button js-page-tab" data-tab-target="alerts" aria-selected="false">Low Stock Alerts</button>
+    <button type="button" class="app-tab-button js-page-tab" data-tab-target="stock-summary" aria-selected="false">Stock Summary</button>
+</div>
+
+<div class="js-page-tab-panel" data-tab-panel="transaction">
+<div class="table-card" style="margin-bottom: 16px;">
+    @if (session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
+    @if ($errors->any())
+        <div class="alert alert-danger">
+            <strong>Please fix the following errors:</strong>
+            <ul>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="table-header">
+        <div class="table-title">Inventory Transaction</div>
+    </div>
+
+    <form action="{{ route('inventory.adjust') }}" method="POST" style="padding: 16px;">
+        @csrf
+        <input type="hidden" name="tab" value="transaction" class="js-active-tab-input">
+        <div class="outlet-form-grid">
+            <div class="outlet-form-group">
+                <label for="trx_type">Transaction Type</label>
+                <select id="trx_type" name="trx_type" class="outlet-input" required>
+                    <option value="in" @selected(old('trx_type') === 'in')>Stock In</option>
+                    <option value="out" @selected(old('trx_type') === 'out')>Stock Out</option>
+                    <option value="transfer" @selected(old('trx_type') === 'transfer')>Transfer</option>
+                    <option value="adjustment" @selected(old('trx_type', 'adjustment') === 'adjustment')>Adjustment</option>
+                </select>
+            </div>
+
+            <div class="outlet-form-group" id="group-location-id">
+                <label for="location_id">Location (in/out/adjustment)</label>
+                <select id="location_id" name="location_id" class="outlet-input">
+                    <option value="">Select Location</option>
+                    @foreach ($locations as $location)
+                        <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('location_id') === (string) $location->id)>
+                            {{ $location->name }} ({{ $location->type }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="outlet-form-group" id="group-from-location-id">
+                <label for="from_location_id">From Location (transfer)</label>
+                <select id="from_location_id" name="from_location_id" class="outlet-input">
+                    <option value="">Select Source</option>
+                    @foreach ($locations as $location)
+                        <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('from_location_id') === (string) $location->id)>
+                            {{ $location->name }} ({{ $location->type }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="outlet-form-group" id="group-to-location-id">
+                <label for="to_location_id">To Location (transfer)</label>
+                <select id="to_location_id" name="to_location_id" class="outlet-input">
+                    <option value="">Select Destination</option>
+                    @foreach ($locations as $location)
+                        <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('to_location_id') === (string) $location->id)>
+                            {{ $location->name }} ({{ $location->type }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="outlet-form-group">
+                <label for="product_id">Product</label>
+                <select id="product_id" name="product_id" class="outlet-input js-inventory-product-select" required>
+                    <option value="">Select Product</option>
+                    @foreach ($products as $product)
+                        <option value="{{ $product->id }}" @selected((string) old('product_id') === (string) $product->id)>
+                            {{ $product->name }} ({{ $product->sku }}) - Unit: {{ $product->unit?->symbol ?: ($product->unit?->name ?: 'N/A') }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="outlet-form-group">
+                <label for="product_variant_id">Variant SKU (Optional)</label>
+                <select id="product_variant_id" name="product_variant_id" class="outlet-input">
+                    <option value="">No Variant</option>
+                    @foreach ($products as $product)
+                        @foreach ($product->variants as $variant)
+                            <option value="{{ $variant->id }}" data-product-id="{{ $product->id }}" @selected((string) old('product_variant_id') === (string) $variant->id)>
+                                {{ $variant->sku }} - {{ $product->name }}
+                                @if($variant->size) / Size: {{ $variant->size }} @endif
+                                @if($variant->color) / Color: {{ $variant->color }} @endif
+                                @if($variant->material) / Material: {{ $variant->material }} @endif
+                            </option>
+                        @endforeach
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="outlet-form-group" id="group-adjustment-type">
+                <label for="adjustment_type">Adjustment Mode</label>
+                <select id="adjustment_type" name="adjustment_type" class="outlet-input">
+                    <option value="add" @selected(old('adjustment_type') === 'add')>Add</option>
+                    <option value="remove" @selected(old('adjustment_type') === 'remove')>Remove</option>
+                    <option value="set" @selected(old('adjustment_type', 'set') === 'set')>Set Final Qty</option>
+                </select>
+            </div>
+
+            <div class="outlet-form-group">
+                <label for="quantity">Quantity</label>
+                <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" class="outlet-input" value="{{ old('quantity', '1.00') }}" required>
+            </div>
+
+            <div class="outlet-form-group">
+                <label for="unit_cost">Unit Cost (Optional)</label>
+                <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost') }}">
+            </div>
+
+            <div class="outlet-form-group">
+                <label for="base_price">Base Price</label>
+                <input id="base_price" name="base_price" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('base_price', '0.00') }}" required>
+            </div>
+
+            <div class="outlet-form-group">
+                <label for="special_price">Special Price</label>
+                <input id="special_price" name="special_price" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('special_price') }}" placeholder="Optional">
+            </div>
+
+            <div class="outlet-form-group outlet-form-group-full">
+                <div class="inventory-reorder-toggle">
+                    <label for="set_reorder_level" class="user-switch">
+                        <input
+                            id="set_reorder_level"
+                            name="set_reorder_level"
+                            type="checkbox"
+                            value="1"
+                            @checked((bool) old('set_reorder_level'))
+                        >
+                        <span class="user-switch-slider"></span>
+                    </label>
+                    <label for="set_reorder_level" class="inventory-reorder-label">
+                        Set/Update Reorder Level for this product at selected location
+                    </label>
+                </div>
+                <label id="reorder-location-hint" for="set_reorder_level" class="inventory-reorder-hint">
+                    Applies to selected location (or destination location for transfer).
+                </label>
+            </div>
+
+            <div class="outlet-form-group" id="group-reorder-min-qty">
+                <label for="reorder_min_qty">Reorder Min Qty</label>
+                <input
+                    id="reorder_min_qty"
+                    name="reorder_min_qty"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="outlet-input"
+                    value="{{ old('reorder_min_qty') }}"
+                    placeholder="e.g. 10.00"
+                >
+            </div>
+
+            <div class="outlet-form-group" id="group-reorder-qty">
+                <label for="reorder_qty">Reorder Qty (Optional)</label>
+                <input
+                    id="reorder_qty"
+                    name="reorder_qty"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="outlet-input"
+                    value="{{ old('reorder_qty') }}"
+                    placeholder="e.g. 25.00"
+                >
+            </div>
+
+            <div class="outlet-form-group outlet-form-group-full">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" class="outlet-input" rows="2" placeholder="Optional transaction note">{{ old('notes') }}</textarea>
+            </div>
+        </div>
+
+        <div class="outlet-form-actions">
+            <button type="submit" class="btn btn-primary">Save Transaction</button>
+        </div>
+    </form>
+</div>
+</div>
+
+<div class="js-page-tab-panel" data-tab-panel="alerts" hidden>
+<div class="table-card" style="margin-bottom: 16px;">
+    <div class="table-header">
+        <div class="table-title">Open Low Stock Alerts</div>
+    </div>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Location</th>
+                    <th>Current Qty</th>
+                    <th>Min Qty</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($alerts as $alert)
+                    <tr>
+                        <td>{{ $alert->product?->name }} ({{ $alert->product?->sku }})</td>
+                        <td>{{ $alert->location?->name }} ({{ $alert->location?->type }})</td>
+                        <td>{{ number_format((float) $alert->current_qty, 2) }}</td>
+                        <td>{{ number_format((float) $alert->min_qty, 2) }}</td>
+                        <td>{{ $alert->status }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="empty">No open low stock alerts.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
+
+<div class="js-page-tab-panel" data-tab-panel="stock-summary" hidden>
+<div class="table-card">
+    <div class="table-header">
+        <div class="table-title">Current Stock Summary</div>
+    </div>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Location</th>
+                    <th>Type</th>
+                    <th>Vendor</th>
+                    <th>Product</th>
+                    <th>Variant SKU</th>
+                    <th>On Hand</th>
+                    <th>Reserved</th>
+                    <th>Unit</th>
+                    <th>Avg Cost</th>
+                    <th>Base Price</th>
+                    <th>Special Price</th>
+                    <th>Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($stocks as $stock)
+                    <tr>
+                        <td>{{ $stock->location?->name ?: '-' }}</td>
+                        <td>{{ $stock->location?->type ?: '-' }}</td>
+                        <td>{{ $stock->vendor?->name ?: '-' }}</td>
+                        <td>{{ $stock->product?->name ?: '-' }}</td>
+                        <td>{{ $stock->variant?->sku ?: '-' }}</td>
+                        <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
+                        <td>{{ number_format((float) $stock->reserved_qty, 2) }}</td>
+                        <td>{{ $stock->unit?->symbol ?: ($stock->unit?->name ?: '-') }}</td>
+                        <td>{{ number_format((float) $stock->avg_cost, 2) }}</td>
+                        <td>{{ number_format((float) $stock->base_price, 2) }}</td>
+                        <td>{{ $stock->special_price !== null ? number_format((float) $stock->special_price, 2) : '-' }}</td>
+                        <td>{{ $stock->updated_at->format('M d, Y h:i A') }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="12" class="empty">No inventory records found.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    @if ($stocks->hasPages())
+        <div class="pagination">
+            {{ $stocks->links() }}
+        </div>
+    @endif
+</div>
+</div>
+
+@endsection
+
+@section('page-specific-script')
+<script>
+    (function () {
+        const tabButtons = Array.from(document.querySelectorAll('.js-page-tab'));
+        const tabPanels = Array.from(document.querySelectorAll('.js-page-tab-panel'));
+        const trxType = document.getElementById('trx_type');
+        const location = document.getElementById('location_id');
+        const fromLocation = document.getElementById('from_location_id');
+        const toLocation = document.getElementById('to_location_id');
+        const product = document.querySelector('.js-inventory-product-select');
+        const variant = document.getElementById('product_variant_id');
+        const adjustmentType = document.getElementById('adjustment_type');
+        const setReorderLevel = document.getElementById('set_reorder_level');
+        const reorderMinQty = document.getElementById('reorder_min_qty');
+        const reorderQty = document.getElementById('reorder_qty');
+        const reorderLocationHint = document.getElementById('reorder-location-hint');
+
+        const groupLocation = document.getElementById('group-location-id');
+        const groupFrom = document.getElementById('group-from-location-id');
+        const groupTo = document.getElementById('group-to-location-id');
+        const groupAdjustment = document.getElementById('group-adjustment-type');
+        const groupReorderMinQty = document.getElementById('group-reorder-min-qty');
+        const groupReorderQty = document.getElementById('group-reorder-qty');
+
+        const setActiveTab = (tab) => {
+            tabButtons.forEach((button) => {
+                const isActive = button.dataset.tabTarget === tab;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            tabPanels.forEach((panel) => {
+                panel.hidden = panel.dataset.tabPanel !== tab;
+            });
+
+            document.querySelectorAll('.js-active-tab-input').forEach((input) => {
+                input.value = tab;
+            });
+        };
+
+        if (tabButtons.length > 0 && tabPanels.length > 0) {
+            const hashTab = String(window.location.hash || '').replace('#', '');
+            const initialTab = tabPanels.some((panel) => panel.dataset.tabPanel === hashTab)
+                ? hashTab
+                : String(tabButtons[0].dataset.tabTarget || 'transaction');
+
+            setActiveTab(initialTab);
+
+            tabButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const tab = String(button.dataset.tabTarget || '');
+                    if (!tab) {
+                        return;
+                    }
+
+                    setActiveTab(tab);
+                    history.replaceState(null, '', '#' + tab);
+                });
+            });
+        }
+
+        if (!trxType) {
+            return;
+        }
+
+        const toggleGroup = (groupEl, inputEl, show, required = false) => {
+            if (!groupEl || !inputEl) {
+                return;
+            }
+            groupEl.style.display = show ? '' : 'none';
+            inputEl.required = required;
+        };
+
+        const initInventoryProductSelect2 = () => {
+            if (!product || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+                return;
+            }
+
+            if (product.dataset.select2Ready === '1') {
+                return;
+            }
+
+            window.jQuery(product).select2({
+                width: '100%',
+                placeholder: product.options[0]?.textContent?.trim() || 'Select Product',
+                allowClear: !product.required,
+            });
+
+            product.dataset.select2Ready = '1';
+        };
+
+        const bindProductChange = (selectEl, onChange) => {
+            if (!selectEl || typeof onChange !== 'function') {
+                return;
+            }
+
+            selectEl.addEventListener('change', onChange);
+
+            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+                window.jQuery(selectEl).on('select2:select select2:clear', onChange);
+            }
+        };
+
+        const applyDependentData = () => {
+            const selectedProductId = product?.value || '';
+            if (!variant) {
+                return;
+            }
+
+            const options = Array.from(variant.options);
+            options.forEach((option, index) => {
+                if (index === 0) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+
+                const productId = option.dataset.productId || '';
+                const show = selectedProductId !== '' && productId === selectedProductId;
+                option.hidden = !show;
+                option.disabled = !show;
+            });
+
+            const selected = variant.options[variant.selectedIndex];
+            if (selected && (selected.hidden || selected.disabled)) {
+                variant.value = '';
+            }
+        };
+
+        const applyVisibility = () => {
+            const selectedTrx = (trxType.value || '').toLowerCase();
+            const isTransfer = selectedTrx === 'transfer';
+            const isAdjustment = selectedTrx === 'adjustment';
+            const needsSingleLocation = selectedTrx === 'in' || selectedTrx === 'out' || isAdjustment;
+            const reorderEnabled = !!setReorderLevel?.checked;
+
+            toggleGroup(groupLocation, location, needsSingleLocation, needsSingleLocation);
+            toggleGroup(groupFrom, fromLocation, isTransfer, isTransfer);
+            toggleGroup(groupTo, toLocation, isTransfer, isTransfer);
+
+            if (!needsSingleLocation && location) {
+                location.value = '';
+            }
+            if (!isTransfer && fromLocation) {
+                fromLocation.value = '';
+            }
+            if (!isTransfer && toLocation) {
+                toLocation.value = '';
+            }
+
+            toggleGroup(groupAdjustment, adjustmentType, isAdjustment, false);
+            if (!isAdjustment && adjustmentType) {
+                adjustmentType.value = 'add';
+            }
+
+            toggleGroup(groupReorderMinQty, reorderMinQty, reorderEnabled, reorderEnabled);
+            toggleGroup(groupReorderQty, reorderQty, reorderEnabled, false);
+            if (!reorderEnabled) {
+                if (reorderMinQty) reorderMinQty.value = '';
+                if (reorderQty) reorderQty.value = '';
+            }
+
+            if (reorderLocationHint) {
+                reorderLocationHint.textContent = isTransfer
+                    ? 'Applies to destination location for transfer transactions.'
+                    : 'Applies to selected location.';
+            }
+
+            applyDependentData();
+        };
+
+        trxType.addEventListener('change', applyVisibility);
+        setReorderLevel?.addEventListener('change', applyVisibility);
+        bindProductChange(product, applyDependentData);
+        initInventoryProductSelect2();
+        applyVisibility();
+    })();
+</script>
+@endsection
+
+@section('page-specific-style')
+<style>
+    .app-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .app-tab-button {
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #334155;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+
+    .app-tab-button.is-active {
+        background: #0f766e;
+        border-color: #0f766e;
+        color: #fff;
+    }
+
+    .js-page-tab-panel[hidden] {
+        display: none !important;
+    }
+
+    .inventory-reorder-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        font-weight: 500;
+    }
+
+    .inventory-reorder-label,
+    .inventory-reorder-hint {
+        cursor: pointer;
+    }
+
+    .inventory-reorder-hint {
+        color: #64748b;
+        display: block;
+        margin-top: 4px;
+    }
+</style>
+@endsection
