@@ -14,13 +14,7 @@
     <div class="header-container">
         <!-- Logo -->
         <a href="{{ route('dashboard') }}" class="logo">
-            <div class="logo-icon">
-                <i class="fas fa-vest"></i>
-            </div>
-            <div class="logo-text">
-                <h1>Fashion Tailor Pro</h1>
-                <p>Admin Dashboard</p>
-            </div>
+            <img src="{{ asset('assets/images/logo.png') }}" alt="Suit Land" width="200">
         </a>
 
         <!-- Header Controls -->

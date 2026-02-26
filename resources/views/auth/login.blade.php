@@ -24,13 +24,7 @@
         <div class="features-panel">
             <div>
                 <div class="auth-logo">
-                    <div class="auth-logo-icon">
-                        <i class="fas fa-vest"></i>
-                    </div>
-                    <div class="auth-logo-text">
-                        <h1>Fashion Tailor Pro</h1>
-                        <p>Complete Garment Business Suite</p>
-                    </div>
+                    <img src="{{ asset('assets/images/logo.png') }}" alt="Suit Land" width="200">
                 </div>
 
                 <ul class="features-list">
