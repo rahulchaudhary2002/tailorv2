@@ -51,9 +51,9 @@ class DashboardController extends Controller
         $currentOutletId = (int) ($user->current_outlet_id ?? 0);
 
         $isWorker = $user->hasPermission('view-assigned-jobs') && !$user->hasPermission('manage-orders');
-        $isOwnerAdmin = (bool) $user->is_super_admin
-            || $user->hasPermission('manage-users')
-            || $user->hasPermission('manage-outlets');
+        // Keep owner/admin dashboard strictly for super admin.
+        // Other non-worker users should see outlet manager dashboard.
+        $isOwnerAdmin = (bool) $user->is_super_admin;
         $roleScope = $isWorker ? 'worker' : ($isOwnerAdmin ? 'owner_admin' : 'outlet_manager');
 
         [$dateFrom, $dateTo, $rangeLabel] = $this->resolveDateRange($request, $range, $now);
@@ -329,6 +329,8 @@ class DashboardController extends Controller
 
         $todayStart = $now->copy()->startOfDay();
         $todayEnd = $now->copy()->endOfDay();
+        $rangeStart = $dateFrom->copy()->startOfDay();
+        $rangeEnd = $dateTo->copy()->endOfDay();
 
         $outletContextId = $selectedOutletId > 0 ? $selectedOutletId : $currentOutletId;
         if ($outletContextId < 1 && $accessibleOutletIds->isNotEmpty()) {
@@ -356,16 +358,16 @@ class DashboardController extends Controller
             }
 
             $outletSalesToday = (float) (clone $outletBaseOrders)
-                ->whereBetween('ordered_at', [$todayStart, $todayEnd])
+                ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
                 ->selectRaw('COALESCE(SUM(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0)), 0) as total')
                 ->value('total');
 
             $outletOrdersToday = (int) (clone $outletBaseOrders)
-                ->whereBetween('ordered_at', [$todayStart, $todayEnd])
+                ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
                 ->count();
 
             $dueTodayCount = (int) (clone $outletBaseOrders)
-                ->whereDate('delivery_due_at', $todayStart->toDateString())
+                ->whereBetween('delivery_due_at', [$rangeStart, $rangeEnd])
                 ->whereNotIn('status', [Order::STATUS_DELIVERED, Order::STATUS_CANCELLED])
                 ->count();
 
@@ -387,7 +389,7 @@ class DashboardController extends Controller
 
             $todayDeliveries = (clone $outletBaseOrders)
                 ->with(['customer:id,name'])
-                ->whereDate('delivery_due_at', $todayStart->toDateString())
+                ->whereBetween('delivery_due_at', [$rangeStart, $rangeEnd])
                 ->orderBy('delivery_due_at')
                 ->limit(10)
                 ->get(['id', 'order_number', 'customer_id', 'delivery_due_at', 'status']);
@@ -490,6 +492,12 @@ class DashboardController extends Controller
         } elseif (!$isOwnerAdmin) {
             $topCustomersQuery->whereRaw('1=0');
         }
+        if ($orderStatus !== '') {
+            $topCustomersQuery->where('orders.status', $orderStatus);
+        }
+        if ($paymentStatus !== '') {
+            $topCustomersQuery->where('orders.payment_status', $paymentStatus);
+        }
 
         $topCustomers = $topCustomersQuery
             ->groupBy('orders.customer_id', 'customers.name')
@@ -513,6 +521,12 @@ class DashboardController extends Controller
         } elseif (!$isOwnerAdmin) {
             $fastMovingQuery->whereRaw('1=0');
         }
+        if ($orderStatus !== '') {
+            $fastMovingQuery->where('orders.status', $orderStatus);
+        }
+        if ($paymentStatus !== '') {
+            $fastMovingQuery->where('orders.payment_status', $paymentStatus);
+        }
 
         $fastMovingItems = $fastMovingQuery
             ->groupBy('order_items.product_id', 'products.name')
@@ -533,6 +547,12 @@ class DashboardController extends Controller
             $recentMovementProductIdsQuery->whereIn('orders.outlet_id', $scopeOutletIds);
         } elseif (!$isOwnerAdmin) {
             $recentMovementProductIdsQuery->whereRaw('1=0');
+        }
+        if ($orderStatus !== '') {
+            $recentMovementProductIdsQuery->where('orders.status', $orderStatus);
+        }
+        if ($paymentStatus !== '') {
+            $recentMovementProductIdsQuery->where('orders.payment_status', $paymentStatus);
         }
 
         $recentMovementProductIds = $recentMovementProductIdsQuery

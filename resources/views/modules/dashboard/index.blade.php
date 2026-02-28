@@ -100,35 +100,10 @@
             </select>
         </div>
         @if ($roleScope === 'owner_admin')
-            <div class="outlet-form-group">
-                <label for="trend_group">Trend Group</label>
-                <select id="trend_group" name="trend_group" class="outlet-input">
-                    <option value="day" @selected($trendGroup === 'day')>Daily</option>
-                    <option value="week" @selected($trendGroup === 'week')>Weekly</option>
-                    <option value="month" @selected($trendGroup === 'month')>Monthly</option>
-                </select>
-            </div>
-            <div class="outlet-form-group">
-                <label for="trend_metric">Trend Metric</label>
-                <select id="trend_metric" name="trend_metric" class="outlet-input">
-                    <option value="sales" @selected($trendMetric === 'sales')>Sales</option>
-                    <option value="orders" @selected($trendMetric === 'orders')>Orders</option>
-                </select>
-            </div>
-            <div class="outlet-form-group">
-                <label for="chart_view">Sales Trend Chart</label>
-                <select id="chart_view" name="chart_view" class="outlet-input">
-                    <option value="bar" @selected($chartView === 'bar')>Bar</option>
-                    <option value="line" @selected($chartView === 'line')>Line</option>
-                </select>
-            </div>
-            <div class="outlet-form-group">
-                <label for="outlet_chart_view">Sales by Outlet View</label>
-                <select id="outlet_chart_view" name="outlet_chart_view" class="outlet-input">
-                    <option value="table" @selected($outletChartView === 'table')>Table</option>
-                    <option value="bars" @selected($outletChartView === 'bars')>Bars</option>
-                </select>
-            </div>
+            <input type="hidden" id="trend_group" name="trend_group" value="{{ $trendGroup }}">
+            <input type="hidden" id="trend_metric" name="trend_metric" value="{{ $trendMetric }}">
+            <input type="hidden" id="chart_view" name="chart_view" value="{{ $chartView }}">
+            <input type="hidden" id="outlet_chart_view" name="outlet_chart_view" value="{{ $outletChartView }}">
         @endif
         <div class="dashboard-filter-actions">
             <button type="submit" class="btn btn-primary">Apply</button>
@@ -149,7 +124,33 @@
 
     <div class="dashboard-grid dashboard-two-col">
         <div class="table-card">
-            <div class="table-header"><div class="table-title">Sales Trend ({{ count($salesTrend) }} points)</div></div>
+            <div class="table-header dashboard-card-header">
+                <div class="table-title">Sales Trend ({{ count($salesTrend) }} points)</div>
+                <div class="dashboard-card-controls">
+                    <div class="dashboard-control-group" role="tablist" aria-label="Sales trend group tabs">
+                        <span class="dashboard-control-label">Range</span>
+                        <div class="dashboard-card-tabs">
+                            <button type="button" class="dashboard-card-tab js-trend-group-tab @if($trendGroup === 'day') is-active @endif" data-trend-group="day" role="tab" aria-selected="{{ $trendGroup === 'day' ? 'true' : 'false' }}">Daily</button>
+                            <button type="button" class="dashboard-card-tab js-trend-group-tab @if($trendGroup === 'week') is-active @endif" data-trend-group="week" role="tab" aria-selected="{{ $trendGroup === 'week' ? 'true' : 'false' }}">Weekly</button>
+                            <button type="button" class="dashboard-card-tab js-trend-group-tab @if($trendGroup === 'month') is-active @endif" data-trend-group="month" role="tab" aria-selected="{{ $trendGroup === 'month' ? 'true' : 'false' }}">Monthly</button>
+                        </div>
+                    </div>
+                    <div class="dashboard-control-group" role="tablist" aria-label="Sales trend metric tabs">
+                        <span class="dashboard-control-label">Metric</span>
+                        <div class="dashboard-card-tabs">
+                            <button type="button" class="dashboard-card-tab js-trend-metric-tab @if($trendMetric === 'sales') is-active @endif" data-trend-metric="sales" role="tab" aria-selected="{{ $trendMetric === 'sales' ? 'true' : 'false' }}">Sales</button>
+                            <button type="button" class="dashboard-card-tab js-trend-metric-tab @if($trendMetric === 'orders') is-active @endif" data-trend-metric="orders" role="tab" aria-selected="{{ $trendMetric === 'orders' ? 'true' : 'false' }}">Orders</button>
+                        </div>
+                    </div>
+                    <div class="dashboard-control-group" role="tablist" aria-label="Sales trend chart tabs">
+                        <span class="dashboard-control-label">Chart</span>
+                        <div class="dashboard-card-tabs">
+                            <button type="button" class="dashboard-card-tab js-trend-tab @if($chartView === 'bar') is-active @endif" data-chart-view="bar" role="tab" aria-selected="{{ $chartView === 'bar' ? 'true' : 'false' }}">Bar</button>
+                            <button type="button" class="dashboard-card-tab js-trend-tab @if($chartView === 'line') is-active @endif" data-chart-view="line" role="tab" aria-selected="{{ $chartView === 'line' ? 'true' : 'false' }}">Line</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             @if (count($salesTrend) > 0)
                 <div class="dashboard-chart-wrap">
                     <canvas id="salesTrendChart" aria-label="Sales trend chart"></canvas>
@@ -160,8 +161,19 @@
         </div>
 
         <div class="table-card">
-            <div class="table-header"><div class="table-title">Sales by Outlet</div></div>
-            @if ($outletChartView === 'bars')
+            <div class="table-header dashboard-card-header">
+                <div class="table-title">Sales by Outlet</div>
+                <div class="dashboard-card-controls">
+                    <div class="dashboard-control-group" role="tablist" aria-label="Sales by outlet view tabs">
+                        <span class="dashboard-control-label">View</span>
+                        <div class="dashboard-card-tabs">
+                            <button type="button" class="dashboard-card-tab js-outlet-tab @if($outletChartView === 'table') is-active @endif" data-outlet-view="table" role="tab" aria-selected="{{ $outletChartView === 'table' ? 'true' : 'false' }}">Table</button>
+                            <button type="button" class="dashboard-card-tab js-outlet-tab @if($outletChartView === 'bars') is-active @endif" data-outlet-view="bars" role="tab" aria-selected="{{ $outletChartView === 'bars' ? 'true' : 'false' }}">Bars</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="outletBarsPanel" @if($outletChartView !== 'bars') hidden @endif>
                 @if (count($salesByOutlet) > 0)
                     <div class="dashboard-chart-wrap">
                         <canvas id="salesByOutletChart" aria-label="Sales by outlet chart"></canvas>
@@ -169,7 +181,8 @@
                 @else
                     <div class="empty">No outlet sales found.</div>
                 @endif
-            @else
+            </div>
+            <div id="outletTablePanel" @if($outletChartView !== 'table') hidden @endif>
                 <div class="table-container">
                     <table class="table">
                         <thead><tr><th>Outlet</th><th>Orders</th><th>Sales</th></tr></thead>
@@ -182,7 +195,7 @@
                         </tbody>
                     </table>
                 </div>
-            @endif
+            </div>
         </div>
     </div>
 
@@ -233,9 +246,9 @@
 
 @if ($roleScope === 'outlet_manager')
     <div class="dashboard-grid dashboard-kpi-grid">
-        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Outlet Sales Today</div><div class="dashboard-kpi__value">Rs {{ $formatMoney($outletKpis['outletSalesToday']) }}</div></div>
-        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Orders Today</div><div class="dashboard-kpi__value">{{ number_format($outletKpis['outletOrdersToday']) }}</div></div>
-        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Due Today</div><div class="dashboard-kpi__value">{{ number_format($outletKpis['dueTodayCount']) }}</div></div>
+        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Outlet Sales ({{ $rangeLabel }})</div><div class="dashboard-kpi__value">Rs {{ $formatMoney($outletKpis['outletSalesToday']) }}</div></div>
+        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Orders ({{ $rangeLabel }})</div><div class="dashboard-kpi__value">{{ number_format($outletKpis['outletOrdersToday']) }}</div></div>
+        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Due In Range</div><div class="dashboard-kpi__value">{{ number_format($outletKpis['dueTodayCount']) }}</div></div>
         <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Overdue Orders</div><div class="dashboard-kpi__value">{{ number_format($outletKpis['overdueOutletCount']) }}</div></div>
         <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Pending Payments</div><div class="dashboard-kpi__value">{{ number_format($outletKpis['outletPendingPayments']) }}</div></div>
         <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Stock Value</div><div class="dashboard-kpi__value">Rs {{ $formatMoney($outletKpis['outletStockValue']) }}</div></div>
@@ -243,7 +256,7 @@
 
     <div class="dashboard-grid dashboard-two-col">
         <div class="table-card">
-            <div class="table-header"><div class="table-title">Today’s Deliveries</div></div>
+            <div class="table-header"><div class="table-title">Due Deliveries ({{ $rangeLabel }})</div></div>
             <div class="table-container">
                 <table class="table">
                     <thead><tr><th>Order</th><th>Customer</th><th>Due</th><th>Status</th></tr></thead>
@@ -252,11 +265,11 @@
                         <tr>
                             <td>{{ $row->order_number }}</td>
                             <td>{{ $row->customer?->name ?: '-' }}</td>
-                            <td>{{ $row->delivery_due_at?->format('h:i A') ?: '-' }}</td>
+                            <td>{{ $row->delivery_due_at?->format('M d, h:i A') ?: '-' }}</td>
                             <td>{{ \App\Models\Order::statusLabel((string) $row->status) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="empty">No deliveries due today.</td></tr>
+                        <tr><td colspan="4" class="empty">No deliveries due in selected range.</td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -510,6 +523,71 @@
         color: #334155;
     }
 
+    .dashboard-card-header {
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-card-controls {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .dashboard-control-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #f8fafc;
+    }
+
+    .dashboard-control-label {
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+
+    .dashboard-card-tabs {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-card-tab {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        color: #334155;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+
+    .dashboard-card-tab:hover {
+        border-color: #94a3b8;
+        color: #0f172a;
+    }
+
+    .dashboard-card-tab.is-active {
+        background: #0f766e;
+        border-color: #0f766e;
+        color: #fff;
+        box-shadow: 0 1px 2px rgba(15, 118, 110, 0.25);
+    }
+
     @media (max-width: 1200px) {
         .dashboard-filter-grid {
             grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -527,6 +605,12 @@
         .dashboard-two-col {
             grid-template-columns: 1fr;
         }
+
+        .dashboard-card-controls {
+            width: 100%;
+            margin-left: 0;
+            justify-content: flex-start;
+        }
     }
 </style>
 @endsection
@@ -535,66 +619,140 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script>
     (() => {
-        if (typeof Chart === 'undefined') {
-            return;
-        }
-
         const salesTrendData = @json($salesTrendChartData);
         const outletSalesData = @json($outletSalesChartData);
-        const trendMetric = @json($trendMetric);
-        const trendChartType = @json($chartView);
+        let trendMetric = @json($trendMetric);
+        let trendChartType = @json($chartView);
+        let outletViewType = @json($outletChartView);
 
         const formatMoney = (value) => `Rs ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         const formatCount = (value) => Number(value || 0).toLocaleString();
-        const isSalesMetric = trendMetric === 'sales';
+        const trendGroupInput = document.getElementById('trend_group');
+        const trendMetricInput = document.getElementById('trend_metric');
+        const filterForm = document.querySelector('.dashboard-filter-card form');
+
+        const chartViewInput = document.getElementById('chart_view');
+        const outletViewInput = document.getElementById('outlet_chart_view');
+        const trendGroupTabs = Array.from(document.querySelectorAll('.js-trend-group-tab'));
+        const trendMetricTabs = Array.from(document.querySelectorAll('.js-trend-metric-tab'));
+        const trendTabs = Array.from(document.querySelectorAll('.js-trend-tab'));
+        const outletTabs = Array.from(document.querySelectorAll('.js-outlet-tab'));
+        const outletBarsPanel = document.getElementById('outletBarsPanel');
+        const outletTablePanel = document.getElementById('outletTablePanel');
+
+        let trendChartInstance = null;
+        let outletChartInstance = null;
 
         const trendChartElement = document.getElementById('salesTrendChart');
-        if (trendChartElement && salesTrendData.length > 0) {
-            const trendValues = salesTrendData.map((point) => isSalesMetric ? Number(point.sales || 0) : Number(point.orders_count || 0));
-
-            new Chart(trendChartElement, {
-                type: trendChartType === 'line' ? 'line' : 'bar',
-                data: {
-                    labels: salesTrendData.map((point) => point.label),
-                    datasets: [{
-                        label: isSalesMetric ? 'Sales' : 'Orders',
-                        data: trendValues,
-                        borderColor: '#0f766e',
-                        backgroundColor: trendChartType === 'line' ? 'rgba(15, 118, 110, 0.15)' : 'rgba(14, 165, 233, 0.75)',
-                        pointRadius: trendChartType === 'line' ? 3 : 0,
-                        pointHoverRadius: trendChartType === 'line' ? 4 : 0,
-                        fill: trendChartType === 'line',
-                        tension: 0.3,
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => isSalesMetric
-                                    ? `${context.dataset.label}: ${formatMoney(context.parsed.y)}`
-                                    : `${context.dataset.label}: ${formatCount(context.parsed.y)}`
-                            }
-                        }
+        if (trendChartElement && salesTrendData.length > 0 && typeof Chart !== 'undefined') {
+            const renderTrendChart = (type) => {
+                const isSalesMetric = trendMetric === 'sales';
+                const trendValues = salesTrendData.map((point) => isSalesMetric ? Number(point.sales || 0) : Number(point.orders_count || 0));
+                if (trendChartInstance) {
+                    trendChartInstance.destroy();
+                }
+                trendChartInstance = new Chart(trendChartElement, {
+                    type: type === 'line' ? 'line' : 'bar',
+                    data: {
+                        labels: salesTrendData.map((point) => point.label),
+                        datasets: [{
+                            label: isSalesMetric ? 'Sales' : 'Orders',
+                            data: trendValues,
+                            borderColor: '#0f766e',
+                            backgroundColor: type === 'line' ? 'rgba(15, 118, 110, 0.15)' : 'rgba(14, 165, 233, 0.75)',
+                            pointRadius: type === 'line' ? 3 : 0,
+                            pointHoverRadius: type === 'line' ? 4 : 0,
+                            fill: type === 'line',
+                            tension: 0.3,
+                            borderWidth: 2
+                        }]
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: (value) => isSalesMetric ? `Rs ${Number(value).toLocaleString()}` : Number(value).toLocaleString()
+                    options: {
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => isSalesMetric
+                                        ? `${context.dataset.label}: ${formatMoney(context.parsed.y)}`
+                                        : `${context.dataset.label}: ${formatCount(context.parsed.y)}`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: (value) => isSalesMetric ? `Rs ${Number(value).toLocaleString()}` : Number(value).toLocaleString()
+                                }
                             }
                         }
                     }
-                }
+                });
+            };
+
+            renderTrendChart(trendChartType);
+
+            trendGroupTabs.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const nextGroup = String(button.dataset.trendGroup || '');
+                    if (!['day', 'week', 'month'].includes(nextGroup)) {
+                        return;
+                    }
+                    if (trendGroupInput) {
+                        trendGroupInput.value = nextGroup;
+                    }
+                    if (filterForm) {
+                        filterForm.submit();
+                    }
+                });
+            });
+
+            trendMetricTabs.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const nextMetric = String(button.dataset.trendMetric || '');
+                    if (!['sales', 'orders'].includes(nextMetric)) {
+                        return;
+                    }
+                    trendMetric = nextMetric;
+                    if (trendMetricInput) {
+                        trendMetricInput.value = trendMetric;
+                    }
+                    trendMetricTabs.forEach((tab) => {
+                        const isActive = tab === button;
+                        tab.classList.toggle('is-active', isActive);
+                        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    });
+                    renderTrendChart(trendChartType);
+                });
+            });
+
+            trendTabs.forEach((button) => {
+                button.addEventListener('click', () => {
+                    const nextType = String(button.dataset.chartView || 'bar');
+                    if (nextType !== 'bar' && nextType !== 'line') {
+                        return;
+                    }
+                    trendChartType = nextType;
+                    if (chartViewInput) {
+                        chartViewInput.value = trendChartType;
+                    }
+                    trendTabs.forEach((tab) => {
+                        const isActive = tab === button;
+                        tab.classList.toggle('is-active', isActive);
+                        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    });
+                    renderTrendChart(trendChartType);
+                });
             });
         }
 
         const outletChartElement = document.getElementById('salesByOutletChart');
-        if (outletChartElement && outletSalesData.length > 0) {
-            new Chart(outletChartElement, {
+        const ensureOutletChart = () => {
+            if (!outletChartElement || outletSalesData.length < 1 || typeof Chart === 'undefined' || outletChartInstance) {
+                return;
+            }
+            outletChartInstance = new Chart(outletChartElement, {
                 type: 'bar',
                 data: {
                     labels: outletSalesData.map((point) => point.label),
@@ -627,6 +785,36 @@
                     }
                 }
             });
+        };
+
+        const applyOutletView = (view) => {
+            outletViewType = view === 'bars' ? 'bars' : 'table';
+            if (outletViewInput) {
+                outletViewInput.value = outletViewType;
+            }
+            if (outletBarsPanel) {
+                outletBarsPanel.hidden = outletViewType !== 'bars';
+            }
+            if (outletTablePanel) {
+                outletTablePanel.hidden = outletViewType !== 'table';
+            }
+            outletTabs.forEach((tab) => {
+                const isActive = String(tab.dataset.outletView || '') === outletViewType;
+                tab.classList.toggle('is-active', isActive);
+                tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            if (outletViewType === 'bars') {
+                ensureOutletChart();
+            }
+        };
+
+        if (outletTabs.length > 0) {
+            outletTabs.forEach((button) => {
+                button.addEventListener('click', () => {
+                    applyOutletView(String(button.dataset.outletView || 'table'));
+                });
+            });
+            applyOutletView(outletViewType);
         }
     })();
 </script>
