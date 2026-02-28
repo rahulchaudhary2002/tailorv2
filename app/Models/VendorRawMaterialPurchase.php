@@ -9,7 +9,6 @@ class VendorRawMaterialPurchase extends Model
     protected $fillable = [
         'vendor_id',
         'product_id',
-        'product_variant_id',
         'unit_id',
         'quantity',
         'unit_price',
@@ -47,11 +46,6 @@ class VendorRawMaterialPurchase extends Model
     public function unit()
     {
         return $this->belongsTo(Unit::class);
-    }
-
-    public function variant()
-    {
-        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     public function inventoryLocation()

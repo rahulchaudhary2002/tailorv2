@@ -21,7 +21,6 @@ class InventoryTransaction extends Model
         'reference_type',
         'reference_id',
         'target_product_id',
-        'target_variant_id',
         'from_location_id',
         'to_location_id',
         'vendor_id',
@@ -71,8 +70,4 @@ class InventoryTransaction extends Model
         return $this->belongsTo(Product::class, 'target_product_id');
     }
 
-    public function targetVariant()
-    {
-        return $this->belongsTo(ProductVariant::class, 'target_variant_id');
-    }
 }

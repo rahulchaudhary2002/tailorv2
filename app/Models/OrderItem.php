@@ -10,7 +10,6 @@ class OrderItem extends Model
         'order_id',
         'item_category',
         'product_id',
-        'product_variant_id',
         'unit_id',
         'quantity',
         'unit_price',
@@ -33,11 +32,6 @@ class OrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
-    }
-
-    public function variant()
-    {
-        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     public function unit()

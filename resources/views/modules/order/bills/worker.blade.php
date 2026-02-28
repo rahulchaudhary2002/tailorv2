@@ -69,7 +69,7 @@
                         <tr>
                             <td>{{ $item->product?->name ?: '-' }}</td>
                             <td>Stock</td>
-                            <td>{{ number_format((float) $item->quantity, 2) }} {{ $item->unit?->symbol ?: '' }}</td>
+                            <td>{{ number_format((float) $item->quantity, 2) }} {{ (string) $item->item_category === 'fabric' ? 'm' : 'pcs' }}</td>
                             <td>Direct fabric item</td>
                         </tr>
                     @endif

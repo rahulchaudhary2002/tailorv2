@@ -19,7 +19,6 @@ use App\Models\OrderItem;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\ProductVariant;
 use App\Models\Role;
 use App\Models\Unit;
 use App\Models\User;
@@ -420,7 +419,7 @@ class DashboardTestingDataSeeder extends Seeder
     }
 
     /**
-     * @return array{0: \Illuminate\Support\Collection<int, Product>, 1: \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, ProductVariant>>}
+     * @return array{0: \Illuminate\Support\Collection<int, Product>, 1: \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, mixed>>}
      */
     private function seedProductsAndVariants($categories, $units, string $seedTag, int $count): array
     {
@@ -435,28 +434,14 @@ class DashboardTestingDataSeeder extends Seeder
 
             $product = Product::query()->create([
                 'product_category_id' => $category->id,
-                'unit_id' => $unit->id,
                 'name' => $faker->words(3, true) . " {$i}",
-                'sku' => $sku,
-                'description' => $faker->sentence(10),
-                'is_active' => true,
+                'code' => $sku,
+                'amount' => (float) random_int(100, 5000),
             ]);
 
             $products->push($product);
 
-            $variantCount = random_int(0, 3);
-            $variants = collect();
-            for ($v = 1; $v <= $variantCount; $v++) {
-                $variants->push(ProductVariant::query()->create([
-                    'product_id' => $product->id,
-                    'sku' => "{$sku}-V{$v}",
-                    'size' => $faker->randomElement(['S', 'M', 'L', 'XL']),
-                    'color' => $faker->safeColorName(),
-                    'material' => $faker->randomElement(['Cotton', 'Linen', 'Silk', 'Wool', 'Polyester']),
-                ]));
-            }
-
-            $variantsByProduct->put($product->id, $variants);
+            $variantsByProduct->put($product->id, collect());
         }
 
         return [$products, $variantsByProduct];
@@ -472,12 +457,6 @@ class DashboardTestingDataSeeder extends Seeder
         foreach ($products as $product) {
             $targetLocations = $locations->shuffle()->take(random_int(1, min(3, $locations->count())));
             foreach ($targetLocations as $location) {
-                $variants = $variantsByProduct->get($product->id, collect());
-                $variantId = null;
-                if ($variants->isNotEmpty() && random_int(1, 100) <= 70) {
-                    $variantId = (int) $variants->random()->id;
-                }
-
                 $vendorId = random_int(1, 100) <= 35 ? (int) $vendors->random()->id : null;
                 $onHand = random_int(0, 180);
                 $avgCost = random_int(150, 4500);
@@ -487,11 +466,10 @@ class DashboardTestingDataSeeder extends Seeder
                     [
                         'location_id' => $location->id,
                         'product_id' => $product->id,
-                        'product_variant_id' => $variantId,
                         'vendor_id' => $vendorId,
                     ],
                     [
-                        'unit_id' => $product->unit_id,
+                        'unit_id' => $this->resolveInventoryUnitIdForProduct($product),
                         'on_hand_qty' => $onHand,
                         'reserved_qty' => random_int(0, (int) max(0, $onHand / 4)),
                         'avg_cost' => $avgCost,
@@ -558,8 +536,6 @@ class DashboardTestingDataSeeder extends Seeder
 
         for ($i = 1; $i <= $count; $i++) {
             $product = $products->random();
-            $variants = $variantsByProduct->get($product->id, collect());
-            $variantId = $variants->isNotEmpty() && random_int(1, 100) <= 50 ? (int) $variants->random()->id : null;
             $quantity = random_int(5, 150);
             $unitPrice = random_int(80, 2500);
             $total = $quantity * $unitPrice;
@@ -568,8 +544,7 @@ class DashboardTestingDataSeeder extends Seeder
             VendorRawMaterialPurchase::query()->create([
                 'vendor_id' => (int) $vendors->random()->id,
                 'product_id' => $product->id,
-                'product_variant_id' => $variantId,
-                'unit_id' => $product->unit_id,
+                'unit_id' => $this->resolveInventoryUnitIdForProduct($product),
                 'quantity' => $quantity,
                 'unit_price' => $unitPrice,
                 'total_amount' => $total,
@@ -664,8 +639,6 @@ class DashboardTestingDataSeeder extends Seeder
 
             for ($line = 1; $line <= $itemCount; $line++) {
                 $product = $products->random();
-                $variants = $variantsByProduct->get($product->id, collect());
-                $variantId = $variants->isNotEmpty() && random_int(1, 100) <= 55 ? (int) $variants->random()->id : null;
                 $quantity = random_int(1, 6);
                 $unitPrice = random_int(250, 5500);
                 $lineTotal = $quantity * $unitPrice;
@@ -677,7 +650,6 @@ class DashboardTestingDataSeeder extends Seeder
                     'order_id' => $order->id,
                     'item_category' => $isCustom ? 'custom' : 'readymade',
                     'product_id' => $isCustom ? null : $product->id,
-                    'product_variant_id' => $isCustom ? null : $variantId,
                     'unit_id' => $isCustom ? null : $product->unit_id,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
@@ -760,12 +732,9 @@ class DashboardTestingDataSeeder extends Seeder
 
             $referenceType = fake()->randomElement(['order', 'purchase', 'manual_adjustment', 'production_transfer']);
             $targetProductId = null;
-            $targetVariantId = null;
             if ($referenceType === 'production_transfer' && random_int(1, 100) <= 60) {
                 $targetProduct = $products->random();
                 $targetProductId = $targetProduct->id;
-                $targetVariants = $variantsByProduct->get($targetProduct->id, collect());
-                $targetVariantId = $targetVariants->isNotEmpty() ? (int) $targetVariants->random()->id : null;
             }
 
             $transaction = InventoryTransaction::query()->create([
@@ -775,7 +744,6 @@ class DashboardTestingDataSeeder extends Seeder
                 'reference_type' => $referenceType,
                 'reference_id' => random_int(1, 10000),
                 'target_product_id' => $targetProductId,
-                'target_variant_id' => $targetVariantId,
                 'from_location_id' => $fromLocationId,
                 'to_location_id' => $toLocationId,
                 'vendor_id' => random_int(1, 100) <= 35 ? (int) $vendors->random()->id : null,
@@ -790,20 +758,29 @@ class DashboardTestingDataSeeder extends Seeder
             $lineCount = random_int(1, 3);
             for ($line = 1; $line <= $lineCount; $line++) {
                 $product = $products->random();
-                $variants = $variantsByProduct->get($product->id, collect());
-                $variantId = $variants->isNotEmpty() && random_int(1, 100) <= 50 ? (int) $variants->random()->id : null;
                 $qty = round(random_int(1, 80) / 2, 2);
                 $unitCost = random_int(100, 3000);
 
                 InventoryTransactionItem::query()->create([
                     'inventory_transaction_id' => $transaction->id,
                     'product_id' => $product->id,
-                    'product_variant_id' => $variantId,
                     'qty' => $qty,
                     'unit_cost' => $unitCost,
                     'total_cost' => round($qty * $unitCost, 2),
                 ]);
             }
         }
+    }
+
+    private function resolveInventoryUnitIdForProduct(Product $product): ?int
+    {
+        if ((string) ($product->category?->slug ?? '') !== 'fabrics') {
+            return null;
+        }
+
+        return (int) (Unit::query()
+            ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
+            ->orWhere('symbol', 'm')
+            ->value('id') ?? 0) ?: null;
     }
 }

@@ -12,7 +12,6 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\Order;
 use App\Models\Product;
-use App\Models\ProductVariant;
 use App\Models\User;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
@@ -215,15 +214,12 @@ class OrderController extends Controller
         $products = Product::query()
             ->with([
                 'category:id,slug',
-                'unit:id,name,symbol',
-                'variants:id,product_id,sku,size,color,material',
             ])
             ->whereHas('category', function ($query) {
                 $query->whereIn('slug', ['ready-made', 'accessories', 'fabrics']);
             })
-            ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'unit_id', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'product_category_id']);
 
         $outletLocation = null;
         if ($outletId > 0) {
@@ -235,12 +231,10 @@ class OrderController extends Controller
         }
 
         $productDefaultPrices = [];
-        $variantDefaultPrices = [];
         $productAvailableQty = [];
-        $variantAvailableQty = [];
         $productIds = $products->pluck('id')->values();
 
-        $buildPriceMaps = function ($rows) use (&$productDefaultPrices, &$variantDefaultPrices): void {
+        $buildPriceMaps = function ($rows) use (&$productDefaultPrices): void {
             foreach ($rows as $row) {
                 if ($row->special_price === null && $row->base_price === null) {
                     continue;
@@ -249,13 +243,6 @@ class OrderController extends Controller
                 $price = $row->special_price !== null
                     ? (float) $row->special_price
                     : (float) $row->base_price;
-
-                if ((int) ($row->product_variant_id ?? 0) > 0) {
-                    $variantId = (int) $row->product_variant_id;
-                    if (!array_key_exists($variantId, $variantDefaultPrices)) {
-                        $variantDefaultPrices[$variantId] = $price;
-                    }
-                }
 
                 $productId = (int) $row->product_id;
                 if (!array_key_exists($productId, $productDefaultPrices)) {
@@ -269,7 +256,7 @@ class OrderController extends Controller
                 ->where('location_id', (int) $outletLocation->id)
                 ->whereIn('product_id', $productIds)
                 ->orderByDesc('id')
-                ->get(['product_id', 'product_variant_id', 'base_price', 'special_price']);
+                ->get(['product_id', 'base_price', 'special_price']);
 
             $buildPriceMaps($outletPriceRows);
 
@@ -277,20 +264,11 @@ class OrderController extends Controller
                 ->where('location_id', (int) $outletLocation->id)
                 ->whereIn('product_id', $productIds)
                 ->where('on_hand_qty', '>', 0)
-                ->get(['product_id', 'product_variant_id', 'on_hand_qty']);
+                ->get(['product_id', 'on_hand_qty']);
 
             foreach ($outletStockRows as $row) {
                 $productId = (int) $row->product_id;
-                $variantId = (int) ($row->product_variant_id ?? 0);
                 $qty = (float) $row->on_hand_qty;
-
-                if ($variantId > 0) {
-                    if (!array_key_exists($variantId, $variantAvailableQty)) {
-                        $variantAvailableQty[$variantId] = 0.0;
-                    }
-                    $variantAvailableQty[$variantId] += $qty;
-                    continue;
-                }
 
                 if (!array_key_exists($productId, $productAvailableQty)) {
                     $productAvailableQty[$productId] = 0.0;
@@ -302,7 +280,7 @@ class OrderController extends Controller
         $allLocationPriceRows = InventoryStock::query()
             ->whereIn('product_id', $productIds)
             ->orderByDesc('id')
-            ->get(['product_id', 'product_variant_id', 'base_price', 'special_price']);
+            ->get(['product_id', 'base_price', 'special_price']);
 
         $buildPriceMaps($allLocationPriceRows);
 
@@ -334,9 +312,7 @@ class OrderController extends Controller
             'selectedCustomerId',
             'workers',
             'productDefaultPrices',
-            'variantDefaultPrices',
-            'productAvailableQty',
-            'variantAvailableQty'
+            'productAvailableQty'
         ));
     }
 
@@ -449,9 +425,8 @@ class OrderController extends Controller
             ->values();
 
         $products = Product::query()
-            ->with('unit:id,name,symbol')
             ->whereIn('id', $productIds)
-            ->get(['id', 'unit_id'])
+            ->get(['id'])
             ->keyBy('id');
 
         foreach ($items as $item) {
@@ -465,10 +440,10 @@ class OrderController extends Controller
             }
 
             $product = $products->get($productId);
-            if (!$product || !$product->unit_id) {
+            if (!$product) {
                 return back()
                     ->withInput()
-                    ->with('error', 'One or more selected products has no measurement unit. Set product unit first.');
+                    ->with('error', 'One or more selected products is invalid.');
             }
         }
 
@@ -484,9 +459,6 @@ class OrderController extends Controller
                 }
 
                 $productId = (int) data_get($item, 'custom.fabric_product_id', 0);
-                $variantId = !empty(data_get($item, 'custom.fabric_product_variant_id'))
-                    ? (int) data_get($item, 'custom.fabric_product_variant_id')
-                    : null;
                 $requiredQty = (float) data_get($item, 'custom.fabric_quantity', 0);
 
                 if ($productId < 1 || $requiredQty <= 0) {
@@ -494,7 +466,6 @@ class OrderController extends Controller
                 }
             } else {
                 $productId = (int) ($item['product_id'] ?? 0);
-                $variantId = !empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : null;
                 $requiredQty = (float) ($item['quantity'] ?? 0);
 
                 if ($productId < 1 || $requiredQty <= 0) {
@@ -502,11 +473,10 @@ class OrderController extends Controller
                 }
             }
 
-            $stockKey = $productId . ':' . ($variantId ?: 'none');
+            $stockKey = (string) $productId;
             if (!array_key_exists($stockKey, $requiredBySku)) {
                 $requiredBySku[$stockKey] = [
                     'product_id' => $productId,
-                    'variant_id' => $variantId,
                     'required_qty' => 0.0,
                 ];
             }
@@ -521,22 +491,15 @@ class OrderController extends Controller
                 ->map(fn ($id) => (int) $id)
                 ->unique()
                 ->values();
-            $requiredVariantIds = $requiredCollection
-                ->pluck('variant_id')
-                ->filter(fn ($id) => !empty($id))
-                ->map(fn ($id) => (int) $id)
-                ->unique()
-                ->values();
-
             $availableStockRows = InventoryStock::query()
                 ->where('location_id', (int) $outletLocation->id)
                 ->whereIn('product_id', $requiredProductIds)
                 ->where('on_hand_qty', '>', 0)
-                ->get(['product_id', 'product_variant_id', 'on_hand_qty']);
+                ->get(['product_id', 'on_hand_qty']);
 
             $availableMap = [];
             foreach ($availableStockRows as $row) {
-                $stockKey = (int) $row->product_id . ':' . ((int) ($row->product_variant_id ?? 0) > 0 ? (int) $row->product_variant_id : 'none');
+                $stockKey = (string) ((int) $row->product_id);
                 if (!array_key_exists($stockKey, $availableMap)) {
                     $availableMap[$stockKey] = 0.0;
                 }
@@ -547,16 +510,8 @@ class OrderController extends Controller
                 ->whereIn('id', $requiredProductIds)
                 ->pluck('name', 'id');
 
-            $variantLabelMap = ProductVariant::query()
-                ->whereIn('id', $requiredVariantIds)
-                ->get(['id', 'sku', 'size', 'color', 'material'])
-                ->mapWithKeys(function ($variant) {
-                    $labelParts = array_filter([$variant->sku, $variant->size, $variant->color, $variant->material]);
-                    return [(int) $variant->id => implode(' | ', $labelParts)];
-                });
-
             foreach ($requiredCollection as $requiredRow) {
-                $stockKey = (int) $requiredRow['product_id'] . ':' . ((int) ($requiredRow['variant_id'] ?? 0) > 0 ? (int) $requiredRow['variant_id'] : 'none');
+                $stockKey = (string) ((int) $requiredRow['product_id']);
                 $availableQty = (float) ($availableMap[$stockKey] ?? 0);
                 $requiredQty = (float) ($requiredRow['required_qty'] ?? 0);
 
@@ -565,17 +520,12 @@ class OrderController extends Controller
                 }
 
                 $productName = (string) ($productNameMap[(int) $requiredRow['product_id']] ?? 'Product');
-                $variantId = (int) ($requiredRow['variant_id'] ?? 0);
-                $variantLabel = $variantId > 0
-                    ? (string) ($variantLabelMap[$variantId] ?? ('Variant #' . $variantId))
-                    : 'No Variant';
 
                 return back()
                     ->withInput()
                     ->with('error', sprintf(
-                        'Insufficient stock at current outlet for %s (%s). Required: %.2f, Available: %.2f.',
+                        'Insufficient stock at current outlet for %s. Required: %.2f, Available: %.2f.',
                         $productName,
-                        $variantLabel,
                         $requiredQty,
                         $availableQty
                     ));
@@ -603,10 +553,8 @@ class OrderController extends Controller
                 ->values();
 
             $productFabricPriceMap = [];
-            $variantFabricPriceMap = [];
-
             if ($customStockFabricProductIds->isNotEmpty()) {
-                $buildFabricPriceMap = function ($rows) use (&$productFabricPriceMap, &$variantFabricPriceMap): void {
+                $buildFabricPriceMap = function ($rows) use (&$productFabricPriceMap): void {
                     foreach ($rows as $row) {
                         if ($row->special_price === null && $row->base_price === null) {
                             continue;
@@ -615,13 +563,6 @@ class OrderController extends Controller
                         $price = $row->special_price !== null
                             ? (float) $row->special_price
                             : (float) $row->base_price;
-
-                        if ((int) ($row->product_variant_id ?? 0) > 0) {
-                            $variantId = (int) $row->product_variant_id;
-                            if (!array_key_exists($variantId, $variantFabricPriceMap)) {
-                                $variantFabricPriceMap[$variantId] = $price;
-                            }
-                        }
 
                         $productId = (int) $row->product_id;
                         if (!array_key_exists($productId, $productFabricPriceMap)) {
@@ -634,17 +575,17 @@ class OrderController extends Controller
                     ->where('location_id', (int) $outletLocation->id)
                     ->whereIn('product_id', $customStockFabricProductIds)
                     ->orderByDesc('id')
-                    ->get(['product_id', 'product_variant_id', 'base_price', 'special_price']);
+                    ->get(['product_id', 'base_price', 'special_price']);
                 $buildFabricPriceMap($outletFabricPriceRows);
 
                 $allLocationFabricPriceRows = InventoryStock::query()
                     ->whereIn('product_id', $customStockFabricProductIds)
                     ->orderByDesc('id')
-                    ->get(['product_id', 'product_variant_id', 'base_price', 'special_price']);
+                    ->get(['product_id', 'base_price', 'special_price']);
                 $buildFabricPriceMap($allLocationFabricPriceRows);
             }
 
-            DB::transaction(function () use ($request, $validated, $items, $products, $outletLocation, $inventoryTypeId, $outletId, $garmentTypes, $productFabricPriceMap, $variantFabricPriceMap, $vatEnabled, &$createdOrder): void {
+            DB::transaction(function () use ($request, $validated, $items, $products, $outletLocation, $inventoryTypeId, $outletId, $garmentTypes, $productFabricPriceMap, $vatEnabled, &$createdOrder): void {
                 $status = (string) $validated['status'];
                 $workerId = (int) ($validated['worker_id'] ?? 0);
                 $hasAssignedOrLaterStatus = in_array($status, [
@@ -707,7 +648,6 @@ class OrderController extends Controller
                             : 0.0;
                         $fabricSource = (string) ($custom['fabric_source'] ?? 'own');
                         $fabricProductId = !empty($custom['fabric_product_id']) ? (int) $custom['fabric_product_id'] : null;
-                        $fabricVariantId = !empty($custom['fabric_product_variant_id']) ? (int) $custom['fabric_product_variant_id'] : null;
                         $fabricQuantity = (float) ($custom['fabric_quantity'] ?? 0);
                         $fabricUnitPrice = 0.0;
                         // Customer fabric: no product/fabric charge, only tailoring charge is tracked separately.
@@ -715,9 +655,7 @@ class OrderController extends Controller
                             $unitPrice = 0.0;
                         }
                         if ($fabricSource === 'stock') {
-                            if ($fabricVariantId && array_key_exists($fabricVariantId, $variantFabricPriceMap)) {
-                                $fabricUnitPrice = (float) $variantFabricPriceMap[$fabricVariantId];
-                            } elseif ($fabricProductId && array_key_exists($fabricProductId, $productFabricPriceMap)) {
+                            if ($fabricProductId && array_key_exists($fabricProductId, $productFabricPriceMap)) {
                                 $fabricUnitPrice = (float) $productFabricPriceMap[$fabricProductId];
                             }
 
@@ -726,8 +664,7 @@ class OrderController extends Controller
                         }
 
                         $lineTotal = $quantity * $unitPrice;
-                        $fabricProduct = $fabricProductId ? $products->get($fabricProductId) : null;
-                        $fabricQuantityUnit = $fabricProduct?->unit?->symbol ?: ($fabricProduct?->unit?->name ?: null);
+                        $fabricQuantityUnit = 'm';
                         $designImagePaths = [];
                         $designImages = (array) $request->file("items.{$itemIndex}.custom.design_images", []);
                         foreach ($designImages as $designImage) {
@@ -744,7 +681,6 @@ class OrderController extends Controller
                         $order->items()->create([
                             'item_category' => 'custom',
                             'product_id' => null,
-                            'product_variant_id' => null,
                             'unit_id' => null,
                             'quantity' => $quantity,
                             'unit_price' => $unitPrice,
@@ -760,7 +696,6 @@ class OrderController extends Controller
                                 'measurements' => array_values((array) ($custom['measurements'] ?? [])),
                                 'fabric_source' => $fabricSource,
                                 'fabric_product_id' => $fabricProductId,
-                                'fabric_product_variant_id' => $fabricVariantId,
                                 'fabric_quantity' => $fabricQuantity,
                                 'fabric_quantity_unit' => $fabricQuantityUnit,
                                 'fabric_unit_price' => $fabricSource === 'stock' ? $fabricUnitPrice : null,
@@ -776,7 +711,6 @@ class OrderController extends Controller
                             $averageCost = $this->deductFromOutletStock(
                                 locationId: (int) $outletLocation->id,
                                 productId: $fabricProductId,
-                                variantId: $fabricVariantId,
                                 requiredQty: $fabricQuantity
                             );
 
@@ -795,7 +729,6 @@ class OrderController extends Controller
 
                             $transaction->items()->create([
                                 'product_id' => $fabricProductId,
-                                'product_variant_id' => $fabricVariantId,
                                 'qty' => $fabricQuantity,
                                 'unit_cost' => $averageCost,
                                 'total_cost' => $averageCost !== null ? $averageCost * $fabricQuantity : null,
@@ -803,15 +736,13 @@ class OrderController extends Controller
                         }
                     } else {
                         $productId = (int) $item['product_id'];
-                        $variantId = !empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : null;
                         $product = $products->get($productId);
                         $lineTotal = $quantity * $unitPrice;
 
                         $order->items()->create([
                             'item_category' => $itemCategory,
                             'product_id' => $productId,
-                            'product_variant_id' => $variantId,
-                            'unit_id' => $product?->unit_id,
+                            'unit_id' => null,
                             'quantity' => $quantity,
                             'unit_price' => $unitPrice,
                             'line_total' => $lineTotal,
@@ -820,7 +751,6 @@ class OrderController extends Controller
                         $averageCost = $this->deductFromOutletStock(
                             locationId: (int) $outletLocation->id,
                             productId: $productId,
-                            variantId: $variantId,
                             requiredQty: $quantity
                         );
 
@@ -839,7 +769,6 @@ class OrderController extends Controller
 
                         $transaction->items()->create([
                             'product_id' => $productId,
-                            'product_variant_id' => $variantId,
                             'qty' => $quantity,
                             'unit_cost' => $averageCost,
                             'total_cost' => $averageCost !== null ? $averageCost * $quantity : null,
@@ -955,8 +884,7 @@ class OrderController extends Controller
             'outlet:id,name',
             'customer:id,name,email,phone,address',
             'worker:id,name,email',
-            'items.product:id,name,sku',
-            'items.variant:id,product_id,sku,size,color,material',
+            'items.product:id,name,code',
             'items.unit:id,name,symbol',
         ]);
 
@@ -1013,14 +941,13 @@ class OrderController extends Controller
         ];
     }
 
-    private function deductFromOutletStock(int $locationId, int $productId, ?int $variantId, float $requiredQty): ?float
+    private function deductFromOutletStock(int $locationId, int $productId, float $requiredQty): ?float
     {
         $remainingQty = $requiredQty;
 
         $stocks = InventoryStock::query()
             ->where('location_id', $locationId)
             ->where('product_id', $productId)
-            ->where('product_variant_id', $variantId)
             ->where('on_hand_qty', '>', 0)
             ->orderBy('id')
             ->lockForUpdate()

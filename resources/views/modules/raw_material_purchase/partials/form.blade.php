@@ -53,7 +53,7 @@
 
     @php
         $oldItems = old('items', [
-            ['product_id' => '', 'product_variant_id' => '', 'quantity' => 1, 'unit_price' => '0.00'],
+            ['product_id' => '', 'quantity' => 1, 'unit_price' => '0.00'],
         ]);
     @endphp
 
@@ -67,7 +67,6 @@
             <thead>
                 <tr>
                     <th>Raw Material</th>
-                    <th>Variant</th>
                     <th>Quantity</th>
                     <th>Unit Price</th>
                     <th>Total</th>
@@ -82,18 +81,9 @@
                                 <option value="">Select Raw Material</option>
                                 @foreach ($products as $product)
                                     <option value="{{ $product->id }}" @selected((string) ($item['product_id'] ?? '') === (string) $product->id)>
-                                        {{ $product->name }} ({{ $product->sku }}) - Unit: {{ $product->unit?->symbol ?: ($product->unit?->name ?: 'N/A') }}
+                                        {{ $product->name }} ({{ $product->code }})
                                     </option>
                                 @endforeach
-                            </select>
-                        </td>
-                        <td>
-                            <select
-                                name="items[{{ $index }}][product_variant_id]"
-                                class="outlet-input item-variant"
-                                data-selected="{{ $item['product_variant_id'] ?? '' }}"
-                            >
-                                <option value="">No Variant</option>
                             </select>
                         </td>
                         <td>
@@ -141,14 +131,9 @@
                     <option value="">Select Raw Material</option>
                     @foreach ($products as $product)
                         <option value="{{ $product->id }}">
-                            {{ $product->name }} ({{ $product->sku }}) - Unit: {{ $product->unit?->symbol ?: ($product->unit?->name ?: 'N/A') }}
+                            {{ $product->name }} ({{ $product->code }})
                         </option>
                     @endforeach
-                </select>
-            </td>
-            <td>
-                <select class="outlet-input item-variant">
-                    <option value="">No Variant</option>
                 </select>
             </td>
             <td>

@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('location_id')->constrained('inventory_locations')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->foreignId('vendor_id')->nullable()->constrained('vendors')->nullOnDelete();
             $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete();
             $table->decimal('on_hand_qty', 12, 2)->default(0);
@@ -25,7 +24,7 @@ return new class extends Migration
             $table->decimal('special_price', 12, 2)->nullable();
             $table->timestamps();
 
-            $table->unique(['product_id', 'product_variant_id', 'location_id', 'vendor_id'], 'inventory_stocks_unique_key');
+            $table->unique(['product_id', 'location_id', 'vendor_id'], 'inventory_stocks_unique_key');
             $table->index(['product_id', 'location_id']);
             $table->index('vendor_id');
             $table->index('unit_id');

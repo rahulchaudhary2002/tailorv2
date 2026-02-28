@@ -14,15 +14,12 @@ return new class extends Migration
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->foreignId('product_category_id')->constrained('product_categories')->restrictOnDelete();
-            $table->foreignId('unit_id')->nullable()->constrained('units')->nullOnDelete();
             $table->string('name');
-            $table->string('sku')->unique();
-            $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->string('code', 80)->unique();
+            $table->decimal('amount', 12, 2)->default(0);
             $table->timestamps();
 
-            $table->index(['product_category_id', 'is_active']);
-            $table->index('unit_id');
+            $table->index('product_category_id');
         });
     }
 

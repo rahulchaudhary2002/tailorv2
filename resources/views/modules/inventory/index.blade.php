@@ -6,7 +6,7 @@
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Inventory Management</h1>
-        <p>Track stock-in, stock-out, transfer, and adjustments with location, vendor, and variant-level consistency.</p>
+        <p>Track stock-in, stock-out, transfer, and adjustments with location and vendor consistency.</p>
     </div>
 </div>
 
@@ -37,7 +37,7 @@
     </div>
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product, variant SKU, or location...', 'reporting' => $reporting])
+@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product code/name or location...', 'reporting' => $reporting])
 
 <div class="app-tabs" role="tablist" aria-label="Inventory sections">
     <button type="button" class="app-tab-button js-page-tab is-active" data-tab-target="transaction" aria-selected="true">Transaction</button>
@@ -124,25 +124,8 @@
                     <option value="">Select Product</option>
                     @foreach ($products as $product)
                         <option value="{{ $product->id }}" @selected((string) old('product_id') === (string) $product->id)>
-                            {{ $product->name }} ({{ $product->sku }}) - Unit: {{ $product->unit?->symbol ?: ($product->unit?->name ?: 'N/A') }}
+                            {{ $product->name }} ({{ $product->code }})
                         </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="outlet-form-group">
-                <label for="product_variant_id">Variant SKU (Optional)</label>
-                <select id="product_variant_id" name="product_variant_id" class="outlet-input">
-                    <option value="">No Variant</option>
-                    @foreach ($products as $product)
-                        @foreach ($product->variants as $variant)
-                            <option value="{{ $variant->id }}" data-product-id="{{ $product->id }}" @selected((string) old('product_variant_id') === (string) $variant->id)>
-                                {{ $variant->sku }} - {{ $product->name }}
-                                @if($variant->size) / Size: {{ $variant->size }} @endif
-                                @if($variant->color) / Color: {{ $variant->color }} @endif
-                                @if($variant->material) / Material: {{ $variant->material }} @endif
-                            </option>
-                        @endforeach
                     @endforeach
                 </select>
             </div>
@@ -258,7 +241,7 @@
             <tbody>
                 @forelse ($alerts as $alert)
                     <tr>
-                        <td>{{ $alert->product?->name }} ({{ $alert->product?->sku }})</td>
+                        <td>{{ $alert->product?->name }} ({{ $alert->product?->code }})</td>
                         <td>{{ $alert->location?->name }} ({{ $alert->location?->type }})</td>
                         <td>{{ number_format((float) $alert->current_qty, 2) }}</td>
                         <td>{{ number_format((float) $alert->min_qty, 2) }}</td>
@@ -289,7 +272,6 @@
                     <th>Type</th>
                     <th>Vendor</th>
                     <th>Product</th>
-                    <th>Variant SKU</th>
                     <th>On Hand</th>
                     <th>Reserved</th>
                     <th>Unit</th>
@@ -306,7 +288,6 @@
                         <td>{{ $stock->location?->type ?: '-' }}</td>
                         <td>{{ $stock->vendor?->name ?: '-' }}</td>
                         <td>{{ $stock->product?->name ?: '-' }}</td>
-                        <td>{{ $stock->variant?->sku ?: '-' }}</td>
                         <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
                         <td>{{ number_format((float) $stock->reserved_qty, 2) }}</td>
                         <td>{{ $stock->unit?->symbol ?: ($stock->unit?->name ?: '-') }}</td>
@@ -317,7 +298,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12" class="empty">No inventory records found.</td>
+                        <td colspan="11" class="empty">No inventory records found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -344,7 +325,6 @@
         const fromLocation = document.getElementById('from_location_id');
         const toLocation = document.getElementById('to_location_id');
         const product = document.querySelector('.js-inventory-product-select');
-        const variant = document.getElementById('product_variant_id');
         const adjustmentType = document.getElementById('adjustment_type');
         const setReorderLevel = document.getElementById('set_reorder_level');
         const reorderMinQty = document.getElementById('reorder_min_qty');
@@ -437,31 +417,7 @@
             }
         };
 
-        const applyDependentData = () => {
-            const selectedProductId = product?.value || '';
-            if (!variant) {
-                return;
-            }
-
-            const options = Array.from(variant.options);
-            options.forEach((option, index) => {
-                if (index === 0) {
-                    option.hidden = false;
-                    option.disabled = false;
-                    return;
-                }
-
-                const productId = option.dataset.productId || '';
-                const show = selectedProductId !== '' && productId === selectedProductId;
-                option.hidden = !show;
-                option.disabled = !show;
-            });
-
-            const selected = variant.options[variant.selectedIndex];
-            if (selected && (selected.hidden || selected.disabled)) {
-                variant.value = '';
-            }
-        };
+        const applyDependentData = () => {};
 
         const applyVisibility = () => {
             const selectedTrx = (trxType.value || '').toLowerCase();

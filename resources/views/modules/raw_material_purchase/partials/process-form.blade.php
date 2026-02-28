@@ -30,17 +30,7 @@
 
         <div class="outlet-form-group">
             <label>Raw Material</label>
-            <input type="text" class="outlet-input" value="{{ $purchase->product?->name }} ({{ $purchase->product?->sku }})" readonly>
-        </div>
-
-        <div class="outlet-form-group">
-            <label>Variant</label>
-            <input
-                type="text"
-                class="outlet-input"
-                value="{{ $purchase->variant?->sku ?: 'No Variant' }}"
-                readonly
-            >
+            <input type="text" class="outlet-input" value="{{ $purchase->product?->name }} ({{ $purchase->product?->code }})" readonly>
         </div>
 
         <div class="outlet-form-group">

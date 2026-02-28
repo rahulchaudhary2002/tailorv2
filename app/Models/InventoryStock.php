@@ -9,7 +9,6 @@ class InventoryStock extends Model
     protected $fillable = [
         'location_id',
         'product_id',
-        'product_variant_id',
         'vendor_id',
         'unit_id',
         'on_hand_qty',
@@ -35,11 +34,6 @@ class InventoryStock extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
-    }
-
-    public function variant()
-    {
-        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
     public function unit()

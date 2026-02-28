@@ -18,12 +18,6 @@ return new class extends Migration
                 ->constrained('products')
                 ->nullOnDelete();
 
-            $table->foreignId('target_variant_id')
-                ->nullable()
-                ->after('target_product_id')
-                ->constrained('product_variants')
-                ->nullOnDelete();
-
             $table->index(['reference_type', 'target_product_id']);
         });
     }
@@ -35,7 +29,6 @@ return new class extends Migration
     {
         Schema::table('inventory_transactions', function (Blueprint $table) {
             $table->dropIndex(['reference_type', 'target_product_id']);
-            $table->dropConstrainedForeignId('target_variant_id');
             $table->dropConstrainedForeignId('target_product_id');
         });
     }

@@ -5,7 +5,6 @@ namespace App\Http\Requests\Order;
 use App\Models\Order;
 use App\Models\ProductCategory;
 use App\Models\GarmentTypeTailoringPackage;
-use App\Models\ProductVariant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -43,13 +42,11 @@ class StoreRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_category' => ['required', 'string', Rule::in(['custom', 'fabric', 'readymade'])],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'items.*.product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.custom.garment_type_id' => ['nullable', 'integer', 'exists:garment_types,id'],
             'items.*.custom.fabric_source' => ['nullable', 'string', Rule::in(['own', 'stock'])],
             'items.*.custom.fabric_product_id' => ['nullable', 'integer', 'exists:products,id'],
-            'items.*.custom.fabric_product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'items.*.custom.fabric_quantity' => ['nullable', 'numeric', 'min:0.01'],
             'items.*.custom.design_note' => ['nullable', 'string', 'max:1000'],
             'items.*.custom.design_images' => ['nullable', 'array'],
@@ -96,16 +93,9 @@ class StoreRequest extends FormRequest
                 ->get(['id', 'product_category_id'])
                 ->keyBy('id');
 
-            $productsWithVariants = ProductVariant::query()
-                ->whereIn('product_id', $productIds)
-                ->distinct()
-                ->pluck('product_id')
-                ->map(fn ($id) => (int) $id);
-
             foreach ($items as $index => $item) {
                 $itemCategory = (string) ($item['item_category'] ?? '');
                 $productId = (int) ($item['product_id'] ?? 0);
-                $variantId = (int) ($item['product_variant_id'] ?? 0);
 
                 if ($itemCategory === 'custom') {
                     $garmentTypeId = (int) data_get($item, 'custom.garment_type_id', 0);
@@ -164,7 +154,6 @@ class StoreRequest extends FormRequest
 
                     if ($fabricSource === 'stock') {
                         $fabricProductId = (int) data_get($item, 'custom.fabric_product_id', 0);
-                        $fabricVariantId = (int) data_get($item, 'custom.fabric_product_variant_id', 0);
                         $fabricQty = (float) data_get($item, 'custom.fabric_quantity', 0);
                         $fabricProduct = $products->get($fabricProductId);
 
@@ -176,21 +165,6 @@ class StoreRequest extends FormRequest
 
                         if ($fabricQty <= 0) {
                             $validator->errors()->add("items.{$index}.custom.fabric_quantity", 'Fabric quantity must be greater than zero when using stock.');
-                        }
-
-                        if ($fabricVariantId < 1 && $productsWithVariants->contains($fabricProductId)) {
-                            $validator->errors()->add("items.{$index}.custom.fabric_product_variant_id", 'Variant is required for selected stock fabric product.');
-                        }
-
-                        if ($fabricVariantId > 0) {
-                            $belongsToFabricProduct = ProductVariant::query()
-                                ->whereKey($fabricVariantId)
-                                ->where('product_id', $fabricProductId)
-                                ->exists();
-
-                            if (!$belongsToFabricProduct) {
-                                $validator->errors()->add("items.{$index}.custom.fabric_product_variant_id", 'Selected stock fabric variant does not belong to selected product.');
-                            }
                         }
                     }
 
@@ -216,23 +190,6 @@ class StoreRequest extends FormRequest
                     $validator->errors()->add("items.{$index}.product_id", 'Readymade category item cannot use a fabric product.');
                 }
 
-                if ($variantId < 1 && $productsWithVariants->contains($productId)) {
-                    $validator->errors()->add("items.{$index}.product_variant_id", 'Variant is required for products that have variants.');
-                    continue;
-                }
-
-                if ($variantId < 1) {
-                    continue;
-                }
-
-                $belongsToProduct = ProductVariant::query()
-                    ->whereKey($variantId)
-                    ->where('product_id', $productId)
-                    ->exists();
-
-                if (!$belongsToProduct) {
-                    $validator->errors()->add("items.{$index}.product_variant_id", 'Selected variant does not belong to the selected product.');
-                }
             }
 
             $advanceAmount = (float) ($this->input('advance_payment_amount') ?? 0);

@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('inventory_transaction_id')->constrained('inventory_transactions')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
-            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->decimal('qty', 12, 2);
             $table->decimal('unit_cost', 12, 2)->nullable();
             $table->decimal('total_cost', 12, 2)->nullable();

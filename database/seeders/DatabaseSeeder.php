@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             InventoryTypeSeeder::class,
             UnitSeeder::class,
             ProductSeeder::class,
-            ProductVariantSeeder::class,
             GarmentTypeSeeder::class,
             CustomerSeeder::class,
             VendorTypeSeeder::class,
@@ -31,7 +30,6 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             OutletUserSeeder::class,
             UserRoleSeeder::class,
-            DashboardTestingDataSeeder::class,
         ]);
     }
 }

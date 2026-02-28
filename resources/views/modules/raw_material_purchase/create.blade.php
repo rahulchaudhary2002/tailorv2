@@ -27,19 +27,6 @@
     $productPayload = $products->map(function ($product) {
         return [
             'id' => $product->id,
-            'variants' => $product->variants->map(function ($variant) {
-                $parts = array_filter([
-                    $variant->sku,
-                    $variant->size,
-                    $variant->color,
-                    $variant->material,
-                ]);
-
-                return [
-                    'id' => $variant->id,
-                    'label' => implode(' | ', $parts),
-                ];
-            })->values(),
         ];
     })->values();
 @endphp
@@ -62,12 +49,10 @@
 
             rows.forEach((row, index) => {
                 const product = row.querySelector('.item-product');
-                const variant = row.querySelector('.item-variant');
                 const qty = row.querySelector('.item-quantity');
                 const unitPrice = row.querySelector('.item-unit-price');
 
                 if (product) product.name = `items[${index}][product_id]`;
-                if (variant) variant.name = `items[${index}][product_variant_id]`;
                 if (qty) qty.name = `items[${index}][quantity]`;
                 if (unitPrice) unitPrice.name = `items[${index}][unit_price]`;
             });
@@ -105,35 +90,6 @@
             }
         }
 
-        function updateVariantsForRow(row) {
-            const productSelect = row.querySelector('.item-product');
-            const variantSelect = row.querySelector('.item-variant');
-
-            if (!productSelect || !variantSelect) {
-                return;
-            }
-
-            const selectedProductId = String(productSelect.value || '');
-            const product = productMap.get(selectedProductId);
-            const currentSelected = variantSelect.dataset.selected || variantSelect.value || '';
-
-            variantSelect.innerHTML = '<option value="">No Variant</option>';
-
-            if (product && Array.isArray(product.variants)) {
-                product.variants.forEach((variant) => {
-                    const option = document.createElement('option');
-                    option.value = String(variant.id);
-                    option.textContent = variant.label;
-                    if (String(variant.id) === String(currentSelected)) {
-                        option.selected = true;
-                    }
-                    variantSelect.appendChild(option);
-                });
-            }
-
-            variantSelect.dataset.selected = '';
-        }
-
         function updateRowTotal(row) {
             const qty = Number(row.querySelector('.item-quantity')?.value || 0);
             const unitPrice = Number(row.querySelector('.item-unit-price')?.value || 0);
@@ -166,9 +122,7 @@
             const unitPriceInput = row.querySelector('.item-unit-price');
             const removeBtn = row.querySelector('.remove-item-row');
 
-            bindProductChange(productSelect, () => {
-                updateVariantsForRow(row);
-            });
+            bindProductChange(productSelect, () => {});
 
             qtyInput?.addEventListener('input', () => {
                 updateRowTotal(row);
@@ -203,7 +157,6 @@
             body.appendChild(row);
             initPurchaseMaterialSelect2(row);
             bindRowEvents(row);
-            updateVariantsForRow(row);
             reindexRows();
             syncTotals();
         }
@@ -212,7 +165,6 @@
 
         body.querySelectorAll('.purchase-item-row').forEach((row) => {
             bindRowEvents(row);
-            updateVariantsForRow(row);
         });
 
         initPurchaseMaterialSelect2(document);

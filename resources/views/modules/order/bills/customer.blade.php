@@ -48,6 +48,9 @@
                 @foreach ($items as $item)
                     @php
                         $isCustom = (string) $item->item_category === 'custom';
+                        $quantityUnit = $isCustom
+                            ? (string) data_get($item->custom_details, 'quantity_unit', 'pcs')
+                            : ((string) $item->item_category === 'fabric' ? 'm' : 'pcs');
                         $itemName = $isCustom
                             ? (data_get($item->custom_details, 'garment_title') ?: 'Custom Garment')
                             : ($item->product?->name ?: 'Product');
@@ -55,7 +58,7 @@
                     <tr>
                         <td>{{ $itemName }}</td>
                         <td>{{ ucfirst((string) $item->item_category) }}</td>
-                        <td class="bill-right">{{ number_format((float) $item->quantity, 2) }} {{ $item->unit?->symbol ?: data_get($item->custom_details, 'quantity_unit', '') }}</td>
+                        <td class="bill-right">{{ number_format((float) $item->quantity, 2) }} {{ $quantityUnit }}</td>
                         <td class="bill-right">{{ number_format((float) $item->unit_price, 2) }}</td>
                         <td class="bill-right">{{ number_format((float) $item->line_total, 2) }}</td>
                     </tr>
@@ -149,8 +152,8 @@
                         <tr>
                             <td>{{ $item->product?->name ?: '-' }}</td>
                             <td>Stock</td>
-                            <td>{{ $item->variant?->material ?: ($item->product?->sku ?: '-') }}</td>
-                            <td>{{ number_format((float) $item->quantity, 2) }} {{ $item->unit?->symbol ?: '' }}</td>
+                            <td>{{ $item->product?->code ?: '-' }}</td>
+                            <td>{{ number_format((float) $item->quantity, 2) }} {{ data_get($item->custom_details, 'quantity_unit', '') }}</td>
                         </tr>
                     @endif
                 @empty

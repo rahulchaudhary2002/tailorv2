@@ -29,15 +29,13 @@ class ManufactureUnitController extends Controller
             ->whereHas('location', function ($query) {
                 $query->whereIn('type', ['warehouse', 'factory']);
             })
-            ->with(['product:id,name,sku,product_category_id', 'product.category:id,slug', 'variant:id,sku', 'location:id,name,type', 'unit:id,name,symbol']);
+            ->with(['product:id,name,code,product_category_id', 'product.category:id,slug', 'location:id,name,type', 'unit:id,name,symbol']);
 
         if ($q !== '') {
             $stocksQuery->where(function ($query) use ($q): void {
                 $query->whereHas('product', function ($productQuery) use ($q): void {
                     $productQuery->where('name', 'like', '%' . $q . '%')
-                        ->orWhere('sku', 'like', '%' . $q . '%');
-                })->orWhereHas('variant', function ($variantQuery) use ($q): void {
-                    $variantQuery->where('sku', 'like', '%' . $q . '%');
+                        ->orWhere('code', 'like', '%' . $q . '%');
                 })->orWhereHas('location', function ($locationQuery) use ($q): void {
                     $locationQuery->where('name', 'like', '%' . $q . '%');
                 });
@@ -77,13 +75,12 @@ class ManufactureUnitController extends Controller
         ];
 
         $productionProducts = Product::query()
-            ->with(['category:id,slug', 'unit:id,name,symbol', 'variants:id,product_id,sku,size,color,material'])
+            ->with(['category:id,slug'])
             ->whereHas('category', function ($query) {
                 $query->whereIn('slug', ['ready-made', 'accessories']);
             })
-            ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'unit_id', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'product_category_id']);
 
         $productionLogs = InventoryTransaction::query()
             ->whereHas('inventoryType', function ($query) {
@@ -93,8 +90,7 @@ class ManufactureUnitController extends Controller
             ->with([
                 'toLocation:id,name,type',
                 'creator:id,name',
-                'items.product:id,name,sku',
-                'items.variant:id,sku',
+                'items.product:id,name,code',
             ])
             ->latest('trx_date')
             ->latest()
@@ -133,10 +129,8 @@ class ManufactureUnitController extends Controller
             ->with([
                 'fromLocation:id,name,type',
                 'creator:id,name',
-                'items.product:id,name,sku',
-                'items.variant:id,sku',
-                'targetProduct:id,name,sku',
-                'targetVariant:id,sku',
+                'items.product:id,name,code',
+                'targetProduct:id,name,code',
             ])
             ->latest('trx_date')
             ->latest()
@@ -150,11 +144,11 @@ class ManufactureUnitController extends Controller
             ->where('reference_type', 'production_transfer')
             ->where('status', InventoryTransaction::STATUS_PROGRESS)
             ->whereNotNull('target_product_id')
-            ->with(['targetProduct:id,name,sku', 'targetVariant:id,sku'])
+            ->with(['targetProduct:id,name,code'])
             ->latest('trx_date')
             ->latest()
             ->limit(100)
-            ->get(['id', 'trx_date', 'status', 'target_product_id', 'target_variant_id']);
+            ->get(['id', 'trx_date', 'status', 'target_product_id']);
 
         return view('modules.manufacture_unit.index', compact('stocks', 'stats', 'productionProducts', 'productionLogs', 'productionTransfers', 'availableProductionTransfers', 'finalGoodsTransferLocations', 'reporting'));
     }
@@ -185,13 +179,8 @@ class ManufactureUnitController extends Controller
                 ->with('error', 'Transfer for production is allowed only to ready-made or accessories goods.');
         }
 
-        $targetVariantId = !empty($validated['target_variant_id']) ? (int) $validated['target_variant_id'] : null;
-        $targetVariant = $targetVariantId
-            ? $targetProduct->variants()->find($targetVariantId)
-            : null;
-
         try {
-            DB::transaction(function () use ($stock, $validated, $quantity, $inventoryTypeId, $targetProduct, $targetVariant): void {
+            DB::transaction(function () use ($stock, $validated, $quantity, $inventoryTypeId, $targetProduct): void {
                 $lockedStock = InventoryStock::query()
                     ->with('location:id,type')
                     ->lockForUpdate()
@@ -209,10 +198,7 @@ class ManufactureUnitController extends Controller
                 $lockedStock->on_hand_qty = $availableQty - $quantity;
                 $lockedStock->save();
 
-                $targetLabel = $targetProduct->name . ' (' . $targetProduct->sku . ')';
-                if ($targetVariant) {
-                    $targetLabel .= ' - Variant: ' . $targetVariant->sku;
-                }
+                $targetLabel = $targetProduct->name . ' (' . $targetProduct->code . ')';
 
                 $notes = trim((string) ($validated['notes'] ?? ''));
                 if ($notes !== '') {
@@ -227,7 +213,6 @@ class ManufactureUnitController extends Controller
                     'reference_type' => 'production_transfer',
                     'reference_id' => $lockedStock->id,
                     'target_product_id' => $targetProduct->id,
-                    'target_variant_id' => $targetVariant?->id,
                     'from_location_id' => $lockedStock->location_id,
                     'to_location_id' => null,
                     'vendor_id' => $lockedStock->vendor_id,
@@ -239,13 +224,12 @@ class ManufactureUnitController extends Controller
                 $unitCost = (float) $lockedStock->avg_cost;
                 $transaction->items()->create([
                     'product_id' => $lockedStock->product_id,
-                    'product_variant_id' => $lockedStock->product_variant_id,
                     'qty' => $quantity,
                     'unit_cost' => $unitCost,
                     'total_cost' => $quantity * $unitCost,
                 ]);
 
-                if ($lockedStock->location->type === InventoryLocation::TYPE_FACTORY && $lockedStock->product_variant_id === null) {
+                if ($lockedStock->location->type === InventoryLocation::TYPE_FACTORY) {
                     $legacyStock = ManufactureUnitStock::query()->firstOrCreate(
                         ['product_id' => $lockedStock->product_id],
                         ['stock_quantity' => 0]
@@ -330,11 +314,10 @@ class ManufactureUnitController extends Controller
                     [
                         'location_id' => (int) $destinationLocation->id,
                         'product_id' => (int) $sourceStock->product_id,
-                        'product_variant_id' => $sourceStock->product_variant_id,
                         'vendor_id' => $sourceStock->vendor_id,
                     ],
                     [
-                        'unit_id' => $sourceStock->unit_id,
+                        'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
                         'avg_cost' => $unitCost,
@@ -350,7 +333,7 @@ class ManufactureUnitController extends Controller
 
                 $targetStock->avg_cost = $targetNewQty > 0 ? (($targetCurrentValue + $incomingValue) / $targetNewQty) : 0;
                 $targetStock->on_hand_qty = $targetNewQty;
-                $targetStock->unit_id = $sourceStock->unit_id;
+                $targetStock->unit_id = null;
                 $targetStock->base_price = (float) $sourceStock->base_price;
                 $targetStock->special_price = $sourceStock->special_price;
                 $targetStock->save();
@@ -375,13 +358,12 @@ class ManufactureUnitController extends Controller
 
                 $transaction->items()->create([
                     'product_id' => (int) $sourceStock->product_id,
-                    'product_variant_id' => $sourceStock->product_variant_id,
                     'qty' => $quantity,
                     'unit_cost' => $unitCost,
                     'total_cost' => $quantity * $unitCost,
                 ]);
 
-                if ($sourceStock->product_variant_id === null) {
+                if (true) {
                     $legacyStock = ManufactureUnitStock::query()->firstOrCreate(
                         ['product_id' => (int) $sourceStock->product_id],
                         ['stock_quantity' => 0]
@@ -493,15 +475,9 @@ class ManufactureUnitController extends Controller
                     throw new \RuntimeException('Selected transfer has no target finished good. Create a new transfer with target product.');
                 }
 
-                if (!$product->unit_id) {
-                    throw new \RuntimeException('Target product has no measurement unit. Set product unit first.');
-                }
-
                 if (!in_array($product->category?->slug, ['ready-made', 'accessories'], true)) {
                     throw new \RuntimeException('Transfer target must be ready-made or accessories.');
                 }
-
-                $variantId = $transfer->target_variant_id ? (int) $transfer->target_variant_id : null;
 
                 $transaction = InventoryTransaction::query()->create([
                     'inventory_type_id' => $inventoryTypeId,
@@ -519,7 +495,6 @@ class ManufactureUnitController extends Controller
 
                 $transaction->items()->create([
                     'product_id' => $product->id,
-                    'product_variant_id' => $variantId,
                     'qty' => $qty,
                     'unit_cost' => $unitCost,
                     'total_cost' => $unitCost !== null ? ($qty * $unitCost) : null,
@@ -529,11 +504,10 @@ class ManufactureUnitController extends Controller
                     [
                         'location_id' => $location->id,
                         'product_id' => $product->id,
-                        'product_variant_id' => $variantId,
                         'vendor_id' => null,
                     ],
                     [
-                        'unit_id' => $product->unit_id,
+                        'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
                         'avg_cost' => 0,
@@ -544,7 +518,7 @@ class ManufactureUnitController extends Controller
 
                 $currentQty = (float) $stock->on_hand_qty;
                 $newQty = $currentQty + $qty;
-                $stock->unit_id = $product->unit_id;
+                $stock->unit_id = null;
 
                 if ($unitCost !== null) {
                     $currentValue = $currentQty * (float) $stock->avg_cost;
@@ -557,7 +531,7 @@ class ManufactureUnitController extends Controller
                 $stock->special_price = $specialPrice;
                 $stock->save();
 
-                if ($location->type === InventoryLocation::TYPE_FACTORY && $variantId === null) {
+                if ($location->type === InventoryLocation::TYPE_FACTORY) {
                     $legacyStock = ManufactureUnitStock::query()->firstOrCreate(
                         ['product_id' => $product->id],
                         ['stock_quantity' => 0]
@@ -639,7 +613,6 @@ class ManufactureUnitController extends Controller
                 $sourceStock = InventoryStock::query()
                     ->where('location_id', $sourceLocationId)
                     ->where('product_id', (int) $outputItem->product_id)
-                    ->where('product_variant_id', $outputItem->product_variant_id)
                     ->whereNull('vendor_id')
                     ->lockForUpdate()
                     ->first();
@@ -661,11 +634,10 @@ class ManufactureUnitController extends Controller
                     [
                         'location_id' => $outletLocation->id,
                         'product_id' => (int) $outputItem->product_id,
-                        'product_variant_id' => $outputItem->product_variant_id,
                         'vendor_id' => null,
                     ],
                     [
-                        'unit_id' => $sourceStock->unit_id,
+                        'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
                         'avg_cost' => $unitCost,
@@ -680,7 +652,7 @@ class ManufactureUnitController extends Controller
                 $incomingValue = $quantity * $unitCost;
                 $targetStock->avg_cost = $targetNewQty > 0 ? (($targetCurrentValue + $incomingValue) / $targetNewQty) : 0;
                 $targetStock->on_hand_qty = $targetNewQty;
-                $targetStock->unit_id = $sourceStock->unit_id;
+                $targetStock->unit_id = null;
                 $targetStock->base_price = (float) $sourceStock->base_price;
                 $targetStock->special_price = $sourceStock->special_price;
                 $targetStock->save();
@@ -705,13 +677,12 @@ class ManufactureUnitController extends Controller
 
                 $distributionTransaction->items()->create([
                     'product_id' => (int) $outputItem->product_id,
-                    'product_variant_id' => $outputItem->product_variant_id,
                     'qty' => $quantity,
                     'unit_cost' => $unitCost,
                     'total_cost' => $quantity * $unitCost,
                 ]);
 
-                if ($lockedOutput->toLocation?->type === InventoryLocation::TYPE_FACTORY && $outputItem->product_variant_id === null) {
+                if ($lockedOutput->toLocation?->type === InventoryLocation::TYPE_FACTORY) {
                     $legacyStock = ManufactureUnitStock::query()->firstOrCreate(
                         ['product_id' => (int) $outputItem->product_id],
                         ['stock_quantity' => 0]

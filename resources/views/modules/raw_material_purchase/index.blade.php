@@ -17,7 +17,7 @@
     @endcanany
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $purchases, 'placeholder' => 'Search by vendor, product, SKU, bill no...', 'reporting' => $reporting])
+@include('includes.reporting-filter', ['paginator' => $purchases, 'placeholder' => 'Search by vendor, product, code, bill no...', 'reporting' => $reporting])
 
     <div class="table-card">
     @if (session('error'))
@@ -38,7 +38,6 @@
                     <th>Date</th>
                     <th>Vendor</th>
                     <th>Raw Material</th>
-                    <th>Variant</th>
                     <th>Quantity</th>
                     <th>Unit</th>
                     <th>Unit Price</th>
@@ -55,7 +54,6 @@
                         <td>{{ $purchase->purchased_at->format('M d, Y') }}</td>
                         <td>{{ $purchase->vendor?->name ?: '-' }}</td>
                         <td>{{ $purchase->product?->name ?: '-' }}</td>
-                        <td>{{ $purchase->variant?->sku ?: '-' }}</td>
                         <td>{{ $purchase->quantity }}</td>
                         <td>{{ $purchase->unit?->symbol ?: ($purchase->unit?->name ?: '-') }}</td>
                         <td>{{ number_format((float) $purchase->unit_price, 2) }}</td>
@@ -73,7 +71,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12" class="empty">No purchases found.</td>
+                        <td colspan="11" class="empty">No purchases found.</td>
                     </tr>
                 @endforelse
             </tbody>

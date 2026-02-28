@@ -9,7 +9,6 @@ class InventoryTransactionItem extends Model
     protected $fillable = [
         'inventory_transaction_id',
         'product_id',
-        'product_variant_id',
         'qty',
         'unit_cost',
         'total_cost',
@@ -31,8 +30,4 @@ class InventoryTransactionItem extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function variant()
-    {
-        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
-    }
 }

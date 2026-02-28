@@ -11,16 +11,11 @@
     </div>
 </div>
 
-<form action="{{ route('product.store') }}" method="POST" enctype="multipart/form-data">
+<form action="{{ route('product.store') }}" method="POST">
     @csrf
     @include('modules.product.partials.form', [
         'title' => 'Product Information',
         'submitLabel' => 'Create Product',
-        'units' => $units,
     ])
 </form>
-@endsection
-
-@section('page-specific-script')
-@include('modules.product.partials.dropzone-script')
 @endsection

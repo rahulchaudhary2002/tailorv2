@@ -3,10 +3,8 @@
 namespace App\Http\Requests\Inventory;
 
 use App\Models\InventoryTransaction;
-use App\Models\ProductVariant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class AdjustStockRequest extends FormRequest
 {
@@ -40,7 +38,6 @@ class AdjustStockRequest extends FormRequest
             'to_location_id' => ['nullable', 'integer', 'exists:inventory_locations,id'],
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'product_id' => ['required', 'integer', 'exists:products,id'],
-            'product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'adjustment_type' => ['nullable', 'in:add,remove,set'],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
@@ -51,39 +48,5 @@ class AdjustStockRequest extends FormRequest
             'reorder_qty' => ['nullable', 'numeric', 'gt:0', 'gte:reorder_min_qty'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator): void {
-            $productId = (int) $this->input('product_id', 0);
-            $variantId = (int) $this->input('product_variant_id', 0);
-
-            if ($productId < 1) {
-                return;
-            }
-
-            $productHasVariants = ProductVariant::query()
-                ->where('product_id', $productId)
-                ->exists();
-
-            if ($variantId < 1 && $productHasVariants) {
-                $validator->errors()->add('product_variant_id', 'Variant is required for products that have variants.');
-                return;
-            }
-
-            if ($variantId < 1) {
-                return;
-            }
-
-            $belongsToProduct = ProductVariant::query()
-                ->whereKey($variantId)
-                ->where('product_id', $productId)
-                ->exists();
-
-            if (!$belongsToProduct) {
-                $validator->errors()->add('product_variant_id', 'Selected variant does not belong to the selected product.');
-            }
-        });
     }
 }

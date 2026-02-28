@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\Unit;
 use Illuminate\Database\Seeder;
 
 class ProductSeeder extends Seeder
@@ -15,59 +14,47 @@ class ProductSeeder extends Seeder
     public function run(): void
     {
         $categoryIds = ProductCategory::query()->pluck('id', 'slug');
-        $unitIds = Unit::query()->pluck('id', 'code');
-
         $products = [
             [
                 'name' => 'Cotton Fabric Roll',
-                'sku' => 'FAB-COT-001',
+                'code' => 'FAB-COT-001',
                 'category_slug' => 'fabrics',
-                'unit_code' => 'METER',
-                'description' => 'Breathable cotton fabric for shirts and kurtas.',
-                'is_active' => true,
+                'amount' => 850,
             ],
             [
                 'name' => 'Linen Fabric Roll',
-                'sku' => 'FAB-LIN-001',
+                'code' => 'FAB-LIN-001',
                 'category_slug' => 'fabrics',
-                'unit_code' => 'METER',
-                'description' => 'Premium linen fabric for summer wear.',
-                'is_active' => true,
+                'amount' => 1200,
             ],
             [
                 'name' => 'Men Shirt Classic',
-                'sku' => 'RM-SHIRT-001',
+                'code' => 'RM-SHIRT-001',
                 'category_slug' => 'ready-made',
-                'unit_code' => 'INCH',
-                'description' => 'Classic fit ready-made men shirt.',
-                'is_active' => true,
+                'amount' => 1600,
             ],
             [
                 'name' => 'Designer Buttons Set',
-                'sku' => 'ACC-BTN-001',
+                'code' => 'ACC-BTN-001',
                 'category_slug' => 'accessories',
-                'unit_code' => 'CM',
-                'description' => 'Mixed designer button set for garments.',
-                'is_active' => true,
+                'amount' => 250,
             ],
         ];
 
         foreach ($products as $product) {
             $categoryId = $categoryIds->get($product['category_slug']);
-            $unitId = $unitIds->get($product['unit_code']);
 
-            if (!$categoryId || !$unitId) {
+            if (!$categoryId) {
                 continue;
             }
 
             Product::query()->updateOrCreate(
-                ['sku' => $product['sku']],
+                ['code' => $product['code']],
                 [
                     'product_category_id' => $categoryId,
-                    'unit_id' => $unitId,
                     'name' => $product['name'],
-                    'description' => $product['description'],
-                    'is_active' => $product['is_active'],
+                    'code' => $product['code'],
+                    'amount' => $product['amount'],
                 ]
             );
         }

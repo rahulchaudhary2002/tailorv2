@@ -11,18 +11,13 @@
     </div>
 </div>
 
-<form action="{{ route('product.update', $product) }}" method="POST" enctype="multipart/form-data">
+<form action="{{ route('product.update', $product) }}" method="POST">
     @csrf
     @method('PUT')
     @include('modules.product.partials.form', [
         'title' => 'Product Information',
         'submitLabel' => 'Save Changes',
         'product' => $product,
-        'units' => $units,
     ])
 </form>
-@endsection
-
-@section('page-specific-script')
-@include('modules.product.partials.dropzone-script')
 @endsection

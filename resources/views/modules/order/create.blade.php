@@ -5,32 +5,22 @@
 @section('content')
 @php
 // Build lightweight payloads for JS
-$productPayload = $products->map(function ($product) use ($productDefaultPrices, $variantDefaultPrices, $productAvailableQty, $variantAvailableQty) {
+$productPayload = $products->map(function ($product) use ($productDefaultPrices, $productAvailableQty) {
+    $isFabric = (string) ($product->category?->slug ?? '') === 'fabrics';
+
     return [
         'id' => $product->id,
         'name' => $product->name,
-        'sku' => $product->sku,
+        'code' => $product->code,
         'category' => $product->category?->slug, // expect 'fabrics' for fabric
-        'unitLabel' => $product->unit?->symbol ?: ($product->unit?->name ?: ''),
+        'unitLabel' => $isFabric ? 'm' : 'pcs',
         'availableQty' => array_key_exists($product->id, $productAvailableQty)
             ? (float) $productAvailableQty[$product->id]
             : 0.0,
         'defaultPrice' => array_key_exists($product->id, $productDefaultPrices)
             ? (float) $productDefaultPrices[$product->id]
             : null,
-        'variants' => $product->variants->map(function ($variant) use ($variantDefaultPrices, $variantAvailableQty) {
-            $parts = array_filter([$variant->sku, $variant->size, $variant->color, $variant->material]);
-            return [
-                'id' => $variant->id,
-                'label' => implode(' | ', $parts),
-                'availableQty' => array_key_exists($variant->id, $variantAvailableQty)
-                    ? (float) $variantAvailableQty[$variant->id]
-                    : 0.0,
-                'defaultPrice' => array_key_exists($variant->id, $variantDefaultPrices)
-                    ? (float) $variantDefaultPrices[$variant->id]
-                    : null,
-            ];
-        })->values(),
+        'variants' => [],
     ];
 })->values();
 
@@ -89,6 +79,16 @@ $customerLookupPayload = $customers->map(function ($customer) {
     {{-- Hidden container where bill items are converted to items[i][...] --}}
     <div id="itemsHiddenInputs"></div>
     <input type="hidden" id="print_bill" name="print_bill" value="{{ old('print_bill', '0') }}">
+    <input type="hidden" id="ordered_at" name="ordered_at" value="{{ old('ordered_at', now()->format('Y-m-d H:i:s')) }}">
+    <input type="hidden" id="delivery_due_at" name="delivery_due_at" value="{{ old('delivery_due_at', now()->addDays(7)->format('Y-m-d H:i:s')) }}">
+    <input type="hidden" id="status" name="status" value="{{ old('status', \App\Models\Order::STATUS_CONFIRMED) }}">
+    <input type="hidden" id="worker_id" name="worker_id" value="{{ old('worker_id') }}">
+    <input type="hidden" id="worker_deadline_at" name="worker_deadline_at" value="{{ old('worker_deadline_at') }}">
+    <input type="hidden" id="notes" name="notes" value="{{ old('notes') }}">
+    <input type="hidden" id="payment_status" name="payment_status" value="{{ old('payment_status', \App\Models\Order::PAYMENT_STATUS_UNPAID) }}">
+    <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method') }}">
+    <input type="hidden" id="advance_payment_amount" name="advance_payment_amount" value="{{ old('advance_payment_amount', '0') }}">
+    <input type="hidden" id="discount_amount" name="discount_amount" value="{{ old('discount_amount', '0') }}">
 
     <div class="tp-container">
         @if (session('error'))
@@ -108,254 +108,147 @@ $customerLookupPayload = $customers->map(function ($customer) {
             </div>
         @endif
 
-        <section class="tp-grid">
-            {{-- LEFT: Order entry --}}
-            <div class="tp-card">
-                <h2 class="tp-h2"><i class="fas fa-edit"></i> Order Entry</h2>
+        <section class="demo-section">
+            <h2><i class="fas fa-desktop"></i> Enhanced Live Billing Interface</h2>
+            <div class="instructions">
+                <i class="fas fa-info-circle"></i> <strong>New Features:</strong>
+                1. Select "Custom" product category to trigger measurement popup.
+                2. Tailoring charges appear separately in bill items (not included in product price).
+            </div>
 
-                <div class="tp-form-grid">
-                    <div class="tp-form-group">
-                        <label>Customer *</label>
-                        <div class="tp-customer-check-row">
+            <div class="demo-layout">
+            {{-- LEFT: Order entry --}}
+            <div class="order-entry">
+                <h3><i class="fas fa-edit"></i> Order Entry</h3>
+
+                <div class="customer-info">
+                    <div class="form-group">
+                        <label>Customer Mobile Number *</label>
+                        <div class="customer-check-row">
                             <input id="customerPhone" type="text" class="tp-input" placeholder="Customer mobile number">
-                            <button type="button" id="checkCustomerBtn" class="tp-btn tp-btn-secondary">Check</button>
+                            <button type="button" id="checkCustomerBtn" class="btn-secondary">Check</button>
                         </div>
-                        <div id="customerCheckMessage" class="tp-customer-check-message" style="display:none;"></div>
+                        <div id="customerCheckMessage" class="customer-check-message" style="display:none;"></div>
                         <input
                             id="customer_id"
                             name="customer_id"
                             type="hidden"
                             value="{{ old('customer_id', $selectedCustomerId ?? '') }}">
                     </div>
-
-                    <div class="tp-form-group">
-                        <label>Order Date *</label>
-                        <input
-                            id="ordered_at"
-                            name="ordered_at"
-                            type="datetime-local"
-                            class="tp-input"
-                            value="{{ old('ordered_at', now()->format('Y-m-d\TH:i')) }}"
-                            required>
-                    </div>
-
-                    <div class="tp-form-group">
-                        <label>Delivery Date *</label>
-                        <input
-                            id="delivery_due_at"
-                            name="delivery_due_at"
-                            type="datetime-local"
-                            class="tp-input"
-                            value="{{ old('delivery_due_at', now()->addDays(7)->format('Y-m-d\TH:i')) }}"
-                            required>
-                    </div>
-
-                    <div class="tp-form-group">
-                        <label>Status *</label>
-                        <select id="status" name="status" class="tp-input" required>
-                            @foreach (\App\Models\Order::creatableStatuses() as $status)
-                                <option value="{{ $status }}" @selected(old('status', \App\Models\Order::STATUS_CONFIRMED)===$status)>
-                                    {{ \App\Models\Order::statusLabels()[$status] ?? ucfirst($status) }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="tp-form-group">
-                        <label>Worker</label>
-                        <select id="worker_id" name="worker_id" class="tp-input">
-                            <option value="">Unassigned</option>
-                            @foreach (($workers ?? collect()) as $worker)
-                                <option value="{{ $worker->id }}" @selected((string) old('worker_id')===(string) $worker->id)>
-                                    {{ $worker->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="tp-form-group">
-                        <label>Worker Deadline</label>
-                        <input id="worker_deadline_at" name="worker_deadline_at" type="datetime-local" class="tp-input" value="{{ old('worker_deadline_at') }}">
-                    </div>
-
-                    <div class="tp-form-group tp-form-group-full">
-                        <label>Notes</label>
-                        <textarea id="notes" name="notes" class="tp-input" rows="3" placeholder="Optional order notes">{{ old('notes') }}</textarea>
-                    </div>
                 </div>
 
-                <hr class="tp-hr">
+                <div class="form-group">
+                    <label>Product Category *</label>
+                    <select id="productCategory" class="tp-input">
+                        <option value="fabric">Fabric</option>
+                        <option value="readymade">Ready-Made</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
 
-                <div class="tp-form-grid">
-                    <div class="tp-form-group">
-                        <label>Product Category *</label>
-                        <select id="productCategory" class="tp-input">
-                            <option value="fabric">Fabric</option>
-                            <option value="readymade">Ready-Made</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label>Select Product *</label>
+                    <select id="productSelect" class="tp-input">
+                        <option value="">-- Select or scan barcode --</option>
+                    </select>
+                </div>
 
-                    <div class="tp-form-group">
-                        <label>Select Product *</label>
-                        <select id="productSelect" class="tp-input">
-                            <option value="">-- Select Product --</option>
-                        </select>
-                    </div>
+                <select id="variantSelect" class="tp-input" disabled hidden>
+                    <option value="">No Variant</option>
+                </select>
 
-                    <div class="tp-form-group">
-                        <label>Variant</label>
-                        <select id="variantSelect" class="tp-input" disabled>
-                            <option value="">No Variant</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input id="quantity" type="number" min="1" step="1" class="tp-input" value="1">
+                    <small class="tp-hint" id="qtyUnitHint">-</small>
+                </div>
 
-                    <div class="tp-form-group">
-                        <label>Quantity</label>
-                        <input id="quantity" type="number" min="0.01" step="0.01" class="tp-input" value="1.00">
-                        <small class="tp-hint" id="qtyUnitHint">-</small>
-                    </div>
+                <div class="form-group">
+                    <label>Fabric Price (NPR)</label>
+                    <input id="unitPrice" type="number" min="0" step="0.01" class="tp-input" placeholder="Enter price per meter">
+                </div>
 
-                    <div class="tp-form-group">
-                        <label>Unit Price</label>
-                        <input id="unitPrice" type="number" min="0" step="0.01" class="tp-input" placeholder="Auto from default price">
-                        <small class="tp-hint">For custom: this is fabric/product price only. Tailoring is separate.</small>
-                    </div>
-
-                    <div class="tp-form-group tp-form-group-full">
-                        <button type="button" id="addToBill" class="tp-btn">
-                            <i class="fas fa-plus-circle"></i> Add to Bill
-                        </button>
-                    </div>
+                <div class="form-group">
+                    <button type="button" id="addToBill" class="tp-btn">
+                        <i class="fas fa-plus-circle"></i> Add to Bill
+                    </button>
                 </div>
             </div>
 
             {{-- RIGHT: Live bill --}}
-            <div class="tp-card" id="billPrintArea">
-                <div class="tp-bill-header">
-                    <div class="tp-bill-title" id="billType">Estimated Bill</div>
-                    <div class="tp-toggle">
+            <div class="live-bill" id="billPrintArea">
+                <div class="bill-header">
+                    <div class="bill-title" id="billType">Estimated Bill</div>
+                    <div class="toggle-switch">
                         <span>VAT (13%)</span>
-                        <label class="tp-switch">
+                        <label class="switch">
                             <input type="checkbox" id="vatToggle">
-                            <span class="tp-slider"></span>
+                            <span class="slider"></span>
                         </label>
                     </div>
                 </div>
 
-                <div class="tp-bill-customer">
+                <div class="customer-display">
                     <div><strong>Customer:</strong> <span id="billCustomer">-</span></div>
                 </div>
 
-                <div class="tp-bill-items" id="billItems"></div>
+                <div class="bill-items" id="billItems"></div>
 
-                <div class="tp-tailoring-breakdown" id="tailoringBreakdown" style="display:none;"></div>
+                <div class="tailoring-breakdown" id="tailoringBreakdown" style="display:none;"></div>
 
-                <div class="tp-discount">
-                    <h3 class="tp-h3"><i class="fas fa-tag"></i> Discount</h3>
-                    <div class="tp-discount-row">
+                <div class="discount-section">
+                    <h4><i class="fas fa-tag"></i> Discount</h4>
+                    <div class="discount-row">
                         <select id="discountType" class="tp-input">
                             <option value="none">No Discount</option>
                             <option value="flat">Flat Amount</option>
                             <option value="percent">Percentage (%)</option>
                         </select>
                         <input type="number" id="discountValue" class="tp-input" placeholder="Value" disabled>
-                        <button type="button" id="applyDiscount" class="tp-btn tp-btn-secondary">Apply</button>
+                        <button type="button" id="applyDiscount" class="btn-secondary">Apply</button>
                     </div>
-                    <div id="discountDisplay" class="tp-discount-display"></div>
+                    <div id="discountDisplay" class="discount-display"></div>
                 </div>
 
-                <div class="tp-summary">
-                    <div class="tp-row">
-                        <span>Subtotal (Fabric/Ready-made):</span>
+                <div class="bill-summary">
+                    <div class="summary-row">
+                        <span>Subtotal (Fabric & Ready-made):</span>
                         <span id="subtotalFabric">0.00</span>
                     </div>
-                    <div class="tp-row">
-                        <span>Subtotal (Custom products):</span>
+                    <div class="summary-row">
+                        <span>Subtotal (Custom Products):</span>
                         <span id="subtotalCustom">0.00</span>
                     </div>
-                    <div class="tp-row">
-                        <span>Tailoring charges:</span>
-                        <span id="tailoringTotal">0.00</span>
-                    </div>
-                    <div class="tp-row">
+                    <div class="summary-row">
                         <span>Discount:</span>
                         <span id="discountTotal">0.00</span>
                     </div>
-                    <div class="tp-row" id="vatRow" style="display:none;">
+                    <div class="summary-row">
+                        <span>Tailoring Charges:</span>
+                        <span id="tailoringTotal">0.00</span>
+                    </div>
+                    <div class="summary-row" id="vatRow" style="display:none;">
                         <span>VAT (13%):</span>
                         <span id="vatAmount">0.00</span>
                     </div>
-                    <div class="tp-row tp-total">
+                    <div class="summary-row total-row">
                         <span>Grand Total:</span>
                         <span id="grandTotal">0.00</span>
                     </div>
                 </div>
 
-                <div class="tp-payment">
-                    <h3 class="tp-h3"><i class="fas fa-wallet"></i> Payment Details</h3>
-                    <div class="tp-form-grid">
-                        <div class="tp-form-group">
-                            <label for="payment_status">Payment Status *</label>
-                            <select id="payment_status" name="payment_status" class="tp-input" required>
-                                @foreach (\App\Models\Order::availablePaymentStatuses() as $paymentStatus)
-                                    <option value="{{ $paymentStatus }}" @selected(old('payment_status', \App\Models\Order::PAYMENT_STATUS_UNPAID) === $paymentStatus)>
-                                        {{ ucfirst($paymentStatus) }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="tp-form-group">
-                            <label for="payment_method">Payment Method</label>
-                            <input
-                                id="payment_method"
-                                name="payment_method"
-                                type="text"
-                                class="tp-input"
-                                value="{{ old('payment_method') }}"
-                                placeholder="Cash, Card, Bank Transfer...">
-                        </div>
-                        <div class="tp-form-group">
-                            <label for="advance_payment_amount">Advance Payment</label>
-                            <input
-                                id="advance_payment_amount"
-                                name="advance_payment_amount"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                class="tp-input"
-                                value="{{ old('advance_payment_amount', '0') }}">
-                        </div>
-                    </div>
-                    <input
-                        id="discount_amount"
-                        name="discount_amount"
-                        type="hidden"
-                        value="{{ old('discount_amount', '0') }}">
-
-                    <div class="tp-summary" style="margin-top:10px;">
-                        <div class="tp-row">
-                            <span>Payable Amount:</span>
-                            <span id="payableAmount">NPR 0.00</span>
-                        </div>
-                        <div class="tp-row">
-                            <span>Due Amount:</span>
-                            <span id="dueAmount">NPR 0.00</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tp-actions">
-                    <button type="button" id="printBill" class="tp-btn tp-btn-secondary">
+                <div class="bill-actions">
+                    <button type="button" id="printBill" class="btn-success">
                         <i class="fas fa-print"></i> Print Bill
                     </button>
-                    <button type="submit" id="saveOrder" class="tp-btn tp-btn-success">
-                        <i class="fas fa-save"></i> Save Order
+                    <button type="submit" id="saveOrder" class="btn-secondary">
+                        <i class="fas fa-file-export"></i> Save Order
                     </button>
-                    <button type="button" id="clearBill" class="tp-btn tp-btn-danger">
-                        <i class="fas fa-trash-alt"></i> Clear
+                    <button type="button" id="clearBill" class="btn-danger">
+                        <i class="fas fa-trash-alt"></i> Clear Bill
                     </button>
                 </div>
+            </div>
             </div>
         </section>
     </div>
@@ -486,76 +379,81 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
 @section('page-specific-style')
 <style>
-/* (Your CSS unchanged – pasted exactly as you sent) */
-:root{--primary:#1a365d;--secondary:#2d4a7c;--accent:#c9a96e;--light:#f8f9fa;--dark:#343a40;--success:#28a745;--danger:#dc3545;--muted:#6c757d;--radius:10px;--shadow:0 4px 12px rgba(0,0,0,.10);}
-.tp-container{max-width:1400px;margin:0 auto;padding:18px;}
-.tp-alert{margin-top:16px;padding:12px 14px;border-radius:10px;}
+:root{--primary:#1a365d;--secondary:#2d4a7c;--accent:#c9a96e;--light:#f8f9fa;--dark:#343a40;--success:#28a745;--danger:#dc3545;--radius:8px;--shadow:0 4px 12px rgba(0,0,0,.1);}
+.tp-container{max-width:1400px;margin:0 auto;padding:20px;}
+.tp-alert{margin-top:16px;padding:12px 14px;border-radius:var(--radius);}
 .tp-alert-danger{background:#ffe8ea;color:#7a0b18;border:1px solid #ffccd1;}
 .tp-alert-success{background:#e7f7ed;color:#0d5a2b;border:1px solid #bfe8cf;}
-.tp-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
-@media(max-width:1024px){.tp-grid{grid-template-columns:1fr;}}
-.tp-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;}
-.tp-h2{margin:0 0 14px;color:var(--primary);border-bottom:2px solid #eee;padding-bottom:8px;}
-.tp-h2 i{color:var(--accent);margin-right:8px;}
-.tp-h3{margin:0 0 10px;color:var(--primary);}
-.tp-h3 i{color:var(--accent);margin-right:8px;}
-.tp-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
-.tp-form-group{display:flex;flex-direction:column;gap:6px;}
-.tp-form-group-full{grid-column:1/-1;}
-.tp-input{width:100%;padding:10px 12px;border:1px solid #cfd6df;border-radius:10px;font-size:14px;}
-.tp-customer-check-row{display:flex;gap:8px;align-items:center;}
-.tp-customer-check-row .tp-input{flex:1;}
-.tp-customer-check-message{font-size:12px;padding:6px 8px;border-radius:8px;background:#f3f6fb;color:#415265;border:1px solid #dbe4ef;}
+.demo-section{background:#fff;padding:25px;border-radius:var(--radius);box-shadow:var(--shadow);}
+.demo-layout{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px;}
+@media(max-width:1024px){.demo-layout{grid-template-columns:1fr;}}
+.order-entry{padding:20px;background:#f8f9fa;border-radius:var(--radius);border:1px solid #ddd;}
+.live-bill{padding:20px;background:#fff;border-radius:var(--radius);border:1px solid #ddd;box-shadow:0 0 15px rgba(0,0,0,.05);}
+h2,h3,h4{color:var(--primary);margin-bottom:15px;padding-bottom:8px;border-bottom:2px solid #eee;}
+h2 i,h3 i,h4 i{margin-right:10px;color:var(--accent);}
+.form-group{margin-bottom:15px;}
+label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
+.tp-input{width:100%;padding:10px 15px;border:1px solid #ccc;border-radius:var(--radius);font-size:1rem;}
 .tp-hint{color:#6a7785;font-size:12px;}
-.tp-btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:10px 12px;font-weight:600;cursor:pointer;transition:.2s;}
-.tp-btn:hover{background:var(--secondary);}
-.tp-btn-secondary{background:var(--muted);}
-.tp-btn-secondary:hover{background:#59626b;}
+.instructions{background:#f0f7ff;padding:15px;border-radius:var(--radius);margin-top:15px;border-left:4px solid #17a2b8;font-size:.9rem;}
+.customer-info{background:#f8f9fa;padding:15px;border-radius:var(--radius);margin-bottom:20px;}
+.customer-check-row{display:flex;gap:10px;}
+.customer-check-row .tp-input{flex:1;}
+.customer-check-message{font-size:.9rem;margin-top:10px;padding:10px;border-radius:var(--radius);border-left:4px solid var(--accent);}
+button,.tp-btn,.btn-secondary,.btn-success,.btn-danger{color:#fff;border:none;padding:12px 20px;border-radius:var(--radius);cursor:pointer;font-weight:600;transition:background-color .3s;}
+button,.tp-btn{background:var(--primary);}
+button:hover,.tp-btn:hover{background:var(--secondary);}
+.btn-secondary{background:#6c757d;}
+.btn-secondary:hover{background:#5a6268;}
+.btn-success{background:var(--success);}
+.btn-success:hover{background:#218838;}
+.btn-danger{background:var(--danger);}
+.btn-danger:hover{background:#c82333;}
+.tp-btn-secondary{background:#6c757d;}
+.tp-btn-secondary:hover{background:#5a6268;}
 .tp-btn-success{background:var(--success);}
 .tp-btn-success:hover{background:#218838;}
 .tp-btn-danger{background:var(--danger);}
 .tp-btn-danger:hover{background:#c82333;}
-.tp-hr{border:0;border-top:1px solid #eef1f5;margin:16px 0;}
-.tp-bill-header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--accent);padding-bottom:10px;margin-bottom:12px;}
-.tp-bill-title{font-size:18px;font-weight:800;color:var(--primary);}
-.tp-toggle{display:flex;gap:10px;align-items:center;font-size:13px;}
-.tp-switch{position:relative;display:inline-block;width:54px;height:28px;}
-.tp-switch input{opacity:0;width:0;height:0;}
-.tp-slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:30px;transition:.2s;}
-.tp-slider:before{content:"";position:absolute;height:20px;width:20px;left:4px;bottom:4px;background:#fff;border-radius:50%;transition:.2s;}
-.tp-switch input:checked+.tp-slider{background:var(--success);}
-.tp-switch input:checked+.tp-slider:before{transform:translateX(26px);}
-.tp-bill-customer{color:#2f3b47;font-size:14px;margin-bottom:10px;}
-.tp-bill-items{max-height:330px;overflow:auto;border:1px solid #eef1f5;border-radius:10px;padding:10px;background:#fbfcfe;}
-.tp-item{padding:10px 0;border-bottom:1px dashed #e7ecf2;}
-.tp-item:last-child{border-bottom:0;}
-.tp-item-top{display:flex;justify-content:space-between;gap:10px;}
-.tp-chip{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;margin-left:8px;}
-.tp-chip-fabric{background:#e3f2fd;color:#1565c0;}
-.tp-chip-ready{background:#e8f5e9;color:#2e7d32;}
-.tp-chip-custom{background:#f3e5f5;color:#7b1fa2;}
-.tp-item-sub{margin-top:4px;color:#6a7682;font-size:13px;}
-.tp-stitch-line{margin-top:6px;background:#f9f0ff;border-left:3px solid #7b1fa2;padding:8px 10px;border-radius:8px;font-size:13px;}
-.tp-item-actions{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;}
-.tp-item-actions button{padding:4px 10px;font-size:12px;border-radius:8px;}
-.tp-summary{border-top:2px solid var(--primary);padding-top:12px;margin-top:12px;}
-.tp-row{display:flex;justify-content:space-between;padding:6px 0;color:#2f3b47;}
-.tp-total{font-weight:900;font-size:16px;color:var(--primary);border-top:1px solid #e7ecf2;margin-top:6px;padding-top:10px;}
-.tp-discount,.tp-payment{margin-top:14px;background:#f8f9fa;border:1px solid #eef1f5;border-radius:10px;padding:12px;}
-.tp-discount-row{display:flex;gap:10px;align-items:center;}
-.tp-discount-row .tp-input{flex:1;}
-.tp-discount-display{margin-top:8px;color:var(--success);font-weight:700;}
-.tp-actions{margin-top:14px;display:flex;gap:10px;}
-.tp-actions>*{flex:1;}
-.tp-tailoring-breakdown{margin-top:10px;background:#f9f0ff;border:1px solid #eadcf6;border-left:4px solid #7b1fa2;border-radius:10px;padding:10px;}
-.tp-tailoring-breakdown h5{margin:0 0 8px;color:#7b1fa2;}
-.tp-tailoring-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#2f3b47;}
-.tp-tailoring-total{font-weight:900;border-top:1px solid #eadcf6;margin-top:6px;padding-top:8px;}
+.bill-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--accent);}
+.bill-title{font-size:1.5rem;font-weight:700;color:var(--primary);}
+.toggle-switch{display:flex;align-items:center;gap:10px;}
+.switch{position:relative;display:inline-block;width:60px;height:30px;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;transition:.4s;border-radius:34px;}
+.slider:before{position:absolute;content:"";height:22px;width:22px;left:4px;bottom:4px;background:#fff;transition:.4s;border-radius:50%;}
+.switch input:checked+.slider{background:var(--success);}
+.switch input:checked+.slider:before{transform:translateX(30px);}
+.customer-display{background:#f8f9fa;padding:15px;border-radius:var(--radius);margin-bottom:20px;}
+.bill-items{margin-bottom:20px;max-height:300px;overflow-y:auto;}
+.bill-item{padding:10px 0;border-bottom:1px dashed #eee;}
+.item-details{display:flex;justify-content:space-between;margin-bottom:5px;gap:12px;}
+.item-sub{font-size:.9rem;color:#666;margin-top:5px;}
+.stitching-detail{background:#f9f0ff;padding:8px 12px;border-radius:4px;margin-top:5px;font-size:.9rem;border-left:3px solid #7b1fa2;}
+.product-actions{display:flex;gap:10px;margin-top:8px;}
+.product-actions button{padding:4px 10px;font-size:.8rem;}
+.product-category{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:600;margin-left:10px;}
+.fabric-cat{background:#e3f2fd;color:#1565c0;}
+.ready-made-cat{background:#e8f5e9;color:#2e7d32;}
+.custom-cat{background:#f3e5f5;color:#7b1fa2;}
+.tailoring-breakdown{background:#f9f0ff;padding:12px;border-radius:var(--radius);margin-bottom:15px;}
+.tailoring-breakdown h5{margin:0 0 8px;color:#7b1fa2;}
+.tailoring-item{display:flex;justify-content:space-between;padding:4px 0;}
+.tailoring-total{font-weight:700;border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
+.discount-section{background:#f8f9fa;padding:15px;border-radius:var(--radius);margin-top:15px;}
+.discount-row{display:flex;gap:10px;margin-top:10px;}
+.discount-row .tp-input{flex:1;}
+.discount-display{margin-top:10px;font-weight:700;color:var(--success);}
+.bill-summary{border-top:2px solid var(--primary);padding-top:15px;margin-top:15px;}
+.summary-row{display:flex;justify-content:space-between;padding:8px 0;}
+.total-row{font-weight:700;font-size:1.2rem;color:var(--primary);border-top:2px solid #ddd;margin-top:10px;padding-top:10px;}
+.bill-actions{margin-top:20px;display:flex;gap:10px;}
+.bill-actions>*{flex:1;}
 .tp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;}
 .tp-modal{width:100%;max-width:860px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.30);overflow:hidden;}
 .tp-modal-header{background:var(--primary);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;}
-.tp-modal-header h3{margin:0;color:#fff;}
-.tp-modal-close{background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;}
+.tp-modal-header h3{margin:0;color:#fff;border:0;padding:0;}
+.tp-modal-close{background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
 .tp-modal-body{padding:16px;max-height:70vh;overflow:auto;}
 .tp-modal-info{background:#f8f9fa;border:1px solid #eef1f5;border-radius:10px;padding:10px;display:grid;gap:6px;}
 .tp-modal-section{margin-top:14px;border:1px solid #eef1f5;border-radius:10px;padding:12px;}
@@ -569,7 +467,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
 .tp-tailoring-option h5{margin:0 0 4px;color:#7b1fa2;}
 .tp-selected-package{margin-top:10px;background:#e1bee7;border-radius:10px;padding:10px;}
 .tp-modal-footer{padding:14px 16px;background:#f8f9fa;border-top:1px solid #eef1f5;display:flex;justify-content:flex-end;gap:10px;}
-@media print{body *{visibility:hidden !important;}#billPrintArea,#billPrintArea *{visibility:visible !important;}#billPrintArea{position:absolute !important;top:0;left:0;width:100% !important;max-width:100% !important;margin:0 !important;padding:0 !important;border:0 !important;box-shadow:none !important;background:#fff !important;}#billPrintArea .tp-actions,#billPrintArea .tp-toggle,#billPrintArea .tp-discount button,#billPrintArea #clearBill,#billPrintArea #printBill{display:none !important;}}
+@media print{body *{visibility:hidden !important;}#billPrintArea,#billPrintArea *{visibility:visible !important;}#billPrintArea{position:absolute !important;top:0;left:0;width:100% !important;max-width:100% !important;margin:0 !important;padding:0 !important;border:0 !important;box-shadow:none !important;background:#fff !important;}#billPrintArea .bill-actions,#billPrintArea .toggle-switch,#billPrintArea .discount-section button,#billPrintArea #clearBill,#billPrintArea #printBill{display:none !important;}}
 </style>
 @endsection
 
@@ -628,10 +526,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
     const tailoringTotalEl = document.getElementById('tailoringTotal');
     const discountTotalEl = document.getElementById('discountTotal');
     const grandTotalEl = document.getElementById('grandTotal');
-    const advancePaymentEl = document.getElementById('advance_payment_amount');
     const discountAmountInputEl = document.getElementById('discount_amount');
-    const payableAmountEl = document.getElementById('payableAmount');
-    const dueAmountEl = document.getElementById('dueAmount');
 
     const clearBillBtn = document.getElementById('clearBill');
     const printBillBtn = document.getElementById('printBill');
@@ -673,7 +568,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
     let latestGrandTotal = 0;
 
     // For modal add/edit
-    let pendingCustom = null; // {productId, variantId, qty, unitPrice, name, unitLabel, variantLabel}
+    let pendingCustom = null; // {productId, qty, unitPrice, name, unitLabel}
     let editingCustomIndex = -1;
 
     const customersByPhone = new Map();
@@ -705,12 +600,8 @@ $customerLookupPayload = $customers->map(function ($customer) {
     function updatePaymentSummary(discountAmount, grandTotal) {
         latestGrandTotal = Number(grandTotal || 0);
         const safeDiscount = Math.max(Number(discountAmount || 0), 0);
-        const advanceAmount = Math.max(Number(advancePaymentEl?.value || 0), 0);
-        const dueAmount = Math.max(latestGrandTotal - advanceAmount, 0);
 
         if (discountAmountInputEl) discountAmountInputEl.value = money(safeDiscount);
-        if (payableAmountEl) payableAmountEl.textContent = `NPR ${money(latestGrandTotal)}`;
-        if (dueAmountEl) dueAmountEl.textContent = `NPR ${money(dueAmount)}`;
     }
 
     function upsertCustomerIndex(customer) {
@@ -746,16 +637,14 @@ $customerLookupPayload = $customers->map(function ($customer) {
     }
 
     function getCategoryLabel(cat) {
-        if (cat === 'fabric') return ['Fabric', 'tp-chip tp-chip-fabric'];
-        if (cat === 'readymade') return ['Ready-Made', 'tp-chip tp-chip-ready'];
-        return ['Custom', 'tp-chip tp-chip-custom'];
+        if (cat === 'fabric') return ['Fabric', 'product-category fabric-cat'];
+        if (cat === 'readymade') return ['Ready-Made', 'product-category ready-made-cat'];
+        return ['Custom', 'product-category custom-cat'];
     }
 
     function getAvailableQtyForProduct(product) {
         if (!product) return 0;
-        const hasVariants = Boolean((product.variants || []).length);
-        if (!hasVariants) return Number(product.availableQty || 0);
-        return (product.variants || []).reduce((total, variant) => total + Number(variant.availableQty || 0), 0);
+        return Number(product.availableQty || 0);
     }
 
     function filterProductsByCategory(cat) {
@@ -768,13 +657,9 @@ $customerLookupPayload = $customers->map(function ($customer) {
         return products.filter(p => matchesCategory(p) && inStock(p));
     }
 
-    function resolveDefaultPrice(productId, variantId) {
+    function resolveDefaultPrice(productId) {
         const p = productMap.get(String(productId));
         if (!p) return 0;
-        if (variantId) {
-            const v = (p.variants || []).find(x => String(x.id) === String(variantId));
-            if (v && v.defaultPrice != null) return Number(v.defaultPrice);
-        }
         if (p.defaultPrice != null) return Number(p.defaultPrice);
         return 0;
     }
@@ -794,12 +679,9 @@ $customerLookupPayload = $customers->map(function ($customer) {
             const opt = document.createElement('option');
             opt.value = String(p.id);
             const available = money(getAvailableQtyForProduct(p));
-            opt.textContent = `${p.name} (${p.sku}) | Available: ${available}${p.unitLabel ? ' ' + p.unitLabel : ''}`;
+            opt.textContent = `${p.name} (${p.code}) | Available: ${available}${p.unitLabel ? ' ' + p.unitLabel : ''}`;
             productSelect.appendChild(opt);
         });
-
-        variantSelect.innerHTML = `<option value="">No Variant</option>`;
-        variantSelect.disabled = true;
 
         unitHint.textContent = '-';
         unitPriceInput.value = '';
@@ -808,39 +690,12 @@ $customerLookupPayload = $customers->map(function ($customer) {
     function updateVariantOptions() {
         const pid = productSelect.value;
         const p = productMap.get(String(pid));
-        variantSelect.innerHTML = '';
-
-        if (!p || !(p.variants || []).length) {
-            variantSelect.innerHTML = `<option value="">No Variant</option>`;
-            variantSelect.disabled = true;
-            unitHint.textContent = p ? `Available: ${money(Number(p.availableQty || 0))}${p.unitLabel ? ' ' + p.unitLabel : ''}` : '-';
-            unitPriceInput.value = money(resolveDefaultPrice(pid, ''));
-            return;
-        }
-
-        const inStockVariants = (p.variants || []).filter(v => Number(v.availableQty || 0) > 0);
-        if (!inStockVariants.length) {
-            variantSelect.innerHTML = `<option value="">Out of Stock</option>`;
-            variantSelect.disabled = true;
-            unitHint.textContent = 'All variants are out of stock in current outlet';
-            unitPriceInput.value = '';
-            return;
-        }
-
-        variantSelect.disabled = false;
-        inStockVariants.forEach(v => {
-            const opt = document.createElement('option');
-            opt.value = String(v.id);
-            opt.textContent = `${v.label} | Available: ${money(Number(v.availableQty || 0))}${p.unitLabel ? ' ' + p.unitLabel : ''}`;
-            variantSelect.appendChild(opt);
-        });
-
-        unitHint.textContent = p.unitLabel || '-';
-        unitPriceInput.value = money(resolveDefaultPrice(pid, variantSelect.value || ''));
+        unitHint.textContent = p ? `Available: ${money(Number(p.availableQty || 0))}${p.unitLabel ? ' ' + p.unitLabel : ''}` : '-';
+        unitPriceInput.value = money(resolveDefaultPrice(pid));
     }
 
     function updatePriceFromSelection() {
-        unitPriceInput.value = money(resolveDefaultPrice(productSelect.value, variantSelect.value));
+        unitPriceInput.value = money(resolveDefaultPrice(productSelect.value));
     }
 
     function selectedCustomFabricSource() {
@@ -872,10 +727,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
         }
 
         let availableQty = Number(product.availableQty || 0);
-        if ((product.variants || []).length) {
-            const selectedVariant = (product.variants || []).find(v => String(v.id) === String(pendingCustom.variantId || ''));
-            availableQty = Number(selectedVariant?.availableQty || 0);
-        }
 
         customStockFabricHint.textContent = `Available: ${money(availableQty)}${product.unitLabel ? ' ' + product.unitLabel : ''}`;
     }
@@ -1100,29 +951,28 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
             const [label, chipClass] = getCategoryLabel(item.category);
             const row = document.createElement('div');
-            row.className = 'tp-item';
+            row.className = 'bill-item';
 
-            const variantText = item.variantLabel ? ` | ${item.variantLabel}` : '';
             const unitLabel = item.unitLabel ? ` ${item.unitLabel}` : '';
 
             let measurementInfo = '';
             if (item.measurements && item.measurements.length) {
-                measurementInfo = `<div class="tp-item-sub"><i class="fas fa-ruler"></i> ${item.garmentTitle || 'Garment'} | ${item.measurements.slice(0,3).map(m => `${m.type}: ${m.measurement}${m.unit ? ' '+m.unit : ''}`).join(', ')}${item.measurements.length>3 ? ' ...' : ''}</div>`;
+                measurementInfo = `<div class="item-sub"><i class="fas fa-ruler"></i> ${item.garmentTitle || 'Garment'} | ${item.measurements.slice(0,3).map(m => `${m.type}: ${m.measurement}${m.unit ? ' '+m.unit : ''}`).join(', ')}${item.measurements.length>3 ? ' ...' : ''}</div>`;
             }
 
             row.innerHTML = `
-                <div class="tp-item-top">
+                <div class="item-details">
                     <div>
                         <div>
                             ${item.name}
                             <span class="${chipClass}">${label}</span>
-                            <div class="tp-item-sub">${money(item.qty)}${unitLabel} × NPR ${money(item.unitPrice)}${variantText}</div>
+                            <div class="item-sub">${money(item.qty)}${unitLabel} × NPR ${money(item.unitPrice)}</div>
                             ${measurementInfo}
-                            ${item.tailoring ? `<div class="tp-stitch-line"><i class="fas fa-cut"></i> <strong>Tailoring:</strong> ${item.tailoring.package} - NPR ${money(item.tailoring.amount)}</div>` : ''}
+                            ${item.tailoring ? `<div class="stitching-detail"><i class="fas fa-cut"></i> <strong>Tailoring:</strong> ${item.tailoring.package} - NPR ${money(item.tailoring.amount)}</div>` : ''}
                         </div>
-                        <div class="tp-item-actions">
-                            <button type="button" class="tp-btn tp-btn-secondary" data-action="edit" data-id="${item.id}">Edit</button>
-                            <button type="button" class="tp-btn tp-btn-danger" data-action="remove" data-id="${item.id}">Remove</button>
+                        <div class="product-actions">
+                            <button type="button" class="btn-secondary" data-action="edit" data-id="${item.id}">Edit</button>
+                            <button type="button" class="btn-danger" data-action="remove" data-id="${item.id}">Remove</button>
                         </div>
                     </div>
                     <div><strong>NPR ${money(lineTotal)}</strong></div>
@@ -1139,9 +989,9 @@ $customerLookupPayload = $customers->map(function ($customer) {
             tailoringBreakdownEl.style.display = '';
             let html = `<h5><i class="fas fa-cut"></i> Tailoring Charges Breakdown</h5>`;
             tailoringLines.forEach(l => {
-                html += `<div class="tp-tailoring-row"><span>${l.label}</span><span>NPR ${money(l.amount)}</span></div>`;
+                html += `<div class="tailoring-item"><span>${l.label}</span><span>NPR ${money(l.amount)}</span></div>`;
             });
-            html += `<div class="tp-tailoring-row tp-tailoring-total"><span>Total Tailoring Charges</span><span>NPR ${money(totalTailoring)}</span></div>`;
+            html += `<div class="tailoring-item tailoring-total"><span>Total Tailoring Charges</span><span>NPR ${money(totalTailoring)}</span></div>`;
             tailoringBreakdownEl.innerHTML = html;
         }
 
@@ -1182,7 +1032,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
             if (item.category !== 'custom') {
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][product_id]`, String(item.productId || '')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][product_variant_id]`, String(item.variantId || '')));
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][quantity]`, String(item.qty || '1.00')));
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][unit_price]`, String(item.unitPrice || '0.00')));
             } else {
@@ -1195,7 +1044,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
                 if (String(item.fabricSource || 'own') === 'stock') {
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
-                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_variant_id]`, String(item.variantId || '')));
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || '0')));
                 }
 
@@ -1222,17 +1070,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
     }
 
     function validateRequiredVariants() {
-        const invalidItem = billItems.find((item) => {
-            if (item.category === 'custom') return false;
-            const product = productMap.get(String(item.productId || ''));
-            const hasVariants = Boolean(product && (product.variants || []).length);
-            if (!hasVariants) return false;
-            return !item.variantId;
-        });
-
-        if (!invalidItem) return true;
-        alert(`Variant is required for "${invalidItem.name}". Please edit the item and select a variant.`);
-        return false;
+        return true;
     }
 
     function validateHasItems() {
@@ -1262,12 +1100,10 @@ $customerLookupPayload = $customers->map(function ($customer) {
             if (item.category === 'custom') {
                 const customPayload = {
                     productId: item.productId,
-                    variantId: item.variantId,
                     qty: Number(item.garmentQty || item.qty || 0), // keep pcs qty if you add garmentQty later
                     unitPrice: Number(item.baseUnitPrice || item.unitPrice || 0),
                     name: item.name,
                     unitLabel: item.unitLabel || '',
-                    variantLabel: item.variantLabel || '',
                 };
                 openCustomMeasurementModal(customPayload, item, index);
             } else {
@@ -1284,7 +1120,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
     addBtn.addEventListener('click', () => {
         const category = categorySelect.value;
         const productId = productSelect.value;
-        const variantId = variantSelect.disabled ? '' : (variantSelect.value || '');
         const qty = Number(qtyInput.value || 0); // for custom: pcs qty
         const unitPrice = Number(unitPriceInput.value || 0);
 
@@ -1299,27 +1134,12 @@ $customerLookupPayload = $customers->map(function ($customer) {
         if (unitPrice < 0) { alert('Unit price must be >= 0'); return; }
 
         const p = productMap.get(String(productId));
-        const variantLabel = variantId ? ((p.variants || []).find(v => String(v.id) === String(variantId))?.label || '') : '';
-
-        if (category !== 'custom' && p && (p.variants || []).length && !variantId) {
-            alert('Please select a variant for this product.');
-            return;
-        }
 
         if (category !== 'custom' && p) {
-            if ((p.variants || []).length) {
-                const selectedVariant = (p.variants || []).find(v => String(v.id) === String(variantId));
-                const availableQty = Number(selectedVariant?.availableQty || 0);
-                if (qty > availableQty) {
-                    alert(`Only ${money(availableQty)} ${p.unitLabel || ''} is available for selected variant in current outlet.`);
-                    return;
-                }
-            } else {
-                const availableQty = Number(p.availableQty || 0);
-                if (qty > availableQty) {
-                    alert(`Only ${money(availableQty)} ${p.unitLabel || ''} is available in current outlet.`);
-                    return;
-                }
+            const availableQty = Number(p.availableQty || 0);
+            if (qty > availableQty) {
+                alert(`Only ${money(availableQty)} ${p.unitLabel || ''} is available in current outlet.`);
+                return;
             }
         }
 
@@ -1328,9 +1148,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 id: Date.now(),
                 category,
                 productId,
-                variantId,
-                name: p ? `${p.name} (${p.sku})` : 'Product',
-                variantLabel,
+                name: p ? `${p.name} (${p.code})` : 'Product',
                 unitLabel: p?.unitLabel || '',
                 qty,
                 unitPrice,
@@ -1338,8 +1156,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
             renderBill();
 
             productSelect.value = '';
-            variantSelect.value = '';
-            variantSelect.disabled = true;
             unitPriceInput.value = '';
             qtyInput.value = '1.00';
             unitHint.textContent = '-';
@@ -1349,12 +1165,10 @@ $customerLookupPayload = $customers->map(function ($customer) {
         // Custom => open modal
         const customPayload = {
             productId,
-            variantId,
             qty, // pcs qty
             unitPrice, // fabric per-unit price
-            name: p ? `${p.name} (${p.sku})` : 'Custom Product',
+            name: p ? `${p.name} (${p.code})` : 'Custom Product',
             unitLabel: p?.unitLabel || '',
-            variantLabel,
         };
         openCustomMeasurementModal(customPayload, null, -1);
     });
@@ -1388,13 +1202,8 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
             const product = productMap.get(String(pendingCustom.productId || ''));
             if (!product) { alert('Selected stock fabric product is invalid.'); return; }
-            if ((product.variants || []).length && !pendingCustom.variantId) { alert('Selected stock fabric requires a variant.'); return; }
 
             let availableQty = Number(product.availableQty || 0);
-            if ((product.variants || []).length) {
-                const selectedVariant = (product.variants || []).find(v => String(v.id) === String(pendingCustom.variantId || ''));
-                availableQty = Number(selectedVariant?.availableQty || 0);
-            }
 
             if (stockFabricQtyValue > availableQty) {
                 alert(`Only ${money(availableQty)} ${product.unitLabel || ''} stock fabric is available.`);
@@ -1430,10 +1239,8 @@ $customerLookupPayload = $customers->map(function ($customer) {
             category: 'custom',
 
             productId: pendingCustom.productId,
-            variantId: pendingCustom.variantId,
 
             name: pendingCustom.name,
-            variantLabel: pendingCustom.variantLabel,
             unitLabel: pendingCustom.unitLabel,
 
             // ✅ this is what renderBill uses in lineTotal = qty * unitPrice
@@ -1471,8 +1278,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
         // reset entry fields
         productSelect.value = '';
-        variantSelect.value = '';
-        variantSelect.disabled = true;
         unitPriceInput.value = '';
         qtyInput.value = '1.00';
         unitHint.textContent = '-';
@@ -1497,10 +1302,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
         if (type === 'percent') discountDisplayEl.textContent = `Percent discount: ${money(val)}%`;
 
         renderBill();
-    });
-
-    advancePaymentEl.addEventListener('input', () => {
-        updatePaymentSummary(discountAmountInputEl?.value || 0, latestGrandTotal);
     });
 
     // VAT
@@ -1619,7 +1420,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
     // Product selection listeners
     categorySelect.addEventListener('change', updateProductOptions);
     productSelect.addEventListener('change', updateVariantOptions);
-    variantSelect.addEventListener('change', updatePriceFromSelection);
 
     // Init
     customerDirectory.forEach(upsertCustomerIndex);

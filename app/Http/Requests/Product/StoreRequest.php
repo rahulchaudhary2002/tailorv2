@@ -3,33 +3,11 @@
 namespace App\Http\Requests\Product;
 
 use App\Models\ProductCategory;
-use App\Rules\ProductMediaFileRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreRequest extends FormRequest
 {
-    protected function prepareForValidation(): void
-    {
-        $variants = collect($this->input('variants', []))
-            ->filter(function ($row) {
-                if (!is_array($row)) {
-                    return false;
-                }
-
-                $sku = trim((string) ($row['sku'] ?? ''));
-                $size = trim((string) ($row['size'] ?? ''));
-                $color = trim((string) ($row['color'] ?? ''));
-                $material = trim((string) ($row['material'] ?? ''));
-
-                return $sku !== '' || $size !== '' || $color !== '' || $material !== '';
-            })
-            ->values()
-            ->all();
-
-        $this->merge(['variants' => $variants]);
-    }
-
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -47,7 +25,7 @@ class StoreRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:150'],
-            'sku' => ['required', 'string', 'max:80', 'alpha_dash', 'unique:products,sku', 'unique:product_variants,sku'],
+            'code' => ['required', 'string', 'max:80', 'alpha_dash', 'unique:products,code'],
             'product_category_id' => [
                 'required',
                 'integer',
@@ -55,30 +33,7 @@ class StoreRequest extends FormRequest
                     $query->whereIn('slug', ProductCategory::PRODUCT_CREATABLE_SLUGS);
                 }),
             ],
-            'unit_id' => ['required', 'integer', 'exists:units,id'],
-            'variants' => ['nullable', 'array'],
-            'variants.*.sku' => [
-                'required',
-                'string',
-                'max:80',
-                'alpha_dash',
-                'distinct',
-                'unique:products,sku',
-                'unique:product_variants,sku',
-                'different:sku',
-            ],
-            'variants.*.size' => ['nullable', 'string', 'max:50'],
-            'variants.*.color' => ['nullable', 'string', 'max:50'],
-            'variants.*.material' => ['nullable', 'string', 'max:80'],
-            'description' => ['nullable', 'string', 'max:1000'],
-            'is_active' => ['nullable', 'boolean'],
-            'media_files' => ['nullable', 'array'],
-            'media_files.*' => [
-                'file',
-                'mimetypes:image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/x-msvideo,video/webm,video/x-matroska',
-                'max:102400',
-                new ProductMediaFileRule(),
-            ],
+            'amount' => ['required', 'numeric', 'min:0'],
         ];
     }
 }

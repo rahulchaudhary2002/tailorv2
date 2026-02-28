@@ -9,6 +9,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\Product;
+use App\Models\Unit;
 use App\Models\Vendor;
 use App\Models\VendorRawMaterialPurchase;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class RawMaterialPurchaseController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $purchasesQuery = VendorRawMaterialPurchase::query()
-            ->with(['vendor:id,name', 'product:id,name,sku', 'variant:id,product_id,sku,size,color,material', 'unit:id,name,symbol', 'inventoryLocation:id,name,type'])
+            ->with(['vendor:id,name', 'product:id,name,code', 'unit:id,name,symbol', 'inventoryLocation:id,name,type'])
             ->whereHas('inventoryLocation', function ($query) {
                 $query->where('type', InventoryLocation::TYPE_WAREHOUSE);
             })
@@ -37,7 +38,7 @@ class RawMaterialPurchaseController extends Controller
                     $vendorQuery->where('name', 'like', '%' . $q . '%');
                 })->orWhereHas('product', function ($productQuery) use ($q): void {
                     $productQuery->where('name', 'like', '%' . $q . '%')
-                        ->orWhere('sku', 'like', '%' . $q . '%');
+                        ->orWhere('code', 'like', '%' . $q . '%');
                 })->orWhere('vendor_bill_number', 'like', '%' . $q . '%');
             });
         }
@@ -68,15 +69,11 @@ class RawMaterialPurchaseController extends Controller
             ->get(['id', 'name']);
 
         $products = Product::query()
-            ->with([
-                'unit:id,name,symbol',
-                'variants:id,product_id,sku,size,color,material',
-            ])
             ->whereHas('category', function ($query) {
                 $query->where('slug', 'fabrics');
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'unit_id']);
+            ->get(['id', 'name', 'code']);
 
         $selectedVendorId = (int) ($request->query('vendor_id') ?? 0);
 
@@ -106,16 +103,16 @@ class RawMaterialPurchaseController extends Controller
 
         $products = Product::query()
             ->whereIn('id', $productIds)
-            ->get(['id', 'unit_id'])
+            ->get(['id'])
             ->keyBy('id');
 
         foreach ($items as $item) {
             $product = $products->get((int) ($item['product_id'] ?? 0));
 
-            if (!$product || !$product->unit_id) {
+            if (!$product) {
                 return back()
                     ->withInput()
-                    ->with('error', 'One or more selected products has no measurement unit. Set product unit first.');
+                    ->with('error', 'One or more selected products is invalid.');
             }
         }
 
@@ -124,14 +121,12 @@ class RawMaterialPurchaseController extends Controller
                 $productId = (int) $item['product_id'];
                 $quantity = (int) $item['quantity'];
                 $unitPrice = (float) $item['unit_price'];
-                $variantId = !empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : null;
-                $product = $products->get($productId);
+                $unitId = $this->resolveInventoryUnitIdForProduct($productId);
 
                 VendorRawMaterialPurchase::query()->create([
                     'vendor_id' => (int) $validated['vendor_id'],
                     'product_id' => $productId,
-                    'product_variant_id' => $variantId,
-                    'unit_id' => $product?->unit_id,
+                    'unit_id' => $unitId,
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'total_amount' => $quantity * $unitPrice,
@@ -154,7 +149,7 @@ class RawMaterialPurchaseController extends Controller
     {
         $this->ensurePurchaseBelongsToWarehouse($purchase);
 
-        $purchase->load(['vendor:id,name', 'product:id,name,sku', 'variant:id,product_id,sku,size,color,material', 'unit:id,name,symbol', 'inventoryLocation:id,name,type']);
+        $purchase->load(['vendor:id,name', 'product:id,name,code', 'unit:id,name,symbol', 'inventoryLocation:id,name,type']);
 
         $inventoryLocations = InventoryLocation::query()
             ->where('is_active', true)
@@ -175,21 +170,12 @@ class RawMaterialPurchaseController extends Controller
 
         $validated = $request->validated();
         $this->validateWarehouseLocationInPayload($validated);
-        $product = Product::query()
-            ->select(['id', 'unit_id'])
-            ->findOrFail((int) $purchase->product_id);
-
-        if (!$product->unit_id) {
-            return back()
-                ->withInput()
-                ->with('error', 'Selected product has no measurement unit. Set product unit first.');
-        }
 
         try {
-            DB::transaction(function () use ($purchase, $request, $validated, $product): void {
+            DB::transaction(function () use ($purchase, $request, $validated): void {
                 $now = now();
 
-                $purchase->unit_id = $product->unit_id;
+                $purchase->unit_id = $this->resolveInventoryUnitIdForProduct((int) $purchase->product_id);
 
                 $purchase->notes = $validated['notes'] ?? $purchase->notes;
                 $purchase->vendor_bill_number = trim((string) ($validated['vendor_bill_number'] ?? $purchase->vendor_bill_number));
@@ -220,11 +206,10 @@ class RawMaterialPurchaseController extends Controller
                         [
                             'location_id' => $locationId,
                             'product_id' => $purchase->product_id,
-                            'product_variant_id' => $purchase->product_variant_id,
                             'vendor_id' => $purchase->vendor_id,
                         ],
                         [
-                            'unit_id' => $product->unit_id,
+                            'unit_id' => $purchase->unit_id,
                             'on_hand_qty' => 0,
                             'reserved_qty' => 0,
                             'avg_cost' => $unitPrice,
@@ -239,7 +224,7 @@ class RawMaterialPurchaseController extends Controller
                     $newQty = $currentQty + $purchaseQty;
 
                     $stock->vendor_id = $purchase->vendor_id;
-                    $stock->unit_id = $product->unit_id;
+                    $stock->unit_id = $purchase->unit_id;
                     $stock->avg_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
                     $stock->on_hand_qty = $newQty;
                     $stock->base_price = $inventoryBasePrice;
@@ -271,7 +256,6 @@ class RawMaterialPurchaseController extends Controller
 
                     $transaction->items()->create([
                         'product_id' => $purchase->product_id,
-                        'product_variant_id' => $purchase->product_variant_id,
                         'qty' => $purchase->quantity,
                         'unit_cost' => (float) $purchase->unit_price,
                         'total_cost' => (float) $purchase->total_amount,
@@ -339,5 +323,24 @@ class RawMaterialPurchaseController extends Controller
         if (!$isValid) {
             abort(404);
         }
+    }
+
+    private function resolveInventoryUnitIdForProduct(int $productId): ?int
+    {
+        $isFabric = Product::query()
+            ->whereKey($productId)
+            ->whereHas('category', function ($query) {
+                $query->where('slug', 'fabrics');
+            })
+            ->exists();
+
+        if (!$isFabric) {
+            return null;
+        }
+
+        return Unit::query()
+            ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
+            ->orWhere('symbol', 'm')
+            ->value('id');
     }
 }

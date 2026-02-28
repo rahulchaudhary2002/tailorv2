@@ -10,7 +10,7 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\InventoryReorderLevel;
 use App\Models\Product;
-use App\Models\ProductVariant;
+use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -40,8 +40,7 @@ class InventoryController extends Controller
             ->with([
                 'location:id,name,type,outlet_id',
                 'location.outlet:id,name',
-                'product:id,name,sku',
-                'variant:id,product_id,sku,size,color,material',
+                'product:id,name,code',
                 'vendor:id,name',
                 'unit:id,name,symbol',
             ]);
@@ -50,9 +49,7 @@ class InventoryController extends Controller
             $stocksQuery->where(function ($query) use ($q): void {
                 $query->whereHas('product', function ($productQuery) use ($q): void {
                     $productQuery->where('name', 'like', '%' . $q . '%')
-                        ->orWhere('sku', 'like', '%' . $q . '%');
-                })->orWhereHas('variant', function ($variantQuery) use ($q): void {
-                    $variantQuery->where('sku', 'like', '%' . $q . '%');
+                        ->orWhere('code', 'like', '%' . $q . '%');
                 })->orWhereHas('location', function ($locationQuery) use ($q): void {
                     $locationQuery->where('name', 'like', '%' . $q . '%');
                 });
@@ -86,12 +83,11 @@ class InventoryController extends Controller
             ->get(['id', 'name', 'type', 'outlet_id']);
 
         $products = Product::query()
-            ->with(['unit:id,name,symbol', 'variants:id,product_id,sku,size,color,material'])
             ->orderBy('name')
-            ->get(['id', 'name', 'sku', 'unit_id']);
+            ->get(['id', 'name', 'code']);
 
         $alerts = InventoryAlert::query()
-            ->with(['product:id,name,sku', 'location:id,name,type'])
+            ->with(['product:id,name,code', 'location:id,name,type'])
             ->whereHas('location', function ($query) use ($outletId) {
                 $query->where('type', InventoryLocation::TYPE_OUTLET)
                     ->where('outlet_id', $outletId);
@@ -146,17 +142,9 @@ class InventoryController extends Controller
 
         $validated = $request->validated();
         $product = Product::query()->findOrFail((int) $validated['product_id']);
+        $unitId = $this->resolveInventoryUnitIdForProduct((int) $product->id);
         $quantity = (float) $validated['quantity'];
         $trxType = (string) $validated['trx_type'];
-        $variantId = isset($validated['product_variant_id']) ? (int) $validated['product_variant_id'] : null;
-
-        if ($variantId) {
-            $variant = ProductVariant::query()->findOrFail($variantId);
-            if ((int) $variant->product_id !== (int) $product->id) {
-                return $this->redirectToIndex($tab)
-                    ->with('error', 'Selected variant does not belong to the selected product.');
-            }
-        }
 
         $basePrice = (float) $validated['base_price'];
         $specialPrice = array_key_exists('special_price', $validated) && $validated['special_price'] !== null
@@ -174,11 +162,6 @@ class InventoryController extends Controller
         $reorderQty = array_key_exists('reorder_qty', $validated) && $validated['reorder_qty'] !== null
             ? (float) $validated['reorder_qty']
             : null;
-
-        if (!$product->unit_id) {
-            return $this->redirectToIndex($tab)
-                ->with('error', 'Selected product has no measurement unit. Set product unit first.');
-        }
 
         $locationId = isset($validated['location_id']) ? (int) $validated['location_id'] : null;
         $fromLocationId = isset($validated['from_location_id']) ? (int) $validated['from_location_id'] : null;
@@ -217,13 +200,13 @@ class InventoryController extends Controller
             DB::transaction(function () use (
                 $validated,
                 $product,
-                $variantId,
                 $trxType,
                 $quantity,
                 $locationId,
                 $fromLocationId,
                 $toLocationId,
                 $vendorId,
+                $unitId,
                 $basePrice,
                 $specialPrice,
                 $unitCost,
@@ -250,7 +233,6 @@ class InventoryController extends Controller
 
                 $transaction->items()->create([
                     'product_id' => $product->id,
-                    'product_variant_id' => $variantId,
                     'qty' => $quantity,
                     'unit_cost' => $unitCost,
                     'total_cost' => $unitCost !== null ? $unitCost * $quantity : null,
@@ -259,10 +241,9 @@ class InventoryController extends Controller
                 if ($trxType === InventoryTransaction::TYPE_TRANSFER) {
                     $this->applyDeltaToStock(
                         productId: (int) $product->id,
-                        variantId: $variantId,
                         locationId: (int) $fromLocationId,
                         vendorId: $vendorId,
-                        unitId: (int) $product->unit_id,
+                        unitId: $unitId,
                         delta: -$quantity,
                         unitCost: $unitCost,
                         basePrice: $basePrice,
@@ -271,10 +252,9 @@ class InventoryController extends Controller
 
                     $toStock = $this->applyDeltaToStock(
                         productId: (int) $product->id,
-                        variantId: $variantId,
                         locationId: (int) $toLocationId,
                         vendorId: $vendorId,
-                        unitId: (int) $product->unit_id,
+                        unitId: $unitId,
                         delta: $quantity,
                         unitCost: $unitCost,
                         basePrice: $basePrice,
@@ -297,18 +277,16 @@ class InventoryController extends Controller
                 if ($trxType === InventoryTransaction::TYPE_ADJUSTMENT && $adjustmentType === 'set') {
                     $stock = $this->getOrCreateStock(
                         productId: (int) $product->id,
-                        variantId: $variantId,
                         locationId: (int) $locationId,
                         vendorId: $vendorId,
-                        unitId: (int) $product->unit_id
+                        unitId: $unitId
                     );
                     $delta = $quantity - (float) $stock->on_hand_qty;
                     $stock = $this->applyDeltaToStock(
                         productId: (int) $product->id,
-                        variantId: $variantId,
                         locationId: (int) $locationId,
                         vendorId: $vendorId,
-                        unitId: (int) $product->unit_id,
+                        unitId: $unitId,
                         delta: $delta,
                         unitCost: $unitCost,
                         basePrice: $basePrice,
@@ -337,10 +315,9 @@ class InventoryController extends Controller
 
                 $stock = $this->applyDeltaToStock(
                     productId: (int) $product->id,
-                    variantId: $variantId,
                     locationId: (int) $locationId,
                     vendorId: $vendorId,
-                    unitId: (int) $product->unit_id,
+                    unitId: $unitId,
                     delta: $signedQty,
                     unitCost: $unitCost,
                     basePrice: $basePrice,
@@ -438,12 +415,11 @@ class InventoryController extends Controller
         return redirect()->to($url);
     }
 
-    private function getOrCreateStock(int $productId, ?int $variantId, int $locationId, ?int $vendorId, int $unitId): InventoryStock
+    private function getOrCreateStock(int $productId, int $locationId, ?int $vendorId, ?int $unitId): InventoryStock
     {
         $stock = InventoryStock::query()->firstOrCreate(
             [
                 'product_id' => $productId,
-                'product_variant_id' => $variantId,
                 'location_id' => $locationId,
                 'vendor_id' => $vendorId,
             ],
@@ -464,16 +440,15 @@ class InventoryController extends Controller
 
     private function applyDeltaToStock(
         int $productId,
-        ?int $variantId,
         int $locationId,
         ?int $vendorId,
-        int $unitId,
+        ?int $unitId,
         float $delta,
         ?float $unitCost,
         float $basePrice,
         ?float $specialPrice
     ): InventoryStock {
-        $stock = $this->getOrCreateStock($productId, $variantId, $locationId, $vendorId, $unitId);
+        $stock = $this->getOrCreateStock($productId, $locationId, $vendorId, $unitId);
 
         $currentQty = (float) $stock->on_hand_qty;
         $newQty = $currentQty + $delta;
@@ -559,5 +534,24 @@ class InventoryController extends Controller
                 'is_active' => true,
             ]
         );
+    }
+
+    private function resolveInventoryUnitIdForProduct(int $productId): ?int
+    {
+        $isFabric = Product::query()
+            ->whereKey($productId)
+            ->whereHas('category', function ($query) {
+                $query->where('slug', 'fabrics');
+            })
+            ->exists();
+
+        if (!$isFabric) {
+            return null;
+        }
+
+        return Unit::query()
+            ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
+            ->orWhere('symbol', 'm')
+            ->value('id');
     }
 }

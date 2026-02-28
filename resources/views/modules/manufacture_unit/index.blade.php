@@ -25,7 +25,7 @@
     </div>
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product, variant SKU, or location...', 'reporting' => $reporting])
+@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product code or location...', 'reporting' => $reporting])
 
 <div class="app-tabs" role="tablist" aria-label="Manufacture unit sections">
     <button type="button" class="app-tab-button js-page-tab is-active" data-tab-target="stock-records" aria-selected="true">Stock Records</button>
@@ -51,8 +51,8 @@
                             <option value="{{ $availableTransfer->id }}" @selected((string) old('transfer_transaction_id') === (string) $availableTransfer->id)>
                                 #{{ $availableTransfer->id }}
                                 - {{ $availableTransfer->targetProduct?->name ?: 'N/A' }}
-                                @if ($availableTransfer->targetVariant?->sku)
-                                    ({{ $availableTransfer->targetVariant->sku }})
+                                @if ($availableTransfer->targetProduct?->code)
+                                    ({{ $availableTransfer->targetProduct->code }})
                                 @endif
                                 - {{ ucfirst($availableTransfer->status ?: 'pending') }}
                                 - {{ $availableTransfer->trx_date?->format('M d, Y') }}
@@ -131,7 +131,7 @@
                 <tr>
                     <th>Location</th>
                     <th>Material</th>
-                    <th>SKU</th>
+                    <th>Code</th>
                     <th>Available Quantity</th>
                     <th>Unit</th>
                     <th>Last Updated</th>
@@ -149,7 +149,7 @@
                     <tr>
                         <td>{{ $stock->location?->name ?: '-' }}</td>
                         <td>{{ $stock->product?->name ?: '-' }}</td>
-                        <td>{{ $stock->variant?->sku ?: ($stock->product?->sku ?: '-') }}</td>
+                        <td>{{ $stock->product?->code ?: '-' }}</td>
                         <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
                         <td>{{ $stock->unit?->symbol ?: ($stock->unit?->name ?: '-') }}</td>
                         <td>{{ $stock->updated_at->format('M d, Y h:i A') }}</td>
@@ -165,7 +165,7 @@
                                             data-action="{{ route('manufactureUnit.finalGoods.transfer', $stock) }}"
                                             data-max-qty="{{ number_format((float) $stock->on_hand_qty, 2, '.', '') }}"
                                             data-product="{{ $stock->product?->name ?: '-' }}"
-                                            data-sku="{{ $stock->variant?->sku ?: ($stock->product?->sku ?: '-') }}"
+                                            data-code="{{ $stock->product?->code ?: '-' }}"
                                         >
                                             Transfer To Outlet/Warehouse
                                         </button>
@@ -176,7 +176,7 @@
                                             data-action="{{ route('manufactureUnit.transfer', $stock) }}"
                                             data-max-qty="{{ number_format((float) $stock->on_hand_qty, 2, '.', '') }}"
                                             data-material="{{ $stock->product?->name ?: '-' }}"
-                                            data-sku="{{ $stock->variant?->sku ?: ($stock->product?->sku ?: '-') }}"
+                                            data-code="{{ $stock->product?->code ?: '-' }}"
                                         >
                                             Transfer for Production
                                         </button>
@@ -216,9 +216,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Raw Material</th>
-                    <th>Variant</th>
                     <th>Target Finished Good</th>
-                    <th>Target Variant</th>
                     <th>Qty</th>
                     <th>From Location</th>
                     <th>Status</th>
@@ -234,9 +232,7 @@
                     <tr>
                         <td>{{ $transfer->trx_date?->format('M d, Y h:i A') ?: '-' }}</td>
                         <td>{{ $transferItem?->product?->name ?: '-' }}</td>
-                        <td>{{ $transferItem?->variant?->sku ?: '-' }}</td>
                         <td>{{ $transfer->targetProduct?->name ?: '-' }}</td>
-                        <td>{{ $transfer->targetVariant?->sku ?: '-' }}</td>
                         <td>{{ number_format((float) ($transferItem?->qty ?? 0), 2) }}</td>
                         <td>{{ $transfer->fromLocation?->name ?: '-' }}</td>
                         <td>{{ ucfirst($transfer->status ?: 'pending') }}</td>
@@ -265,7 +261,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="empty">No production transfer records found.</td>
+                        <td colspan="8" class="empty">No production transfer records found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -286,7 +282,6 @@
                 <tr>
                     <th>Date</th>
                     <th>Product</th>
-                    <th>Variant</th>
                     <th>Produced Qty</th>
                     <th>Material Wastage</th>
                     <th>Transferred Qty</th>
@@ -305,7 +300,6 @@
                     <tr>
                         <td>{{ $log->trx_date?->format('M d, Y h:i A') ?: '-' }}</td>
                         <td>{{ $item?->product?->name ?: '-' }}</td>
-                        <td>{{ $item?->variant?->sku ?: '-' }}</td>
                         <td>{{ number_format((float) ($log->produced_qty ?? ($item?->qty ?? 0)), 2) }}</td>
                         <td>{{ number_format((float) ($log->material_wastage_qty ?? 0), 2) }}</td>
                         <td>{{ number_format((float) ($log->transferred_qty ?? 0), 2) }}</td>
@@ -322,7 +316,7 @@
                                         data-action="{{ route('manufactureUnit.productionOutput.transfer', $log) }}"
                                         data-max-qty="{{ number_format((float) ($log->remaining_qty ?? 0), 2, '.', '') }}"
                                         data-product="{{ $item?->product?->name ?: '-' }}"
-                                        data-variant="{{ $item?->variant?->sku ?: '-' }}"
+                                        data-code="{{ $item?->product?->code ?: '-' }}"
                                     >
                                         Transfer To Current Outlet
                                     </button>
@@ -336,7 +330,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="empty">No production records found.</td>
+                        <td colspan="10" class="empty">No production records found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -364,24 +358,8 @@
                     <option value="">Select Product</option>
                     @foreach ($productionProducts as $productionProduct)
                         <option value="{{ $productionProduct->id }}">
-                            {{ $productionProduct->name }} ({{ $productionProduct->sku }})
+                            {{ $productionProduct->name }} ({{ $productionProduct->code }})
                         </option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="outlet-form-group" style="margin-bottom:8px;">
-                <label>Target Variant (Optional)</label>
-                <select name="target_variant_id" class="outlet-input js-target-variant">
-                    <option value="">No Variant</option>
-                    @foreach ($productionProducts as $productionProduct)
-                        @foreach ($productionProduct->variants as $productionVariant)
-                            <option
-                                value="{{ $productionVariant->id }}"
-                                data-product-id="{{ $productionProduct->id }}"
-                            >
-                                {{ $productionVariant->sku }}
-                            </option>
-                        @endforeach
                     @endforeach
                 </select>
             </div>
@@ -663,7 +641,6 @@
         const productionItemMeta = productionModal?.querySelector('.js-production-modal-item');
         const productionMaxMeta = productionModal?.querySelector('.js-production-modal-max');
         const targetProduct = productionModal?.querySelector('.js-target-product');
-        const targetVariant = productionModal?.querySelector('.js-target-variant');
 
         const initManufactureTargetProductSelect2 = () => {
             if (!targetProduct || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
@@ -704,36 +681,8 @@
             }
         };
 
-        const applyTransferVariantFilter = () => {
-            if (!targetProduct || !targetVariant) {
-                return;
-            }
-
-            const selectedProductId = String(targetProduct.value || '');
-            const options = Array.from(targetVariant.options);
-
-            options.forEach((option, index) => {
-                if (index === 0) {
-                    option.hidden = false;
-                    option.disabled = false;
-                    return;
-                }
-
-                const optionProductId = String(option.dataset.productId || '');
-                const show = selectedProductId !== '' && optionProductId === selectedProductId;
-                option.hidden = !show;
-                option.disabled = !show;
-            });
-
-            const selected = targetVariant.options[targetVariant.selectedIndex];
-            if (selected && (selected.hidden || selected.disabled)) {
-                targetVariant.value = '';
-            }
-        };
-
-        bindProductChange(targetProduct, applyTransferVariantFilter);
         initManufactureTargetProductSelect2();
-        applyTransferVariantFilter();
+        bindProductChange(targetProduct, () => {});
 
         document.querySelectorAll('.js-open-transfer-production-modal').forEach((button) => {
             button.addEventListener('click', () => {
@@ -744,7 +693,7 @@
                 const action = String(button.dataset.action || '#');
                 const maxQty = String(button.dataset.maxQty || '0.00');
                 const material = String(button.dataset.material || '-');
-                const sku = String(button.dataset.sku || '-');
+                const code = String(button.dataset.code || '-');
 
                 productionForm.setAttribute('action', action);
                 productionQtyInput.setAttribute('max', maxQty);
@@ -753,12 +702,8 @@
                     targetProduct.value = '';
                     refreshSelect2(targetProduct);
                 }
-                if (targetVariant) {
-                    targetVariant.value = '';
-                }
-                applyTransferVariantFilter();
                 if (productionItemMeta) {
-                    productionItemMeta.textContent = 'Raw material: ' + material + ' (' + sku + ')';
+                    productionItemMeta.textContent = 'Raw material: ' + material + ' (' + code + ')';
                 }
                 if (productionMaxMeta) {
                     productionMaxMeta.textContent = 'Available Qty: ' + maxQty;
@@ -783,13 +728,13 @@
                 const action = String(button.dataset.action || '#');
                 const maxQty = String(button.dataset.maxQty || '0.00');
                 const product = String(button.dataset.product || '-');
-                const variant = String(button.dataset.variant || '-');
+                const code = String(button.dataset.code || '-');
 
                 outletForm.setAttribute('action', action);
                 outletQtyInput.setAttribute('max', maxQty);
                 outletQtyInput.value = maxQty;
                 if (outletItemMeta) {
-                    outletItemMeta.textContent = 'Produced item: ' + product + ' (' + variant + ')';
+                    outletItemMeta.textContent = 'Produced item: ' + product + ' (' + code + ')';
                 }
                 if (outletMaxMeta) {
                     outletMaxMeta.textContent = 'Max transferable: ' + maxQty;
@@ -815,7 +760,7 @@
                 const action = String(button.dataset.action || '#');
                 const maxQty = String(button.dataset.maxQty || '0.00');
                 const product = String(button.dataset.product || '-');
-                const sku = String(button.dataset.sku || '-');
+                const code = String(button.dataset.code || '-');
 
                 finalGoodsForm.setAttribute('action', action);
                 finalGoodsQtyInput.setAttribute('max', maxQty);
@@ -824,7 +769,7 @@
                     finalGoodsDestination.value = '';
                 }
                 if (finalGoodsItemMeta) {
-                    finalGoodsItemMeta.textContent = 'Final goods: ' + product + ' (' + sku + ')';
+                    finalGoodsItemMeta.textContent = 'Final goods: ' + product + ' (' + code + ')';
                 }
                 if (finalGoodsMaxMeta) {
                     finalGoodsMaxMeta.textContent = 'Max transferable: ' + maxQty;

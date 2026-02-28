@@ -18,7 +18,7 @@
     @endcanany
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $products, 'placeholder' => 'Search by product name, SKU, description...', 'reporting' => $reporting])
+@include('includes.reporting-filter', ['paginator' => $products, 'placeholder' => 'Search by product name, code, amount...', 'reporting' => $reporting])
 
 <div class="table-card">
     @if (session('success'))
@@ -34,13 +34,10 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Primary SKU</th>
-                    <th>Variants</th>
-                    <th>Unit</th>
+                    <th>Code</th>
+                    <th>Amount</th>
                     <th>Category</th>
                     <th>Inventory Qty</th>
-                    <th>Media</th>
-                    <th>Status</th>
                     <th>Created</th>
                     <th>Actions</th>
                 </tr>
@@ -49,13 +46,10 @@
                 @forelse ($products as $product)
                     <tr>
                         <td>{{ $product->name }}</td>
-                        <td>{{ $product->sku }}</td>
-                        <td>{{ $product->variants_count }}</td>
-                        <td>{{ $product->unit?->symbol ?: ($product->unit?->name ?: '-') }}</td>
+                        <td>{{ $product->code }}</td>
+                        <td>Rs {{ number_format((float) $product->amount, 2) }}</td>
                         <td>{{ $product->category?->name ?? '-' }}</td>
                         <td>{{ number_format((float) ($product->inventory_total_quantity ?? 0), 2) }}</td>
-                        <td>{{ $product->media_files_count }}</td>
-                        <td>{{ $product->is_active ? 'Active' : 'Inactive' }}</td>
                         <td>{{ $product->created_at->format('M d, Y') }}</td>
                         <td>
                             <div class="actions">
@@ -80,7 +74,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="empty">No products found.</td>
+                        <td colspan="7" class="empty">No products found.</td>
                     </tr>
                 @endforelse
             </tbody>
