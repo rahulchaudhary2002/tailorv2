@@ -69,6 +69,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
         'id' => $customer->id,
         'name' => $customer->name,
         'phone' => $customer->phone,
+        'customer_type' => $customer->customer_type,
     ];
 })->values();
 @endphp
@@ -128,7 +129,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
                             <input id="customerPhone" type="text" class="tp-input" placeholder="Customer mobile number">
                             <button type="button" id="checkCustomerBtn" class="btn-secondary">Check</button>
                         </div>
-                        <div id="customerCheckMessage" class="customer-check-message" style="display:none;"></div>
                         <input
                             id="customer_id"
                             name="customer_id"
@@ -164,11 +164,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 </div>
 
                 <div class="form-group">
-                    <label>Fabric Price (NPR)</label>
-                    <input id="unitPrice" type="number" min="0" step="0.01" class="tp-input" placeholder="Enter price per meter">
-                </div>
-
-                <div class="form-group">
                     <button type="button" id="addToBill" class="tp-btn">
                         <i class="fas fa-plus-circle"></i> Add to Bill
                     </button>
@@ -189,7 +184,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 </div>
 
                 <div class="customer-display">
-                    <div><strong>Customer:</strong> <span id="billCustomer">-</span></div>
+                    <div id="billCustomer">-</div>
                 </div>
 
                 <div class="bill-items" id="billItems"></div>
@@ -394,6 +389,83 @@ h2 i,h3 i,h4 i{margin-right:10px;color:var(--accent);}
 .form-group{margin-bottom:15px;}
 label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
 .tp-input{width:100%;padding:10px 15px;border:1px solid #ccc;border-radius:var(--radius);font-size:1rem;}
+.demo-section .select2-container--default .select2-selection--single{
+    min-height:auto;
+    height:43px;
+    border:1px solid #c9d5e6;
+    border-radius:var(--radius);
+    background:#f7fafd;
+    padding:0 40px 0 0;
+    font-size:1rem;
+    font-family:inherit;
+    box-shadow:none;
+    display:block;
+}
+.demo-section .select2-container--default .select2-selection--single .select2-selection__rendered{
+    color:inherit;
+    line-height:43px;
+    padding-left:14px;
+    padding-right:30px;
+    margin-left:0;
+}
+.demo-section .select2-container--default .select2-selection--single .select2-selection__placeholder{
+    color:#6a7785;
+}
+.demo-section .select2-container--default .select2-selection--single .select2-selection__arrow{
+    height:100%;
+    right:10px;
+}
+.demo-section .select2-container--default .select2-selection--single .select2-selection__clear{
+    position:absolute;
+    right:32px;
+    top:50%;
+    transform:translateY(-50%);
+    color:#6c757d;
+    font-size:18px;
+    line-height:1;
+    margin-right:0;
+    padding:0;
+    float:none;
+}
+.demo-section .select2-container--default .select2-selection--single .select2-selection__clear:hover{
+    color:#dc3545;
+}
+.demo-section .select2-container--default.select2-container--focus .select2-selection--single,
+.demo-section .select2-container--default.select2-container--open .select2-selection--single{
+    border-color:var(--accent);
+    background:#fff;
+    box-shadow:0 0 0 3px rgba(201,169,110,.16);
+}
+.demo-section .select2-dropdown{
+    border:1px solid #d7e0ec;
+    border-radius:var(--radius);
+    box-shadow:0 12px 24px rgba(26,54,93,.12);
+    background:#fff;
+}
+.demo-section .select2-search--dropdown .select2-search__field{
+    border:1px solid #c9d5e6;
+    border-radius:var(--radius);
+    font-family:inherit;
+    color:var(--primary);
+    background:#f7fafd;
+}
+.demo-section .select2-search--dropdown .select2-search__field:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(201,169,110,.14);
+}
+.demo-section .select2-results__option{
+    color:var(--primary);
+    padding:10px 14px;
+}
+.demo-section .select2-container--default .select2-results__option--selected{
+    background:#eef3f9;
+    color:var(--primary);
+}
+.demo-section .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable{
+    background:var(--primary);
+    color:#fff;
+}
 .tp-hint{color:#6a7785;font-size:12px;}
 .instructions{background:#f0f7ff;padding:15px;border-radius:var(--radius);margin-top:15px;border-left:4px solid #17a2b8;font-size:.9rem;}
 .customer-info{background:#f8f9fa;padding:15px;border-radius:var(--radius);margin-bottom:20px;}
@@ -489,7 +561,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const productSelect = document.getElementById('productSelect');
     const variantSelect = document.getElementById('variantSelect');
     const qtyInput = document.getElementById('quantity');
-    const unitPriceInput = document.getElementById('unitPrice');
     const unitHint = document.getElementById('qtyUnitHint');
     const addBtn = document.getElementById('addToBill');
 
@@ -500,7 +571,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const billCustomerEl = document.getElementById('billCustomer');
     const customerPhoneInput = document.getElementById('customerPhone');
     const checkCustomerBtn = document.getElementById('checkCustomerBtn');
-    const customerCheckMessage = document.getElementById('customerCheckMessage');
     const createCustomerModal = document.getElementById('createCustomerModal');
     const closeCustomerModalBtn = document.getElementById('closeCustomerModal');
     const cancelCustomerModalBtn = document.getElementById('cancelCustomerModal');
@@ -561,6 +631,47 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     const hiddenInputsHost = document.getElementById('itemsHiddenInputs');
 
+    function initOrderSelect2(selectEl, placeholder = 'Select option') {
+        if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+            return;
+        }
+
+        if (selectEl.dataset.select2Ready === '1') {
+            return;
+        }
+
+        const hasEmptyOption = Array.from(selectEl.options || []).some((option) => option.value === '');
+
+        window.jQuery(selectEl).select2({
+            width: '100%',
+            placeholder,
+            allowClear: hasEmptyOption,
+            dropdownParent: window.jQuery(selectEl.closest('.tp-modal') || document.body),
+        });
+
+        selectEl.dataset.select2Ready = '1';
+    }
+
+    function refreshOrderSelect2(selectEl) {
+        if (!selectEl || selectEl.dataset.select2Ready !== '1' || !window.jQuery) {
+            return;
+        }
+
+        window.jQuery(selectEl).trigger('change.select2');
+    }
+
+    function bindOrderSelectChange(selectEl, onChange) {
+        if (!selectEl || typeof onChange !== 'function') {
+            return;
+        }
+
+        selectEl.addEventListener('change', onChange);
+
+        if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+            window.jQuery(selectEl).on('select2:select select2:clear', onChange);
+        }
+    }
+
     // Bill State
     let billItems = [];
     let discount = { type: 'none', value: 0 };
@@ -577,26 +688,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function money(n) { return Number(n || 0).toFixed(2); }
     function normalizePhone(value) { return String(value || '').replace(/\D+/g, ''); }
 
-    function setCustomerCheckMessage(message, tone = 'info') {
-        customerCheckMessage.textContent = message;
-        customerCheckMessage.style.display = message ? 'block' : 'none';
-        if (tone === 'error') {
-            customerCheckMessage.style.background = '#ffe8ea';
-            customerCheckMessage.style.color = '#7a0b18';
-            customerCheckMessage.style.borderColor = '#ffccd1';
-            return;
-        }
-        if (tone === 'success') {
-            customerCheckMessage.style.background = '#e7f7ed';
-            customerCheckMessage.style.color = '#0d5a2b';
-            customerCheckMessage.style.borderColor = '#bfe8cf';
-            return;
-        }
-        customerCheckMessage.style.background = '#f3f6fb';
-        customerCheckMessage.style.color = '#415265';
-        customerCheckMessage.style.borderColor = '#dbe4ef';
-    }
-
     function updatePaymentSummary(discountAmount, grandTotal) {
         latestGrandTotal = Number(grandTotal || 0);
         const safeDiscount = Math.max(Number(discountAmount || 0), 0);
@@ -607,11 +698,28 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function upsertCustomerIndex(customer) {
         const customerId = String(customer?.id || '');
         if (customerId) {
-            customersById.set(customerId, { id: Number(customer.id), name: String(customer.name || ''), phone: String(customer.phone || '') });
+            customersById.set(customerId, {
+                id: Number(customer.id),
+                name: String(customer.name || ''),
+                phone: String(customer.phone || ''),
+                customerType: String(customer.customer_type || ''),
+            });
         }
         const normalized = normalizePhone(customer?.phone || '');
         if (!normalized) return;
-        customersByPhone.set(normalized, { id: Number(customer.id), name: String(customer.name || ''), phone: String(customer.phone || '') });
+        customersByPhone.set(normalized, {
+            id: Number(customer.id),
+            name: String(customer.name || ''),
+            phone: String(customer.phone || ''),
+            customerType: String(customer.customer_type || ''),
+        });
+    }
+
+    function formatCustomerTypeLabel(customerType) {
+        if (customerType === 'retail') return 'Retail Customer';
+        if (customerType === 'wholesale') return 'Wholesale Customer';
+        if (customerType === 'custom') return 'Custom Customer';
+        return 'Customer';
     }
 
     function selectCustomer(customer) {
@@ -683,19 +791,15 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             productSelect.appendChild(opt);
         });
 
+        productSelect.value = '';
         unitHint.textContent = '-';
-        unitPriceInput.value = '';
+        refreshOrderSelect2(productSelect);
     }
 
     function updateVariantOptions() {
         const pid = productSelect.value;
         const p = productMap.get(String(pid));
         unitHint.textContent = p ? `Available: ${money(Number(p.availableQty || 0))}${p.unitLabel ? ' ' + p.unitLabel : ''}` : '-';
-        unitPriceInput.value = money(resolveDefaultPrice(pid));
-    }
-
-    function updatePriceFromSelection() {
-        unitPriceInput.value = money(resolveDefaultPrice(productSelect.value));
     }
 
     function selectedCustomFabricSource() {
@@ -760,6 +864,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             opt.textContent = g.title;
             garmentTypeSelect.appendChild(opt);
         });
+
+        refreshOrderSelect2(garmentTypeSelect);
     }
 
     function getCustomerMeasurementForGarment(customerId, garmentTypeId) {
@@ -1121,7 +1227,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const category = categorySelect.value;
         const productId = productSelect.value;
         const qty = Number(qtyInput.value || 0); // for custom: pcs qty
-        const unitPrice = Number(unitPriceInput.value || 0);
+        const unitPrice = resolveDefaultPrice(productId);
 
         if (!customerSelect.value) {
             alert('Check/select customer first.');
@@ -1156,7 +1262,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             renderBill();
 
             productSelect.value = '';
-            unitPriceInput.value = '';
             qtyInput.value = '1.00';
             unitHint.textContent = '-';
             return;
@@ -1278,7 +1383,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
         // reset entry fields
         productSelect.value = '';
-        unitPriceInput.value = '';
         qtyInput.value = '1.00';
         unitHint.textContent = '-';
     });
@@ -1345,27 +1449,36 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     // Customer display
     function updateCustomerDisplay() {
         const customer = customersById.get(String(customerSelect.value || ''));
-        const text = customer ? (customer.phone ? `${customer.name} (${customer.phone})` : customer.name) : '-';
-        billCustomerEl.textContent = text;
+        if (!customer) {
+            billCustomerEl.textContent = '-';
+            return;
+        }
+
+        const customerName = customer.phone
+            ? `${customer.name} (${customer.phone})`
+            : customer.name;
+
+        billCustomerEl.innerHTML = `
+            <div><strong>Customer:</strong> ${customerName}</div>
+            <div><strong>Type:</strong> ${formatCustomerTypeLabel(customer.customerType)}</div>
+        `;
     }
 
     checkCustomerBtn.addEventListener('click', () => {
         const normalizedPhone = normalizePhone(customerPhoneInput.value);
         if (normalizedPhone.length < 7) {
-            setCustomerCheckMessage('Enter a valid phone number before checking.', 'error');
+            alert('Enter a valid phone number before checking.');
             return;
         }
 
         const foundCustomer = customersByPhone.get(normalizedPhone);
         if (foundCustomer) {
             selectCustomer(foundCustomer);
-            setCustomerCheckMessage(`Existing customer selected: ${foundCustomer.name}`, 'success');
             return;
         }
 
         customerSelect.value = '';
         updateCustomerDisplay();
-        setCustomerCheckMessage('Customer not found. Create customer in popup.', 'info');
         openCustomerCreateModal(normalizedPhone);
     });
 
@@ -1379,8 +1492,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             address: (newCustomerAddress.value || '').trim(),
         };
 
-        if (payload.phone.length < 7) { setCustomerCheckMessage('Enter a valid phone number before creating customer.', 'error'); return; }
-        if (!payload.name || !payload.email || !payload.address) { setCustomerCheckMessage('Name, email and address are required to create customer.', 'error'); return; }
+        if (payload.phone.length < 7) { alert('Enter a valid phone number before creating customer.'); return; }
+        if (!payload.name || !payload.email || !payload.address) { alert('Name, email and address are required to create customer.'); return; }
 
         createCustomerBtn.disabled = true;
         try {
@@ -1391,21 +1504,15 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             });
 
             const data = await response.json();
-            if (!response.ok) { setCustomerCheckMessage(data?.message || 'Unable to create customer.', 'error'); return; }
+            if (!response.ok) { alert(data?.message || 'Unable to create customer.'); return; }
 
             const customer = data?.customer;
-            if (!customer?.id) { setCustomerCheckMessage('Customer response was invalid. Please try again.', 'error'); return; }
+            if (!customer?.id) { alert('Customer response was invalid. Please try again.'); return; }
 
             upsertCustomerIndex(customer);
             selectCustomer(customer);
-            setCustomerCheckMessage(
-                data.status === 'existing'
-                    ? `Existing customer selected: ${customer.name}`
-                    : `Customer created and selected: ${customer.name}`,
-                'success'
-            );
         } catch (error) {
-            setCustomerCheckMessage('Unable to reach server. Please retry.', 'error');
+            alert('Unable to reach server. Please retry.');
         } finally {
             createCustomerBtn.disabled = false;
         }
@@ -1418,10 +1525,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     });
 
     // Product selection listeners
-    categorySelect.addEventListener('change', updateProductOptions);
-    productSelect.addEventListener('change', updateVariantOptions);
+    bindOrderSelectChange(categorySelect, updateProductOptions);
+    bindOrderSelectChange(productSelect, updateVariantOptions);
 
     // Init
+    initOrderSelect2(productSelect, 'Select or scan barcode');
     customerDirectory.forEach(upsertCustomerIndex);
     if (customerSelect.value) {
         const customer = customersById.get(String(customerSelect.value));

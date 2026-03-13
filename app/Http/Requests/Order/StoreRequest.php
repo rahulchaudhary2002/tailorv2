@@ -2,9 +2,13 @@
 
 namespace App\Http\Requests\Order;
 
+use App\Models\InventoryLocation;
+use App\Models\InventoryStock;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\GarmentTypeTailoringPackage;
+use Illuminate\Support\Collection;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -90,8 +94,29 @@ class StoreRequest extends FormRequest
 
             $products = \App\Models\Product::query()
                 ->whereIn('id', $productIds)
-                ->get(['id', 'product_category_id'])
+                ->get(['id', 'product_category_id', 'amount'])
                 ->keyBy('id');
+
+            $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+            $outletLocationId = 0;
+
+            if ($outletId > 0) {
+                $outletLocationId = (int) (InventoryLocation::query()
+                    ->where('outlet_id', $outletId)
+                    ->where('type', InventoryLocation::TYPE_OUTLET)
+                    ->where('is_active', true)
+                    ->value('id') ?? 0);
+            }
+
+            $effectiveProductPrices = $this->resolveProductDefaultPricesForOutlet(
+                $items
+                    ->filter(fn ($item) => (string) ($item['item_category'] ?? '') !== 'custom')
+                    ->map(fn ($item) => (int) ($item['product_id'] ?? 0))
+                    ->filter(fn ($id) => $id > 0)
+                    ->unique()
+                    ->values(),
+                $outletLocationId
+            );
 
             foreach ($items as $index => $item) {
                 $itemCategory = (string) ($item['item_category'] ?? '');
@@ -195,9 +220,15 @@ class StoreRequest extends FormRequest
             $advanceAmount = (float) ($this->input('advance_payment_amount') ?? 0);
             $discountAmount = (float) ($this->input('discount_amount') ?? 0);
             $vatEnabled = $this->boolean('vat_enabled');
-            $grandTotal = $items->sum(function ($item) {
+            $grandTotal = $items->sum(function ($item) use ($effectiveProductPrices) {
                 $qty = (float) ($item['quantity'] ?? 0);
-                $unitPrice = (float) ($item['unit_price'] ?? 0);
+                $itemCategory = (string) ($item['item_category'] ?? '');
+                $productId = (int) ($item['product_id'] ?? 0);
+                $submittedUnitPrice = (float) ($item['unit_price'] ?? 0);
+                $resolvedUnitPrice = (float) ($effectiveProductPrices[$productId] ?? 0);
+                $unitPrice = $itemCategory === 'custom'
+                    ? $submittedUnitPrice
+                    : ($resolvedUnitPrice > 0 ? $resolvedUnitPrice : $submittedUnitPrice);
 
                 return $qty * $unitPrice;
             });
@@ -232,5 +263,75 @@ class StoreRequest extends FormRequest
                 $validator->errors()->add('status', 'Use the status update workflow to mark orders delivered or cancelled.');
             }
         });
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int>  $productIds
+     * @return array<int, float>
+     */
+    private function resolveProductDefaultPricesForOutlet(Collection $productIds, int $outletLocationId): array
+    {
+        $productIds = $productIds
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($productIds->isEmpty()) {
+            return [];
+        }
+
+        $prices = [];
+
+        $applyRows = function ($rows) use (&$prices): void {
+            foreach ($rows as $row) {
+                $productId = (int) $row->product_id;
+
+                if (array_key_exists($productId, $prices)) {
+                    continue;
+                }
+
+                if ($row->special_price === null && $row->base_price === null) {
+                    continue;
+                }
+
+                $prices[$productId] = $row->special_price !== null
+                    ? (float) $row->special_price
+                    : (float) $row->base_price;
+            }
+        };
+
+        if ($outletLocationId > 0) {
+            $applyRows(
+                InventoryStock::query()
+                    ->where('location_id', $outletLocationId)
+                    ->whereIn('product_id', $productIds)
+                    ->orderByDesc('id')
+                    ->get(['product_id', 'base_price', 'special_price'])
+            );
+        }
+
+        $applyRows(
+            InventoryStock::query()
+                ->whereIn('product_id', $productIds)
+                ->orderByDesc('id')
+                ->get(['product_id', 'base_price', 'special_price'])
+        );
+
+        $fallbackAmounts = Product::query()
+            ->whereIn('id', $productIds)
+            ->pluck('amount', 'id');
+
+        foreach ($productIds as $productId) {
+            $productId = (int) $productId;
+
+            if (array_key_exists($productId, $prices)) {
+                continue;
+            }
+
+            $prices[$productId] = (float) ($fallbackAmounts[$productId] ?? 0.0);
+        }
+
+        return $prices;
     }
 }

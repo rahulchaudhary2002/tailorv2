@@ -219,7 +219,7 @@ class OrderController extends Controller
                 $query->whereIn('slug', ['ready-made', 'accessories', 'fabrics']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'product_category_id', 'amount']);
 
         $outletLocation = null;
         if ($outletId > 0) {
@@ -283,6 +283,16 @@ class OrderController extends Controller
             ->get(['product_id', 'base_price', 'special_price']);
 
         $buildPriceMaps($allLocationPriceRows);
+
+        foreach ($products as $product) {
+            $productId = (int) $product->id;
+
+            if (array_key_exists($productId, $productDefaultPrices)) {
+                continue;
+            }
+
+            $productDefaultPrices[$productId] = (float) ($product->amount ?? 0);
+        }
 
         $customers = Customer::query()
             ->with([
@@ -412,6 +422,15 @@ class OrderController extends Controller
 
         $validated = $request->validated();
         $items = collect($validated['items'])->values();
+        $effectiveProductPrices = $this->resolveProductDefaultPricesForOutlet(
+            $items
+                ->filter(fn ($item) => (string) ($item['item_category'] ?? '') !== 'custom')
+                ->map(fn ($item) => (int) ($item['product_id'] ?? 0))
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values(),
+            (int) $outletLocation->id
+        );
 
         $productIds = $items
             ->flatMap(function ($item) {
@@ -737,6 +756,9 @@ class OrderController extends Controller
                     } else {
                         $productId = (int) $item['product_id'];
                         $product = $products->get($productId);
+                        $submittedUnitPrice = (float) ($item['unit_price'] ?? 0.0);
+                        $resolvedUnitPrice = (float) ($effectiveProductPrices[$productId] ?? 0.0);
+                        $unitPrice = $resolvedUnitPrice > 0 ? $resolvedUnitPrice : $submittedUnitPrice;
                         $lineTotal = $quantity * $unitPrice;
 
                         $order->items()->create([
@@ -803,6 +825,80 @@ class OrderController extends Controller
         return redirect()
             ->route('order.index')
             ->with('success', 'Order created successfully.');
+    }
+
+    /**
+     * Resolve the selling price to use for each selected product.
+     *
+     * Prefers the current outlet stock price, then any stock price, then the product amount.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $productIds
+     * @return array<int, float>
+     */
+    private function resolveProductDefaultPricesForOutlet(Collection $productIds, int $outletLocationId): array
+    {
+        $productIds = $productIds
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($productIds->isEmpty()) {
+            return [];
+        }
+
+        $prices = [];
+
+        $applyRows = function ($rows) use (&$prices): void {
+            foreach ($rows as $row) {
+                $productId = (int) $row->product_id;
+
+                if (array_key_exists($productId, $prices)) {
+                    continue;
+                }
+
+                if ($row->special_price === null && $row->base_price === null) {
+                    continue;
+                }
+
+                $prices[$productId] = $row->special_price !== null
+                    ? (float) $row->special_price
+                    : (float) $row->base_price;
+            }
+        };
+
+        if ($outletLocationId > 0) {
+            $applyRows(
+                InventoryStock::query()
+                    ->where('location_id', $outletLocationId)
+                    ->whereIn('product_id', $productIds)
+                    ->orderByDesc('id')
+                    ->get(['product_id', 'base_price', 'special_price'])
+            );
+        }
+
+        $applyRows(
+            InventoryStock::query()
+                ->whereIn('product_id', $productIds)
+                ->orderByDesc('id')
+                ->get(['product_id', 'base_price', 'special_price'])
+        );
+
+        $fallbackAmounts = Product::query()
+            ->whereIn('id', $productIds)
+            ->pluck('amount', 'id');
+
+        foreach ($productIds as $productId) {
+            $productId = (int) $productId;
+
+            if (array_key_exists($productId, $prices)) {
+                continue;
+            }
+
+            $prices[$productId] = (float) ($fallbackAmounts[$productId] ?? 0.0);
+        }
+
+        return $prices;
     }
 
     /**

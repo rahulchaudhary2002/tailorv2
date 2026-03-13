@@ -59,14 +59,6 @@
                         <i class="fas fa-user"></i>
                         <span>My Profile</span>
                     </a>
-                    <a href="settings.html" class="dropdown-item">
-                        <i class="fas fa-cog"></i>
-                        <span>Settings</span>
-                    </a>
-                    <a href="help.html" class="dropdown-item">
-                        <i class="fas fa-question-circle"></i>
-                        <span>Help & Support</span>
-                    </a>
                     <div class="dropdown-divider"></div>
                     <a href="#" class="dropdown-item logout-btn" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         <i class="fas fa-sign-out-alt"></i>

@@ -25,7 +25,6 @@ return new class extends Migration
     {
         Schema::table('order_items', function (Blueprint $table) {
             $table->dropColumn('custom_details');
-            $table->unsignedBigInteger('product_id')->nullable(false)->change();
             $table->dropColumn('item_category');
         });
     }
