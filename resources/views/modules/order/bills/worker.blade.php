@@ -29,7 +29,17 @@
 
         @php
             $workTypes = $customItems
-                ->map(fn ($item) => trim((string) data_get($item->custom_details, 'garment_title', '')))
+                ->flatMap(function ($item) {
+                    $garments = collect((array) data_get($item->custom_details, 'garments', []))
+                        ->pluck('garment_title')
+                        ->filter();
+
+                    if ($garments->isNotEmpty()) {
+                        return $garments;
+                    }
+
+                    return [trim((string) data_get($item->custom_details, 'garment_title', ''))];
+                })
                 ->filter()
                 ->unique()
                 ->values();
@@ -59,8 +69,12 @@
             <tbody>
                 @forelse ($fabricItems as $item)
                     @if ((string) $item->item_category === 'custom')
+                        @php
+                            $customName = data_get($item->custom_details, 'garment_title')
+                                ?: (collect((array) data_get($item->custom_details, 'garments', []))->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment');
+                        @endphp
                         <tr>
-                            <td>{{ data_get($item->custom_details, 'garment_title', 'Custom Garment') }}</td>
+                            <td>{{ $customName }}</td>
                             <td>{{ ucfirst((string) data_get($item->custom_details, 'fabric_source', 'own')) }}</td>
                             <td>{{ number_format((float) data_get($item->custom_details, 'fabric_quantity', 0), 2) }} {{ data_get($item->custom_details, 'fabric_quantity_unit', '') }}</td>
                             <td>{{ data_get($item->custom_details, 'design_note', '-') ?: '-' }}</td>
@@ -81,6 +95,86 @@
     </div>
 
     <div class="bill-card">
+        <h3 class="bill-title" style="font-size:18px;">Measurement Details</h3>
+        @forelse ($customItems as $customItem)
+            @php
+                $garments = collect((array) data_get($customItem->custom_details, 'garments', []));
+                $fallbackMeasurements = (array) data_get($customItem->custom_details, 'measurements', []);
+                $displayName = data_get($customItem->custom_details, 'garment_title')
+                    ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment');
+            @endphp
+
+            <div class="bill-muted" style="margin-top:10px;">
+                {{ $displayName }}
+            </div>
+
+            @if ($garments->isNotEmpty())
+                @foreach ($garments as $garment)
+                    <div class="bill-detail-box" style="margin-top:10px;">
+                        <div class="bill-detail-row" style="padding-top:0;">
+                            <div>
+                                <div class="bill-detail-name">
+                                    {{ $garment['garment_title'] ?? 'Garment' }} x {{ number_format((float) ($garment['quantity'] ?? 1), 2) }}
+                                </div>
+                                <div class="bill-detail-meta">
+                                    {{ $garment['tailoring_package'] ?? 'Tailoring' }}
+                                </div>
+                            </div>
+                            <div class="bill-detail-price">
+                                Stitching
+                            </div>
+                        </div>
+
+                        <table class="bill-table" style="margin-top:10px;">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Measurement</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ((array) ($garment['measurements'] ?? []) as $measurement)
+                                    <tr>
+                                        <td>{{ $measurement['type'] ?? '-' }}</td>
+                                        <td>{{ $measurement['measurement'] ?? '-' }}</td>
+                                        <td>{{ $measurement['unit'] ?? '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="3">No measurements captured.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                @endforeach
+            @else
+                <table class="bill-table" style="margin-top:10px;">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Measurement</th>
+                            <th>Unit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($fallbackMeasurements as $measurement)
+                            <tr>
+                                <td>{{ $measurement['type'] ?? '-' }}</td>
+                                <td>{{ $measurement['measurement'] ?? '-' }}</td>
+                                <td>{{ $measurement['unit'] ?? '-' }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3">No measurements captured.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            @endif
+        @empty
+            <div class="bill-muted">No measurement details available for this order.</div>
+        @endforelse
+    </div>
+
+    <div class="bill-card">
         <h3 class="bill-title" style="font-size:18px;">Design References</h3>
         @forelse ($customItems as $customItem)
             @php
@@ -91,7 +185,8 @@
                     ->values();
             @endphp
             <div class="bill-muted" style="margin-top:10px;">
-                {{ data_get($customItem->custom_details, 'garment_title', 'Custom Garment') }}
+                {{ data_get($customItem->custom_details, 'garment_title')
+                    ?: (collect((array) data_get($customItem->custom_details, 'garments', []))->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment') }}
             </div>
             @if ($designImages->isNotEmpty())
                 <div class="bill-design-grid" style="margin-top:6px;">

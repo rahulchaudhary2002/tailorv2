@@ -118,6 +118,52 @@
         background: #fff;
     }
 
+    .bill-detail-box {
+        background: #f9f0ff;
+        border: 1px solid #eadcf6;
+        border-left: 4px solid #7b1fa2;
+        border-radius: 10px;
+        padding: 12px 14px;
+    }
+
+    .bill-detail-grid {
+        display: grid;
+        gap: 10px;
+    }
+
+    .bill-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 10px 0;
+        border-bottom: 1px dashed #d9c8ea;
+    }
+
+    .bill-detail-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .bill-detail-name {
+        font-weight: 700;
+        color: #5a267e;
+    }
+
+    .bill-detail-meta {
+        color: #5f7083;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .bill-detail-price {
+        flex-shrink: 0;
+        text-align: right;
+        white-space: nowrap;
+        font-weight: 700;
+        color: #1f3d5a;
+    }
+
     @media print {
         .bill-actions,
         .page-header {

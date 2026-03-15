@@ -2,13 +2,10 @@
 
 namespace App\Http\Requests\Order;
 
-use App\Models\InventoryLocation;
-use App\Models\InventoryStock;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\GarmentTypeTailoringPackage;
-use Illuminate\Support\Collection;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -46,22 +43,26 @@ class StoreRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_category' => ['required', 'string', Rule::in(['custom', 'fabric', 'readymade'])],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.size' => ['nullable', 'string', Rule::in(['S', 'M', 'L', 'XL', 'XXL'])],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'items.*.custom.garment_type_id' => ['nullable', 'integer', 'exists:garment_types,id'],
             'items.*.custom.fabric_source' => ['nullable', 'string', Rule::in(['own', 'stock'])],
             'items.*.custom.fabric_product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.custom.fabric_quantity' => ['nullable', 'numeric', 'min:0.01'],
             'items.*.custom.design_note' => ['nullable', 'string', 'max:1000'],
             'items.*.custom.design_images' => ['nullable', 'array'],
             'items.*.custom.design_images.*' => ['nullable', 'image', 'max:5120'],
-            'items.*.custom.measurements' => ['nullable', 'array'],
-            'items.*.custom.measurements.*.type' => ['nullable', 'string', 'max:100'],
-            'items.*.custom.measurements.*.measurement' => ['nullable', 'string', 'max:100'],
-            'items.*.custom.measurements.*.unit' => ['nullable', 'string', 'max:20'],
-            'items.*.custom.tailoring_package_id' => ['nullable', 'integer', 'exists:garment_type_tailoring_packages,id'],
-            'items.*.custom.tailoring_package' => ['nullable', 'string', 'max:100'],
-            'items.*.custom.tailoring_amount' => ['nullable', 'numeric', 'min:0'],
+            'items.*.custom.garments' => ['nullable', 'array'],
+            'items.*.custom.garments.*.garment_type_id' => ['nullable', 'integer', 'exists:garment_types,id'],
+            'items.*.custom.garments.*.garment_title' => ['nullable', 'string', 'max:100'],
+            'items.*.custom.garments.*.quantity' => ['nullable', 'numeric', 'min:1'],
+            'items.*.custom.garments.*.measurements' => ['nullable', 'array'],
+            'items.*.custom.garments.*.measurements.*.type' => ['nullable', 'string', 'max:100'],
+            'items.*.custom.garments.*.measurements.*.measurement' => ['nullable', 'string', 'max:100'],
+            'items.*.custom.garments.*.measurements.*.unit' => ['nullable', 'string', 'max:20'],
+            'items.*.custom.garments.*.tailoring_package_id' => ['nullable', 'integer', 'exists:garment_type_tailoring_packages,id'],
+            'items.*.custom.garments.*.tailoring_package' => ['nullable', 'string', 'max:100'],
+            'items.*.custom.garments.*.tailoring_amount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -97,83 +98,104 @@ class StoreRequest extends FormRequest
                 ->get(['id', 'product_category_id', 'amount'])
                 ->keyBy('id');
 
-            $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
-            $outletLocationId = 0;
-
-            if ($outletId > 0) {
-                $outletLocationId = (int) (InventoryLocation::query()
-                    ->where('outlet_id', $outletId)
-                    ->where('type', InventoryLocation::TYPE_OUTLET)
-                    ->where('is_active', true)
-                    ->value('id') ?? 0);
-            }
-
-            $effectiveProductPrices = $this->resolveProductDefaultPricesForOutlet(
-                $items
-                    ->filter(fn ($item) => (string) ($item['item_category'] ?? '') !== 'custom')
-                    ->map(fn ($item) => (int) ($item['product_id'] ?? 0))
-                    ->filter(fn ($id) => $id > 0)
-                    ->unique()
-                    ->values(),
-                $outletLocationId
-            );
+            $effectiveProductPrices = Product::query()
+                ->whereIn(
+                    'id',
+                    $items
+                        ->filter(fn ($item) => (string) ($item['item_category'] ?? '') !== 'custom')
+                        ->map(fn ($item) => (int) ($item['product_id'] ?? 0))
+                        ->filter(fn ($id) => $id > 0)
+                        ->unique()
+                        ->values()
+                )
+                ->pluck('amount', 'id')
+                ->map(fn ($amount) => (float) $amount)
+                ->all();
 
             foreach ($items as $index => $item) {
                 $itemCategory = (string) ($item['item_category'] ?? '');
                 $productId = (int) ($item['product_id'] ?? 0);
 
                 if ($itemCategory === 'custom') {
-                    $garmentTypeId = (int) data_get($item, 'custom.garment_type_id', 0);
                     $fabricSource = (string) data_get($item, 'custom.fabric_source', '');
-                    $measurements = collect((array) data_get($item, 'custom.measurements', []))->values();
-                    $tailoringPackageId = (int) data_get($item, 'custom.tailoring_package_id', 0);
-                    $tailoringPackage = trim((string) data_get($item, 'custom.tailoring_package', ''));
-                    $tailoringAmount = (float) data_get($item, 'custom.tailoring_amount', 0);
-
-                    if ($garmentTypeId < 1) {
-                        $validator->errors()->add("items.{$index}.custom.garment_type_id", 'Garment type is required for custom item.');
-                    }
+                    $garments = collect((array) data_get($item, 'custom.garments', []))->values();
 
                     if (!in_array($fabricSource, ['own', 'stock'], true)) {
                         $validator->errors()->add("items.{$index}.custom.fabric_source", 'Fabric source is required for custom item.');
                     }
 
-                    if ($measurements->isEmpty()) {
-                        $validator->errors()->add("items.{$index}.custom.measurements", 'At least one measurement row is required for custom item.');
+                    if ($garments->isEmpty()) {
+                        $validator->errors()->add("items.{$index}.custom.garments", 'At least one garment entry is required for custom item.');
                     }
 
-                    if ($tailoringPackage === '') {
-                        $validator->errors()->add("items.{$index}.custom.tailoring_package", 'Tailoring package is required for custom item.');
-                    }
+                    foreach ($garments as $garmentIndex => $garment) {
+                        $garmentTypeId = (int) ($garment['garment_type_id'] ?? 0);
+                        $garmentQty = (float) ($garment['quantity'] ?? 0);
+                        $measurements = collect((array) ($garment['measurements'] ?? []))->values();
+                        $tailoringPackageId = (int) ($garment['tailoring_package_id'] ?? 0);
+                        $tailoringPackage = trim((string) ($garment['tailoring_package'] ?? ''));
+                        $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
 
-                    if ($tailoringAmount <= 0) {
-                        $validator->errors()->add("items.{$index}.custom.tailoring_amount", 'Tailoring amount must be greater than zero for custom item.');
-                    }
-
-                    if ($tailoringPackageId > 0) {
-                        $validPackage = GarmentTypeTailoringPackage::query()
-                            ->whereKey($tailoringPackageId)
-                            ->where('garment_type_id', $garmentTypeId)
-                            ->exists();
-
-                        if (!$validPackage) {
+                        if ($garmentTypeId < 1) {
                             $validator->errors()->add(
-                                "items.{$index}.custom.tailoring_package_id",
-                                'Selected tailoring package does not belong to selected garment type.'
+                                "items.{$index}.custom.garments.{$garmentIndex}.garment_type_id",
+                                'Garment type is required for every garment row.'
                             );
                         }
-                    }
 
-                    foreach ($measurements as $measurementIndex => $measurement) {
-                        $type = trim((string) ($measurement['type'] ?? ''));
-                        $value = trim((string) ($measurement['measurement'] ?? ''));
-                        $unit = trim((string) ($measurement['unit'] ?? ''));
-
-                        if ($type === '' || $value === '' || $unit === '') {
+                        if ($garmentQty < 1) {
                             $validator->errors()->add(
-                                "items.{$index}.custom.measurements.{$measurementIndex}.measurement",
-                                'Measurement type, value and unit are required.'
+                                "items.{$index}.custom.garments.{$garmentIndex}.quantity",
+                                'Garment quantity must be at least 1.'
                             );
+                        }
+
+                        if ($measurements->isEmpty()) {
+                            $validator->errors()->add(
+                                "items.{$index}.custom.garments.{$garmentIndex}.measurements",
+                                'At least one measurement row is required for every garment row.'
+                            );
+                        }
+
+                        if ($tailoringPackage === '') {
+                            $validator->errors()->add(
+                                "items.{$index}.custom.garments.{$garmentIndex}.tailoring_package",
+                                'Tailoring package is required for every garment row.'
+                            );
+                        }
+
+                        if ($tailoringAmount <= 0) {
+                            $validator->errors()->add(
+                                "items.{$index}.custom.garments.{$garmentIndex}.tailoring_amount",
+                                'Tailoring amount must be greater than zero for every garment row.'
+                            );
+                        }
+
+                        if ($tailoringPackageId > 0 && $garmentTypeId > 0) {
+                            $validPackage = GarmentTypeTailoringPackage::query()
+                                ->whereKey($tailoringPackageId)
+                                ->where('garment_type_id', $garmentTypeId)
+                                ->exists();
+
+                            if (!$validPackage) {
+                                $validator->errors()->add(
+                                    "items.{$index}.custom.garments.{$garmentIndex}.tailoring_package_id",
+                                    'Selected tailoring package does not belong to selected garment type.'
+                                );
+                            }
+                        }
+
+                        foreach ($measurements as $measurementIndex => $measurement) {
+                            $type = trim((string) ($measurement['type'] ?? ''));
+                            $value = trim((string) ($measurement['measurement'] ?? ''));
+                            $unit = trim((string) ($measurement['unit'] ?? ''));
+
+                            if ($type === '' || $value === '' || $unit === '') {
+                                $validator->errors()->add(
+                                    "items.{$index}.custom.garments.{$garmentIndex}.measurements.{$measurementIndex}.measurement",
+                                    'Measurement type, value and unit are required.'
+                                );
+                            }
                         }
                     }
 
@@ -215,12 +237,16 @@ class StoreRequest extends FormRequest
                     $validator->errors()->add("items.{$index}.product_id", 'Readymade category item cannot use a fabric product.');
                 }
 
+                if ($itemCategory === 'readymade' && !in_array((string) ($item['size'] ?? ''), ['S', 'M', 'L', 'XL', 'XXL'], true)) {
+                    $validator->errors()->add("items.{$index}.size", 'Size is required for ready-made item.');
+                }
+
             }
 
             $advanceAmount = (float) ($this->input('advance_payment_amount') ?? 0);
             $discountAmount = (float) ($this->input('discount_amount') ?? 0);
             $vatEnabled = $this->boolean('vat_enabled');
-            $grandTotal = $items->sum(function ($item) use ($effectiveProductPrices) {
+            $subtotal = $items->sum(function ($item) use ($effectiveProductPrices) {
                 $qty = (float) ($item['quantity'] ?? 0);
                 $itemCategory = (string) ($item['item_category'] ?? '');
                 $productId = (int) ($item['product_id'] ?? 0);
@@ -232,11 +258,17 @@ class StoreRequest extends FormRequest
 
                 return $qty * $unitPrice;
             });
-            $netTotalWithoutVat = max(0.0, $grandTotal - $discountAmount);
+            $tailoringTotal = $items->sum(function ($item) {
+                return collect((array) data_get($item, 'custom.garments', []))
+                    ->sum(function ($garment) {
+                        return (float) ($garment['quantity'] ?? 0) * (float) ($garment['tailoring_amount'] ?? 0);
+                    });
+            });
+            $netTotalWithoutVat = max(0.0, $subtotal - $discountAmount);
             $vatAmount = $vatEnabled ? ($netTotalWithoutVat * 0.13) : 0.0;
-            $netTotal = $netTotalWithoutVat + $vatAmount;
+            $netTotal = $netTotalWithoutVat + $vatAmount + $tailoringTotal;
 
-            if ($discountAmount > $grandTotal) {
+            if ($discountAmount > $subtotal) {
                 $validator->errors()->add('discount_amount', 'Discount cannot be greater than order total.');
             }
 
@@ -265,73 +297,4 @@ class StoreRequest extends FormRequest
         });
     }
 
-    /**
-     * @param  \Illuminate\Support\Collection<int, int>  $productIds
-     * @return array<int, float>
-     */
-    private function resolveProductDefaultPricesForOutlet(Collection $productIds, int $outletLocationId): array
-    {
-        $productIds = $productIds
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->unique()
-            ->values();
-
-        if ($productIds->isEmpty()) {
-            return [];
-        }
-
-        $prices = [];
-
-        $applyRows = function ($rows) use (&$prices): void {
-            foreach ($rows as $row) {
-                $productId = (int) $row->product_id;
-
-                if (array_key_exists($productId, $prices)) {
-                    continue;
-                }
-
-                if ($row->special_price === null && $row->base_price === null) {
-                    continue;
-                }
-
-                $prices[$productId] = $row->special_price !== null
-                    ? (float) $row->special_price
-                    : (float) $row->base_price;
-            }
-        };
-
-        if ($outletLocationId > 0) {
-            $applyRows(
-                InventoryStock::query()
-                    ->where('location_id', $outletLocationId)
-                    ->whereIn('product_id', $productIds)
-                    ->orderByDesc('id')
-                    ->get(['product_id', 'base_price', 'special_price'])
-            );
-        }
-
-        $applyRows(
-            InventoryStock::query()
-                ->whereIn('product_id', $productIds)
-                ->orderByDesc('id')
-                ->get(['product_id', 'base_price', 'special_price'])
-        );
-
-        $fallbackAmounts = Product::query()
-            ->whereIn('id', $productIds)
-            ->pluck('amount', 'id');
-
-        foreach ($productIds as $productId) {
-            $productId = (int) $productId;
-
-            if (array_key_exists($productId, $prices)) {
-                continue;
-            }
-
-            $prices[$productId] = (float) ($fallbackAmounts[$productId] ?? 0.0);
-        }
-
-        return $prices;
-    }
 }

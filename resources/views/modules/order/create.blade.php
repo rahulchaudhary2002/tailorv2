@@ -5,7 +5,7 @@
 @section('content')
 @php
 // Build lightweight payloads for JS
-$productPayload = $products->map(function ($product) use ($productDefaultPrices, $productAvailableQty) {
+$productPayload = $products->map(function ($product) use ($productAvailableQty) {
     $isFabric = (string) ($product->category?->slug ?? '') === 'fabrics';
 
     return [
@@ -17,9 +17,7 @@ $productPayload = $products->map(function ($product) use ($productDefaultPrices,
         'availableQty' => array_key_exists($product->id, $productAvailableQty)
             ? (float) $productAvailableQty[$product->id]
             : 0.0,
-        'defaultPrice' => array_key_exists($product->id, $productDefaultPrices)
-            ? (float) $productDefaultPrices[$product->id]
-            : null,
+        'defaultPrice' => (float) ($product->amount ?? 0),
         'variants' => [],
     ];
 })->values();
@@ -146,6 +144,17 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     </select>
                 </div>
 
+                <div class="form-group" id="sizeSelector" style="display:none;">
+                    <label>Select Size *</label>
+                    <div class="tp-size-radio-group">
+                        <label><input type="radio" name="productSize" value="S"> S</label>
+                        <label><input type="radio" name="productSize" value="M" checked> M</label>
+                        <label><input type="radio" name="productSize" value="L"> L</label>
+                        <label><input type="radio" name="productSize" value="XL"> XL</label>
+                        <label><input type="radio" name="productSize" value="XXL"> XXL</label>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Select Product *</label>
                     <select id="productSelect" class="tp-input">
@@ -157,11 +166,13 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <option value="">No Variant</option>
                 </select>
 
-                <div class="form-group">
+                <div class="form-group" id="singleQuantityGroup">
                     <label>Quantity</label>
                     <input id="quantity" type="number" min="1" step="1" class="tp-input" value="1">
                     <small class="tp-hint" id="qtyUnitHint">-</small>
                 </div>
+
+                <div class="form-group" id="customQuantityContainer" style="display:none;"></div>
 
                 <div class="form-group">
                     <button type="button" id="addToBill" class="tp-btn">
@@ -294,7 +305,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
     <div class="tp-modal-overlay" id="measurementModal" style="display:none;">
         <div class="tp-modal">
             <div class="tp-modal-header">
-                <h3><i class="fas fa-ruler-combined"></i> Measurements & Tailoring</h3>
+                <h3><i class="fas fa-ruler-combined"></i> Measurements & Tailoring (<span id="modalProductCounter">1/1</span>)</h3>
                 <button type="button" class="tp-modal-close" id="closeModal">&times;</button>
             </div>
 
@@ -303,13 +314,18 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <div><strong>Product:</strong> <span id="modalProductName">-</span></div>
                     <div><strong>Unit Price:</strong> <span id="modalProductPrice">0.00</span></div>
                     <div><strong>Qty:</strong> <span id="modalProductQuantity">0.00</span></div>
+                    <div><strong>Queue:</strong> <span id="modalQueueLabel">-</span></div>
+                </div>
+
+                <div class="tp-modal-section" style="margin-top:14px;">
+                    <h4><i class="fas fa-layer-group"></i> Selected Fabrics</h4>
+                    <div id="selectedFabricQueue" class="tp-selected-fabric-queue"></div>
                 </div>
 
                 <div class="tp-form-group" style="margin-top: 14px;">
                     <label>Garment Type *</label>
-                    <select id="garmentType" class="tp-input">
-                        <option value="">Select Garment Type</option>
-                    </select>
+                    <div id="garmentTypeCheckboxes" class="tp-garment-check-group"></div>
+                    <small class="tp-hint">Select one or more garments for the current fabric.</small>
                 </div>
 
                 <div class="tp-modal-section">
@@ -335,26 +351,18 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
                 <div class="tp-modal-section">
                     <h4>Measurement Details</h4>
-                    <div id="measurementFields" class="tp-measurement-grid"></div>
-                    <small class="tp-hint">Fields come from your GarmentType measurements.</small>
+                    <div id="measurementFields" class="tp-garment-sections"></div>
+                    <small class="tp-hint">Each selected garment keeps its own quantity, measurements, and tailoring package.</small>
                 </div>
 
                 <div class="tp-modal-section tp-stitching">
-                    <h4><i class="fas fa-cut"></i> Select Tailoring Package</h4>
-                    <div class="tp-tailoring-options" id="tailoringOptions"></div>
-
-                    <div id="selectedTailoringPackage" class="tp-selected-package" style="display:none;">
-                        <strong>Selected:</strong> <span id="selectedPackageName">-</span>
-                        — NPR <span id="selectedPackagePrice">0.00</span>
-                    </div>
-
                     <div class="tp-form-group" style="margin-top: 12px;">
                         <label>Design Note</label>
                         <textarea id="customDesignNote" class="tp-input" rows="3" placeholder="Design details..."></textarea>
                     </div>
 
                     <div class="tp-form-group">
-                        <label>Design Images</label>
+                        <label>Upload design sample (optional)</label>
                         <input id="customDesignImages" type="file" class="tp-input" accept="image/*" multiple>
                         <small class="tp-hint">Images will be submitted with the form.</small>
                     </div>
@@ -383,7 +391,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
 .demo-layout{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px;}
 @media(max-width:1024px){.demo-layout{grid-template-columns:1fr;}}
 .order-entry{padding:20px;background:#f8f9fa;border-radius:var(--radius);border:1px solid #ddd;}
-.live-bill{padding:20px;background:#fff;border-radius:var(--radius);border:1px solid #ddd;box-shadow:0 0 15px rgba(0,0,0,.05);}
+.live-bill{padding:24px;background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);border-radius:18px;border:1px solid #d9e3f0;box-shadow:0 18px 40px rgba(26,54,93,.08);}
 h2,h3,h4{color:var(--primary);margin-bottom:15px;padding-bottom:8px;border-bottom:2px solid #eee;}
 h2 i,h3 i,h4 i{margin-right:10px;color:var(--accent);}
 .form-group{margin-bottom:15px;}
@@ -436,6 +444,55 @@ label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
     background:#fff;
     box-shadow:0 0 0 3px rgba(201,169,110,.16);
 }
+.demo-section .select2-container--default .select2-selection--multiple{
+    min-height:43px;
+    border:1px solid #c9d5e6;
+    border-radius:var(--radius);
+    background:#f7fafd;
+    padding:4px 10px;
+}
+.demo-section .select2-container--default .select2-selection--multiple .select2-selection__choice{
+    background:var(--primary);
+    border:none;
+    color:#fff;
+    border-radius:999px;
+    padding:4px 10px 4px 12px;
+    margin-top:4px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    flex-direction:row-reverse;
+    font-weight:600;
+}
+.demo-section .select2-container--default .select2-selection--multiple .select2-selection__choice__remove{
+    position:static;
+    color:#fff;
+    margin:0;
+    margin-left:2px;
+    width:18px;
+    height:18px;
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(255,255,255,.18);
+    transition:background-color .2s ease,color .2s ease;
+    flex-shrink:0;
+}
+.demo-section .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover{
+    background:#fff;
+    color:var(--primary);
+}
+.demo-section .select2-container--default .select2-selection--multiple .select2-selection__choice__display{
+    padding-left:0;
+    padding-right:0;
+}
+.demo-section .select2-container--default.select2-container--focus .select2-selection--multiple,
+.demo-section .select2-container--default.select2-container--open .select2-selection--multiple{
+    border-color:var(--accent);
+    background:#fff;
+    box-shadow:0 0 0 3px rgba(201,169,110,.16);
+}
 .demo-section .select2-dropdown{
     border:1px solid #d7e0ec;
     border-radius:var(--radius);
@@ -472,6 +529,9 @@ label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
 .customer-check-row{display:flex;gap:10px;}
 .customer-check-row .tp-input{flex:1;}
 .customer-check-message{font-size:.9rem;margin-top:10px;padding:10px;border-radius:var(--radius);border-left:4px solid var(--accent);}
+.tp-size-radio-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
+.tp-size-radio-group label{display:flex;align-items:center;gap:6px;font-weight:500;background:#e9eef5;padding:8px 14px;border-radius:999px;cursor:pointer;color:var(--primary);}
+.tp-size-radio-group input[type="radio"]{width:auto;margin:0;}
 button,.tp-btn,.btn-secondary,.btn-success,.btn-danger{color:#fff;border:none;padding:12px 20px;border-radius:var(--radius);cursor:pointer;font-weight:600;transition:background-color .3s;}
 button,.tp-btn{background:var(--primary);}
 button:hover,.tp-btn:hover{background:var(--secondary);}
@@ -487,7 +547,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-btn-success:hover{background:#218838;}
 .tp-btn-danger{background:var(--danger);}
 .tp-btn-danger:hover{background:#c82333;}
-.bill-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--accent);}
+.bill-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid #d9e3f0;}
 .bill-title{font-size:1.5rem;font-weight:700;color:var(--primary);}
 .toggle-switch{display:flex;align-items:center;gap:10px;}
 .switch{position:relative;display:inline-block;width:60px;height:30px;}
@@ -496,30 +556,36 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .slider:before{position:absolute;content:"";height:22px;width:22px;left:4px;bottom:4px;background:#fff;transition:.4s;border-radius:50%;}
 .switch input:checked+.slider{background:var(--success);}
 .switch input:checked+.slider:before{transform:translateX(30px);}
-.customer-display{background:#f8f9fa;padding:15px;border-radius:var(--radius);margin-bottom:20px;}
-.bill-items{margin-bottom:20px;max-height:300px;overflow-y:auto;}
-.bill-item{padding:10px 0;border-bottom:1px dashed #eee;}
-.item-details{display:flex;justify-content:space-between;margin-bottom:5px;gap:12px;}
-.item-sub{font-size:.9rem;color:#666;margin-top:5px;}
-.stitching-detail{background:#f9f0ff;padding:8px 12px;border-radius:4px;margin-top:5px;font-size:.9rem;border-left:3px solid #7b1fa2;}
-.product-actions{display:flex;gap:10px;margin-top:8px;}
-.product-actions button{padding:4px 10px;font-size:.8rem;}
+.customer-display{background:linear-gradient(135deg,#f4f8fd 0%,#eef4fb 100%);padding:16px 18px;border-radius:14px;margin-bottom:20px;border:1px solid #dbe5f1;}
+.bill-items{margin-bottom:20px;max-height:360px;overflow-y:auto;display:grid;gap:12px;padding-right:4px;}
+.bill-item{padding:16px;background:#fff;border:1px solid #e1eaf4;border-radius:16px;display:grid;gap:10px;box-shadow:0 8px 18px rgba(22,44,72,.05);}
+.item-details{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0;gap:16px;}
+.item-main{flex:1;min-width:0;}
+.item-price{flex-shrink:0;min-width:132px;text-align:right;padding:10px 12px;border-radius:12px;background:#f5f8fc;color:var(--primary);}
+.item-sub{font-size:.9rem;color:#5f7083;margin-top:6px;line-height:1.5;}
+.stitching-detail{background:linear-gradient(135deg,#fbf4ff 0%,#f6ecff 100%);padding:12px 14px;border-radius:12px;font-size:.9rem;border:1px solid #e6d8f5;border-left:4px solid #7b1fa2;width:100%;box-sizing:border-box;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;grid-column:1 / -1;}
+.stitching-detail > div:first-child{flex:1;min-width:0;}
+.stitching-detail > div:last-child{flex-shrink:0;white-space:nowrap;}
+.product-actions{display:flex;gap:10px;margin-top:10px;}
+.product-actions button{padding:6px 12px;font-size:.8rem;border-radius:999px;}
 .product-category{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:600;margin-left:10px;}
 .fabric-cat{background:#e3f2fd;color:#1565c0;}
 .ready-made-cat{background:#e8f5e9;color:#2e7d32;}
 .custom-cat{background:#f3e5f5;color:#7b1fa2;}
-.tailoring-breakdown{background:#f9f0ff;padding:12px;border-radius:var(--radius);margin-bottom:15px;}
+.tailoring-breakdown{background:linear-gradient(135deg,#fbf4ff 0%,#f5ebff 100%);padding:14px 16px;border-radius:14px;margin-bottom:16px;border:1px solid #eadcf6;}
 .tailoring-breakdown h5{margin:0 0 8px;color:#7b1fa2;}
 .tailoring-item{display:flex;justify-content:space-between;padding:4px 0;}
 .tailoring-total{font-weight:700;border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
-.discount-section{background:#f8f9fa;padding:15px;border-radius:var(--radius);margin-top:15px;}
+.discount-section{background:#f7fafc;padding:16px;border-radius:14px;margin-top:15px;border:1px solid #dbe5f1;}
 .discount-row{display:flex;gap:10px;margin-top:10px;}
 .discount-row .tp-input{flex:1;}
 .discount-display{margin-top:10px;font-weight:700;color:var(--success);}
-.bill-summary{border-top:2px solid var(--primary);padding-top:15px;margin-top:15px;}
-.summary-row{display:flex;justify-content:space-between;padding:8px 0;}
-.total-row{font-weight:700;font-size:1.2rem;color:var(--primary);border-top:2px solid #ddd;margin-top:10px;padding-top:10px;}
-.bill-actions{margin-top:20px;display:flex;gap:10px;}
+.bill-summary{border-top:1px solid #dbe5f1;padding-top:16px;margin-top:18px;display:grid;gap:4px;}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:#34506b;}
+.summary-row span:last-child{font-weight:700;color:#17324d;}
+.total-row{font-weight:700;font-size:1.15rem;color:var(--primary);border-top:1px solid #dbe5f1;margin-top:8px;padding-top:14px;}
+.total-row span:last-child{font-size:1.4rem;color:#0f2942;}
+.bill-actions{margin-top:22px;display:flex;gap:12px;}
 .bill-actions>*{flex:1;}
 .tp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;}
 .tp-modal{width:100%;max-width:860px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.30);overflow:hidden;}
@@ -531,6 +597,23 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-modal-section{margin-top:14px;border:1px solid #eef1f5;border-radius:10px;padding:12px;}
 .tp-modal-section h4{margin:0 0 10px;color:var(--primary);}
 .tp-measurement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.tp-garment-sections{display:grid;gap:14px;}
+.tp-garment-check-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
+.tp-garment-check-item{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:#eef3f9;border:1px solid #d7e0ec;color:var(--primary);font-weight:600;cursor:pointer;}
+.tp-garment-check-item input[type="checkbox"]{width:auto;margin:0;}
+.tp-garment-section{border:1px solid #e2d7ef;border-radius:12px;padding:14px;background:#fff;}
+.tp-garment-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;}
+.tp-garment-title{font-weight:700;color:#7b1fa2;}
+.tp-garment-summary{font-size:12px;color:#6a7785;}
+.tp-product-quantity-list{display:grid;gap:10px;padding:12px;border:1px solid #d7e0ec;border-radius:10px;background:#fff;}
+.tp-product-quantity-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #eef1f5;border-radius:10px;}
+.tp-product-quantity-item strong{color:var(--primary);}
+.tp-product-quantity-input{display:flex;align-items:center;gap:8px;}
+.tp-product-quantity-input input{width:110px;}
+.tp-selected-fabric-queue{display:grid;gap:8px;}
+.tp-selected-fabric-chip{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d7e0ec;border-radius:10px;background:#f7fafd;color:var(--primary);}
+.tp-selected-fabric-chip.active{border-color:#7b1fa2;background:#f9f0ff;box-shadow:0 0 0 2px rgba(123,31,162,.12);}
+.tp-selected-fabric-chip strong{color:inherit;}
 .tp-stitching{background:#f9f0ff;border-color:#eadcf6;}
 .tp-tailoring-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
 .tp-tailoring-option{background:#fff;border:1px solid #d1c4e9;border-radius:10px;padding:12px;cursor:pointer;transition:.2s;}
@@ -554,15 +637,18 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const resolveCustomerUrl = @json(route('order.customer.resolve'));
     const csrfToken = @json(csrf_token());
 
-    const productMap = new Map(products.map(p => [String(p.id), p]));
-    const garmentMap = new Map(garmentTypes.map(g => [String(g.id), g]));
+    const productMap = new Map(products.map((product) => [String(product.id), product]));
+    const garmentMap = new Map(garmentTypes.map((garment) => [String(garment.id), garment]));
 
     const categorySelect = document.getElementById('productCategory');
     const productSelect = document.getElementById('productSelect');
-    const variantSelect = document.getElementById('variantSelect');
     const qtyInput = document.getElementById('quantity');
     const unitHint = document.getElementById('qtyUnitHint');
     const addBtn = document.getElementById('addToBill');
+    const singleQuantityGroup = document.getElementById('singleQuantityGroup');
+    const customQuantityContainer = document.getElementById('customQuantityContainer');
+    const sizeSelector = document.getElementById('sizeSelector');
+    const sizeRadios = Array.from(document.querySelectorAll('input[name="productSize"]'));
 
     const billItemsEl = document.getElementById('billItems');
     const tailoringBreakdownEl = document.getElementById('tailoringBreakdown');
@@ -603,8 +689,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const saveOrderBtn = document.getElementById('saveOrder');
     const printBillInput = document.getElementById('print_bill');
     const orderForm = document.getElementById('orderForm');
+    const hiddenInputsHost = document.getElementById('itemsHiddenInputs');
 
-    // Modal
     const modal = document.getElementById('measurementModal');
     const closeModalBtn = document.getElementById('closeModal');
     const cancelMeasurementBtn = document.getElementById('cancelMeasurement');
@@ -612,107 +698,134 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const modalProductName = document.getElementById('modalProductName');
     const modalProductPrice = document.getElementById('modalProductPrice');
     const modalProductQuantity = document.getElementById('modalProductQuantity');
-
-    const garmentTypeSelect = document.getElementById('garmentType');
+    const modalProductCounter = document.getElementById('modalProductCounter');
+    const modalQueueLabel = document.getElementById('modalQueueLabel');
+    const selectedFabricQueue = document.getElementById('selectedFabricQueue');
+    const garmentTypeCheckboxes = document.getElementById('garmentTypeCheckboxes');
     const measurementFieldsEl = document.getElementById('measurementFields');
     const customFabricOwnRadio = document.getElementById('customFabricOwn');
     const customFabricStockRadio = document.getElementById('customFabricStock');
     const customStockFabricFields = document.getElementById('customStockFabricFields');
     const customStockFabricQty = document.getElementById('customStockFabricQty');
     const customStockFabricHint = document.getElementById('customStockFabricHint');
-
-    const tailoringOptionsEl = document.getElementById('tailoringOptions');
-    const selectedTailoringBox = document.getElementById('selectedTailoringPackage');
-    const selectedPackageNameEl = document.getElementById('selectedPackageName');
-    const selectedPackagePriceEl = document.getElementById('selectedPackagePrice');
-
     const customDesignNote = document.getElementById('customDesignNote');
     const customDesignImages = document.getElementById('customDesignImages');
 
-    const hiddenInputsHost = document.getElementById('itemsHiddenInputs');
-
-    function initOrderSelect2(selectEl, placeholder = 'Select option') {
-        if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
-            return;
-        }
-
-        if (selectEl.dataset.select2Ready === '1') {
-            return;
-        }
-
-        const hasEmptyOption = Array.from(selectEl.options || []).some((option) => option.value === '');
-
-        window.jQuery(selectEl).select2({
-            width: '100%',
-            placeholder,
-            allowClear: hasEmptyOption,
-            dropdownParent: window.jQuery(selectEl.closest('.tp-modal') || document.body),
-        });
-
-        selectEl.dataset.select2Ready = '1';
-    }
-
-    function refreshOrderSelect2(selectEl) {
-        if (!selectEl || selectEl.dataset.select2Ready !== '1' || !window.jQuery) {
-            return;
-        }
-
-        window.jQuery(selectEl).trigger('change.select2');
-    }
-
-    function bindOrderSelectChange(selectEl, onChange) {
-        if (!selectEl || typeof onChange !== 'function') {
-            return;
-        }
-
-        selectEl.addEventListener('change', onChange);
-
-        if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
-            window.jQuery(selectEl).on('select2:select select2:clear', onChange);
-        }
-    }
-
-    // Bill State
     let billItems = [];
     let discount = { type: 'none', value: 0 };
     let vatEnabled = Boolean(initialVatEnabled);
-    let latestGrandTotal = 0;
-
-    // For modal add/edit
-    let pendingCustom = null; // {productId, qty, unitPrice, name, unitLabel}
+    let pendingCustomQueue = [];
+    let pendingCustomIndex = 0;
     let editingCustomIndex = -1;
+    let selectedCustomProductIds = [];
 
     const customersByPhone = new Map();
     const customersById = new Map();
 
-    function money(n) { return Number(n || 0).toFixed(2); }
-    function normalizePhone(value) { return String(value || '').replace(/\D+/g, ''); }
+    function money(value) {
+        return Number(value || 0).toFixed(2);
+    }
 
-    function updatePaymentSummary(discountAmount, grandTotal) {
-        latestGrandTotal = Number(grandTotal || 0);
+    function normalizePhone(value) {
+        return String(value || '').replace(/\D+/g, '');
+    }
+
+    function updatePaymentSummary(discountAmount) {
         const safeDiscount = Math.max(Number(discountAmount || 0), 0);
+        if (discountAmountInputEl) {
+            discountAmountInputEl.value = money(safeDiscount);
+        }
+    }
 
-        if (discountAmountInputEl) discountAmountInputEl.value = money(safeDiscount);
+    function setupOrderSelect2(selectEl, placeholder, extraOptions = {}) {
+        if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+            return;
+        }
+
+        const $select = window.jQuery(selectEl);
+        if ($select.hasClass('select2-hidden-accessible')) {
+            $select.off('.orderSelect2');
+            $select.select2('destroy');
+        }
+
+        const hasEmptyOption = Array.from(selectEl.options || []).some((option) => option.value === '');
+        $select.select2({
+            width: '100%',
+            placeholder,
+            allowClear: hasEmptyOption && !selectEl.multiple,
+            closeOnSelect: !selectEl.multiple,
+            dropdownParent: window.jQuery(selectEl.closest('.tp-modal') || document.body),
+            ...extraOptions,
+        });
+    }
+
+    function bindSelect2Change(selectEl, handler) {
+        if (!selectEl || typeof handler !== 'function') {
+            return;
+        }
+
+        selectEl.addEventListener('change', handler);
+        if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+            window.jQuery(selectEl).on('change.orderSelect2 select2:select.orderSelect2 select2:unselect.orderSelect2 select2:clear.orderSelect2', handler);
+        }
+    }
+
+    function bindProductSelectionSync() {
+        productSelect.removeEventListener('change', syncCustomProductQuantities);
+        productSelect.addEventListener('change', syncCustomProductQuantities);
+
+        if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+            window.jQuery(productSelect)
+                .off('.customQtySync')
+                .on('change.customQtySync select2:select.customQtySync select2:unselect.customQtySync select2:clear.customQtySync', () => {
+                    window.requestAnimationFrame(() => {
+                        syncCustomProductQuantities();
+                        updateProductSelectionUI();
+                    });
+                });
+        }
+    }
+
+    function getSelectedProductIds() {
+        if (productSelect.multiple) {
+            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+                return (window.jQuery(productSelect).val() || []).map((value) => String(value || '')).filter(Boolean);
+            }
+
+            return Array.from(productSelect.selectedOptions || []).map((option) => String(option.value || '')).filter(Boolean);
+        }
+
+        return productSelect.value ? [String(productSelect.value)] : [];
+    }
+
+    function getCurrentPendingCustom() {
+        return pendingCustomQueue[pendingCustomIndex] || null;
+    }
+
+    function selectedCustomFabricSource() {
+        return customFabricStockRadio?.checked ? 'stock' : 'own';
+    }
+
+    function selectedReadymadeSize() {
+        return sizeRadios.find((radio) => radio.checked)?.value || 'M';
     }
 
     function upsertCustomerIndex(customer) {
-        const customerId = String(customer?.id || '');
-        if (customerId) {
-            customersById.set(customerId, {
-                id: Number(customer.id),
-                name: String(customer.name || ''),
-                phone: String(customer.phone || ''),
-                customerType: String(customer.customer_type || ''),
-            });
-        }
         const normalized = normalizePhone(customer?.phone || '');
-        if (!normalized) return;
-        customersByPhone.set(normalized, {
-            id: Number(customer.id),
-            name: String(customer.name || ''),
-            phone: String(customer.phone || ''),
-            customerType: String(customer.customer_type || ''),
-        });
+        const payload = {
+            id: Number(customer?.id || 0),
+            name: String(customer?.name || ''),
+            phone: String(customer?.phone || ''),
+            customerType: String(customer?.customer_type || ''),
+        };
+
+        if (payload.id > 0) {
+            customersById.set(String(payload.id), payload);
+        }
+
+        if (normalized) {
+            customersByPhone.set(normalized, payload);
+        }
     }
 
     function formatCustomerTypeLabel(customerType) {
@@ -744,128 +857,187 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         document.body.style.overflow = '';
     }
 
-    function getCategoryLabel(cat) {
-        if (cat === 'fabric') return ['Fabric', 'product-category fabric-cat'];
-        if (cat === 'readymade') return ['Ready-Made', 'product-category ready-made-cat'];
+    function updateCustomerDisplay() {
+        const customer = customersById.get(String(customerSelect.value || ''));
+        if (!customer) {
+            billCustomerEl.textContent = '-';
+            return;
+        }
+
+        const customerName = customer.phone ? `${customer.name} (${customer.phone})` : customer.name;
+        billCustomerEl.innerHTML = `
+            <div><strong>Customer:</strong> ${customerName}</div>
+            <div><strong>Type:</strong> ${formatCustomerTypeLabel(customer.customerType)}</div>
+        `;
+    }
+
+    function getCategoryLabel(category) {
+        if (category === 'fabric') return ['Fabric', 'product-category fabric-cat'];
+        if (category === 'readymade') return ['Ready-Made', 'product-category ready-made-cat'];
         return ['Custom', 'product-category custom-cat'];
     }
 
     function getAvailableQtyForProduct(product) {
-        if (!product) return 0;
-        return Number(product.availableQty || 0);
+        return Number(product?.availableQty || 0);
     }
 
-    function filterProductsByCategory(cat) {
+    function filterProductsByCategory(category) {
         const matchesCategory = (product) => {
-            if (cat === 'fabric') return product.category === 'fabrics';
-            if (cat === 'readymade') return product.category !== 'fabrics';
+            if (category === 'fabric') return product.category === 'fabrics';
+            if (category === 'readymade') return product.category !== 'fabrics';
             return product.category === 'fabrics';
         };
-        const inStock = (product) => getAvailableQtyForProduct(product) > 0;
-        return products.filter(p => matchesCategory(p) && inStock(p));
+
+        return products.filter((product) => matchesCategory(product) && getAvailableQtyForProduct(product) > 0);
     }
 
     function resolveDefaultPrice(productId) {
-        const p = productMap.get(String(productId));
-        if (!p) return 0;
-        if (p.defaultPrice != null) return Number(p.defaultPrice);
-        return 0;
+        const product = productMap.get(String(productId));
+        if (!product) return 0;
+        return product.defaultPrice != null ? Number(product.defaultPrice) : 0;
     }
 
-    function updateProductOptions() {
-        const cat = categorySelect.value;
-        const list = filterProductsByCategory(cat);
+    function rebuildProductSelect(category) {
+        const isCustom = category === 'custom';
+        const list = filterProductsByCategory(category);
+        const selectedValues = isCustom ? getSelectedProductIds() : (productSelect.value ? [String(productSelect.value)] : []);
 
-        productSelect.innerHTML = `<option value="">-- Select Product --</option>`;
-        if (!list.length) {
-            const emptyOption = document.createElement('option');
-            emptyOption.value = '';
-            emptyOption.textContent = '-- No in-stock products in current outlet --';
-            productSelect.appendChild(emptyOption);
+        productSelect.innerHTML = '';
+        productSelect.removeAttribute('size');
+        if (!isCustom) {
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '-- Select Product --';
+            productSelect.appendChild(placeholder);
         }
-        list.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = String(p.id);
-            const available = money(getAvailableQtyForProduct(p));
-            opt.textContent = `${p.name} (${p.code}) | Available: ${available}${p.unitLabel ? ' ' + p.unitLabel : ''}`;
-            productSelect.appendChild(opt);
+
+        list.forEach((product) => {
+            const option = document.createElement('option');
+            option.value = String(product.id);
+            option.textContent = `${product.name} (${product.code}) | Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim();
+            if (selectedValues.includes(String(product.id))) {
+                option.selected = true;
+            }
+            productSelect.appendChild(option);
         });
 
-        productSelect.value = '';
-        unitHint.textContent = '-';
-        refreshOrderSelect2(productSelect);
-    }
+        productSelect.multiple = isCustom;
+        singleQuantityGroup.style.display = isCustom ? 'none' : '';
+        customQuantityContainer.style.display = isCustom ? '' : 'none';
+        sizeSelector.style.display = category === 'readymade' ? '' : 'none';
+        if (!isCustom) {
+            selectedCustomProductIds = [];
+        }
 
-    function updateVariantOptions() {
-        const pid = productSelect.value;
-        const p = productMap.get(String(pid));
-        unitHint.textContent = p ? `Available: ${money(Number(p.availableQty || 0))}${p.unitLabel ? ' ' + p.unitLabel : ''}` : '-';
-    }
-
-    function selectedCustomFabricSource() {
-        return customFabricStockRadio?.checked ? 'stock' : 'own';
-    }
-
-    // ✅ UPDATED: also update modal qty display when switching source
-    function updateCustomFabricSourceUI() {
-        const source = selectedCustomFabricSource();
-        customStockFabricFields.style.display = source === 'stock' ? '' : 'none';
-
-        if (pendingCustom) {
-            if (source === 'stock') {
-                modalProductQuantity.textContent = money(Number(customStockFabricQty?.value || 0));
+        setupOrderSelect2(
+            productSelect,
+            isCustom ? 'Search and select custom fabrics' : 'Select or scan barcode',
+            isCustom
+                ? {
+                    closeOnSelect: false,
+                    allowClear: true,
+                }
+                : {}
+        );
+        bindProductSelectionSync();
+        if (!selectedValues.length) {
+            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+                window.jQuery(productSelect).val(isCustom ? [] : '').trigger('change.select2');
             } else {
-                modalProductQuantity.textContent = money(pendingCustom.qty);
+                productSelect.value = '';
             }
         }
+        if (!isCustom) {
+            productSelect.value = '';
+            customQuantityContainer.innerHTML = '';
+        }
+        updateProductSelectionUI();
+    }
 
-        if (source !== 'stock' || !pendingCustom) {
-            customStockFabricHint.textContent = '';
+    function renderCustomQuantityInputs() {
+        const selectedIds = selectedCustomProductIds.slice();
+        if (!selectedIds.length) {
+            customQuantityContainer.innerHTML = '';
+            customQuantityContainer.style.display = 'none';
             return;
         }
 
-        const product = productMap.get(String(pendingCustom.productId || ''));
-        if (!product) {
-            customStockFabricHint.textContent = 'Selected stock fabric is unavailable.';
+        const existingValues = new Map(
+            Array.from(customQuantityContainer.querySelectorAll('input[data-product-id]')).map((input) => [
+                String(input.dataset.productId || ''),
+                Number(input.value || 1),
+            ])
+        );
+
+        let html = '<label>Custom Fabric Quantities</label><div class="tp-product-quantity-list">';
+        selectedIds.forEach((productId) => {
+            const product = productMap.get(String(productId));
+            if (!product) return;
+            const value = existingValues.get(String(productId)) || 1;
+            html += `
+                <div class="tp-product-quantity-item">
+                    <div>
+                        <strong>${product.name}</strong>
+                        <div class="tp-garment-summary">${product.code} | Available ${money(product.availableQty)} ${product.unitLabel || ''}</div>
+                    </div>
+                    <div class="tp-product-quantity-input">
+                        <input type="number" class="tp-input" data-product-id="${productId}" min="0.01" step="0.01" value="${money(value)}">
+                        <span>${product.unitLabel || 'qty'}</span>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        customQuantityContainer.innerHTML = html;
+        customQuantityContainer.style.display = '';
+    }
+
+    function updateProductSelectionUI() {
+        if (categorySelect.value === 'custom') {
+            const selectedIds = selectedCustomProductIds.slice();
+            renderCustomQuantityInputs();
+            unitHint.textContent = selectedIds.length
+                ? `${selectedIds.length} custom fabric${selectedIds.length > 1 ? 's' : ''} selected. Specify quantity for each.`
+                : 'Select one or more custom fabrics.';
             return;
         }
 
-        let availableQty = Number(product.availableQty || 0);
-
-        customStockFabricHint.textContent = `Available: ${money(availableQty)}${product.unitLabel ? ' ' + product.unitLabel : ''}`;
+        const product = productMap.get(String(productSelect.value || ''));
+        unitHint.textContent = product
+            ? `Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim()
+            : '-';
     }
 
-    // ✅ UPDATED: on stock qty input, update modal qty and (optionally) refresh tailoring cards display (tailoring is per pcs, so no change needed)
-    customStockFabricQty?.addEventListener('input', () => {
-        if (selectedCustomFabricSource() === 'stock' && pendingCustom) {
-            modalProductQuantity.textContent = money(Number(customStockFabricQty.value || 0));
+    function syncCustomProductQuantities() {
+        if (categorySelect.value !== 'custom') {
+            return;
         }
-        updateCustomFabricSourceUI();
-    });
 
-    function openModal() {
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        selectedCustomProductIds = getSelectedProductIds();
+        renderCustomQuantityInputs();
+        const selectedIds = selectedCustomProductIds.slice();
+        unitHint.textContent = selectedIds.length
+            ? `${selectedIds.length} custom fabric${selectedIds.length > 1 ? 's' : ''} selected. Specify quantity for each.`
+            : 'Select one or more custom fabrics.';
     }
 
-    function closeModal() {
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
-        pendingCustom = null;
-        editingCustomIndex = -1;
-        saveMeasurementBtn.textContent = 'Add Custom Item';
+    function getSelectedGarmentIds() {
+        return Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => String(input.value || ''))
+            .filter(Boolean);
     }
 
     function fillGarmentTypeOptions() {
-        garmentTypeSelect.innerHTML = `<option value="">Select Garment Type</option>`;
-        garmentTypes.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = String(g.id);
-            opt.textContent = g.title;
-            garmentTypeSelect.appendChild(opt);
+        garmentTypeCheckboxes.innerHTML = '';
+        garmentTypes.forEach((garment) => {
+            const label = document.createElement('label');
+            label.className = 'tp-garment-check-item';
+            label.innerHTML = `
+                <input type="checkbox" value="${garment.id}">
+                <span>${garment.title}</span>
+            `;
+            garmentTypeCheckboxes.appendChild(label);
         });
-
-        refreshOrderSelect2(garmentTypeSelect);
     }
 
     function getCustomerMeasurementForGarment(customerId, garmentTypeId) {
@@ -873,168 +1045,251 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         return customerRows[String(garmentTypeId)] || [];
     }
 
-    function renderMeasurementFields(garmentTypeId) {
-        measurementFieldsEl.innerHTML = '';
-        const g = garmentMap.get(String(garmentTypeId));
-        if (!g) return;
+    function collectGarmentDraftsFromDom() {
+        const drafts = new Map();
+        Array.from(measurementFieldsEl.querySelectorAll('.tp-garment-section')).forEach((section) => {
+            const garmentTypeId = String(section.dataset.garmentTypeId || '');
+            if (!garmentTypeId) return;
+
+            const measurements = Array.from(section.querySelectorAll('input[data-measure-type]')).map((input) => ({
+                type: String(input.dataset.measureType || ''),
+                measurement: String(input.value || ''),
+                unit: String(input.dataset.measureUnit || ''),
+            }));
+
+            const tailoringSelect = section.querySelector('select[data-tailoring-for]');
+            drafts.set(garmentTypeId, {
+                quantity: Number(section.querySelector('input[data-garment-qty]')?.value || 1),
+                measurements,
+                tailoringPackageId: Number(tailoringSelect?.value || 0) || null,
+                tailoringPackage: tailoringSelect?.selectedOptions?.[0]?.dataset.packageName || '',
+            });
+        });
+
+        return drafts;
+    }
+
+    function renderGarmentSections() {
+        const selectedGarmentIds = getSelectedGarmentIds();
+        const existingDrafts = collectGarmentDraftsFromDom();
+        const modalState = modal.dataset.itemState ? JSON.parse(modal.dataset.itemState) : {};
+
+        if (!selectedGarmentIds.length) {
+            measurementFieldsEl.innerHTML = '<div class="tp-hint">Select at least one garment type.</div>';
+            return;
+        }
 
         const customerId = customerSelect.value || '';
-        const saved = getCustomerMeasurementForGarment(customerId, garmentTypeId);
-        const base = (saved && saved.length)
-            ? saved.map(x => ({ title: x.type || '', value: x.measurement || '', unit: x.unit || '' }))
-            : (g.measurements || []).map(x => ({ title: x.title || '', value: '', unit: x.unit || '' }));
+        measurementFieldsEl.innerHTML = '';
 
-        base.forEach((m) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'tp-form-group';
-            const label = document.createElement('label');
-            label.textContent = `${m.title} ${m.unit ? '('+m.unit+')' : ''}`;
-            const input = document.createElement('input');
-            input.className = 'tp-input';
-            input.type = 'text';
-            input.value = m.value || '';
-            input.dataset.measureType = m.title || '';
-            input.dataset.measureUnit = m.unit || '';
-            wrap.appendChild(label);
-            wrap.appendChild(input);
-            measurementFieldsEl.appendChild(wrap);
-        });
-    }
+        selectedGarmentIds.forEach((garmentTypeId) => {
+            const garment = garmentMap.get(String(garmentTypeId));
+            if (!garment) return;
 
-    // Tailoring packages from garment configured packages; amount is per pcs × (pendingCustom.qty)
-    function buildTailoringPackages(garmentTypeId) {
-        const g = garmentMap.get(String(garmentTypeId));
-        const pcsQty = Number(pendingCustom?.qty || 1); // ✅ tailoring is based on pcs count, NOT stock meter
-        const configuredPackages = (g?.tailoringPackages || []).filter(pkg => Number(pkg.amount || 0) >= 0);
+            const existingGarment = (modalState.garments || []).find((entry) => String(entry.garmentTypeId) === String(garmentTypeId));
+            const draft = existingDrafts.get(String(garmentTypeId));
+            const savedMeasurements = getCustomerMeasurementForGarment(customerId, garmentTypeId);
+            const baseMeasurements = garment.measurements || [];
+            const selectedPackageId = draft?.tailoringPackageId || existingGarment?.tailoring?.packageId || '';
 
-        return configuredPackages.map((pkg) => {
-            const perPiece = Number(pkg.amount || 0);
-            return {
-                id: pkg.id || null,
-                name: pkg.name || 'Tailoring Package',
-                price: Math.max(perPiece * pcsQty, 0),
-                desc: `${pkg.description || 'Configured package'} (${money(perPiece)} per pcs × ${pcsQty})`,
-            };
-        });
-    }
+            const section = document.createElement('div');
+            section.className = 'tp-garment-section';
+            section.dataset.garmentTypeId = String(garmentTypeId);
 
-    function renderTailoringOptions(garmentTypeId) {
-        tailoringOptionsEl.innerHTML = '';
-        selectedTailoringBox.style.display = 'none';
+            let measurementHtml = '<div class="tp-measurement-grid">';
+            baseMeasurements.forEach((measurement) => {
+                const existingMeasurement = draft?.measurements?.find((row) => row.type === measurement.title)
+                    || existingGarment?.measurements?.find((row) => row.type === measurement.title)
+                    || savedMeasurements.find((row) => row.type === measurement.title);
+                measurementHtml += `
+                    <div class="tp-form-group">
+                        <label>${measurement.title}${measurement.unit ? ` (${measurement.unit})` : ''}</label>
+                        <input
+                            type="text"
+                            class="tp-input"
+                            data-measure-type="${measurement.title}"
+                            data-measure-unit="${measurement.unit || ''}"
+                            value="${String(existingMeasurement?.measurement || '')}">
+                    </div>
+                `;
+            });
+            measurementHtml += '</div>';
 
-        if (!garmentTypeId) {
-            tailoringOptionsEl.innerHTML = `<div class="tp-hint">Select a garment type to view tailoring packages.</div>`;
-            return;
-        }
+            let tailoringOptions = '<option value="">Select tailoring package</option>';
+            (garment.tailoringPackages || []).forEach((pkg) => {
+                tailoringOptions += `
+                    <option
+                        value="${pkg.id}"
+                        data-package-name="${pkg.name}"
+                        data-package-amount="${pkg.amount}"
+                        ${String(selectedPackageId) === String(pkg.id) ? 'selected' : ''}>
+                        ${pkg.name} - NPR ${money(pkg.amount)}
+                    </option>
+                `;
+            });
 
-        const pkgs = buildTailoringPackages(garmentTypeId);
-        if (!pkgs.length) {
-            tailoringOptionsEl.innerHTML = `<div class="tp-hint">No tailoring package configured for this garment type.</div>`;
-            return;
-        }
-
-        pkgs.forEach((pkg, idx) => {
-            const card = document.createElement('div');
-            card.className = 'tp-tailoring-option';
-            card.dataset.price = String(pkg.price);
-            card.dataset.name = pkg.name;
-            card.dataset.packageId = String(pkg.id || '');
-
-            card.innerHTML = `
-                <h5>${pkg.name}</h5>
-                <div style="font-size:12px;color:#6a7682;margin:6px 0;">${pkg.desc}</div>
-                <div style="font-weight:900;color:var(--primary);">NPR ${money(pkg.price)}</div>
+            section.innerHTML = `
+                <div class="tp-garment-head">
+                    <div>
+                        <div class="tp-garment-title">${garment.title}</div>
+                        <div class="tp-garment-summary">Measurements and tailoring for this garment.</div>
+                    </div>
+                    <div class="tp-form-group" style="margin:0;min-width:140px;">
+                        <label>Garment Qty</label>
+                        <input type="number" class="tp-input" data-garment-qty min="1" step="1" value="${Number(draft?.quantity || existingGarment?.quantity || 1)}">
+                    </div>
+                </div>
+                ${measurementHtml}
+                <div class="tp-form-group" style="margin-top:12px;">
+                    <label>Tailoring Package</label>
+                    <select class="tp-input" data-tailoring-for="${garmentTypeId}">
+                        ${tailoringOptions}
+                    </select>
+                </div>
             `;
 
-            if (idx === 0) {
-                card.classList.add('selected');
-                selectedTailoringBox.style.display = '';
-                selectedPackageNameEl.textContent = pkg.name;
-                selectedPackagePriceEl.textContent = money(pkg.price);
-            }
-
-            tailoringOptionsEl.appendChild(card);
+            measurementFieldsEl.appendChild(section);
         });
     }
 
-    function applyExistingMeasurements(measurements) {
-        const byType = new Map((measurements || []).map(m => [String(m.type || ''), String(m.measurement || '')]));
-        Array.from(measurementFieldsEl.querySelectorAll('input.tp-input')).forEach((input) => {
-            const key = String(input.dataset.measureType || '');
-            if (byType.has(key)) input.value = byType.get(key) || '';
+    function updateCustomFabricSourceUI() {
+        const pending = getCurrentPendingCustom();
+        const source = selectedCustomFabricSource();
+        customStockFabricFields.style.display = source === 'stock' ? '' : 'none';
+
+        if (!pending) {
+            customStockFabricHint.textContent = '';
+            return;
+        }
+
+        if (source === 'stock') {
+            modalProductQuantity.textContent = money(Number(customStockFabricQty.value || 0));
+            const product = productMap.get(String(pending.productId || ''));
+            customStockFabricHint.textContent = product
+                ? `Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim()
+                : 'Selected stock fabric is unavailable.';
+        } else {
+            modalProductQuantity.textContent = money(Number(pending.qty || 0));
+            customStockFabricHint.textContent = '';
+        }
+    }
+
+    function renderSelectedFabricQueue() {
+        if (!selectedFabricQueue) return;
+        if (!pendingCustomQueue.length) {
+            selectedFabricQueue.innerHTML = '<div class="tp-hint">No custom fabrics selected yet.</div>';
+            return;
+        }
+
+        selectedFabricQueue.innerHTML = pendingCustomQueue.map((item, index) => `
+            <div class="tp-selected-fabric-chip ${index === pendingCustomIndex ? 'active' : ''}">
+                <div>
+                    <strong>${item.name}</strong>
+                    <div class="tp-garment-summary">Qty: ${money(item.qty)} ${item.unitLabel || ''}</div>
+                </div>
+                <div>${index === pendingCustomIndex ? 'Current' : `Next ${index + 1}`}</div>
+            </div>
+        `).join('');
+    }
+
+    function openModal() {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function resetCustomModalState() {
+        modal.dataset.itemState = JSON.stringify({ garments: [] });
+        customDesignNote.value = '';
+        customFabricOwnRadio.checked = true;
+        customFabricStockRadio.checked = false;
+        customStockFabricQty.value = '1.00';
+        try {
+            customDesignImages.value = '';
+        } catch (error) {}
+        Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
+            input.checked = false;
         });
+        measurementFieldsEl.innerHTML = '<div class="tp-hint">Select at least one garment type.</div>';
+        if (selectedFabricQueue) {
+            selectedFabricQueue.innerHTML = '';
+        }
     }
 
-    function applyExistingTailoring(tailoring) {
-        if (!tailoring) return;
-        const cards = Array.from(tailoringOptionsEl.querySelectorAll('.tp-tailoring-option'));
-        if (!cards.length) return;
-
-        let target = null;
-        if (tailoring.packageId) target = cards.find(card => String(card.dataset.packageId || '') === String(tailoring.packageId));
-        if (!target && tailoring.package) target = cards.find(card => String(card.dataset.name || '') === String(tailoring.package));
-        if (!target) return;
-
-        cards.forEach(card => card.classList.remove('selected'));
-        target.classList.add('selected');
-        selectedTailoringBox.style.display = '';
-        selectedPackageNameEl.textContent = target.dataset.name || '-';
-        selectedPackagePriceEl.textContent = money(target.dataset.price || 0);
+    function closeModal() {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        pendingCustomQueue = [];
+        pendingCustomIndex = 0;
+        editingCustomIndex = -1;
+        saveMeasurementBtn.textContent = 'Add Custom Item';
+        resetCustomModalState();
     }
 
-    function openCustomMeasurementModal(customPayload, existingItem = null, itemIndex = -1) {
-        pendingCustom = customPayload;
-        editingCustomIndex = itemIndex;
+    function loadPendingCustomIntoModal(existingItem = null) {
+        const pending = getCurrentPendingCustom();
+        if (!pending) {
+            closeModal();
+            renderBill();
+            productSelect.value = '';
+            qtyInput.value = '1';
+            customQuantityContainer.innerHTML = '';
+            rebuildProductSelect(categorySelect.value);
+            return;
+        }
 
-        modalProductName.textContent = pendingCustom.name;
-        modalProductPrice.textContent = money(pendingCustom.unitPrice);
-        // ✅ default show pcs qty; if stock selected later, updateCustomFabricSourceUI will change display
-        modalProductQuantity.textContent = money(pendingCustom.qty);
+        modalProductName.textContent = pending.name;
+        modalProductPrice.textContent = money(pending.unitPrice);
+        modalProductQuantity.textContent = money(pending.qty);
+        if (modalProductCounter) {
+            modalProductCounter.textContent = `${pendingCustomIndex + 1}/${pendingCustomQueue.length}`;
+        }
+        if (modalQueueLabel) {
+            modalQueueLabel.textContent = `${pending.name} (${pendingCustomIndex + 1} of ${pendingCustomQueue.length})`;
+        }
+        renderSelectedFabricQueue();
 
-        fillGarmentTypeOptions();
+        const itemState = {
+            garments: existingItem?.garments || [],
+        };
+        modal.dataset.itemState = JSON.stringify(itemState);
 
-        const garmentTypeId = existingItem?.garmentTypeId ? String(existingItem.garmentTypeId) : '';
-        garmentTypeSelect.value = garmentTypeId;
-        renderMeasurementFields(garmentTypeId);
-        renderTailoringOptions(garmentTypeId);
-        applyExistingMeasurements(existingItem?.measurements || []);
-        applyExistingTailoring(existingItem?.tailoring || null);
+        const selectedIds = itemState.garments.length
+            ? itemState.garments.map((garment) => String(garment.garmentTypeId))
+            : (garmentTypes[0] ? [String(garmentTypes[0].id)] : []);
+        Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
+            input.checked = selectedIds.includes(String(input.value || ''));
+        });
 
         customDesignNote.value = String(existingItem?.designNote || '');
         const fabricSource = String(existingItem?.fabricSource || 'own');
         customFabricOwnRadio.checked = fabricSource !== 'stock';
         customFabricStockRadio.checked = fabricSource === 'stock';
-        customStockFabricQty.value = money(existingItem?.fabricQuantity || 1);
+        customStockFabricQty.value = money(existingItem?.fabricQuantity || pending.qty || 1);
+        saveMeasurementBtn.textContent = editingCustomIndex > -1
+            ? 'Update Custom Item'
+            : (pendingCustomIndex + 1 < pendingCustomQueue.length
+                ? `Save & Continue (${pendingCustomIndex + 1}/${pendingCustomQueue.length})`
+                : `Save Custom Item (${pendingCustomIndex + 1}/${pendingCustomQueue.length})`);
+
+        renderGarmentSections();
         updateCustomFabricSourceUI();
-
-        try { customDesignImages.value = ''; } catch (e) {}
-
-        saveMeasurementBtn.textContent = editingCustomIndex > -1 ? 'Update Custom Item' : 'Add Custom Item';
         openModal();
     }
 
-    function getSelectedTailoring() {
-        const selected = tailoringOptionsEl.querySelector('.tp-tailoring-option.selected');
-        if (!selected) return null;
-        return {
-            packageId: selected.dataset.packageId ? Number(selected.dataset.packageId) : null,
-            name: selected.dataset.name,
-            price: Number(selected.dataset.price || 0),
-        };
+    function openCustomMeasurementModal(queue, existingItem = null, itemIndex = -1) {
+        pendingCustomQueue = Array.isArray(queue) ? queue : [queue];
+        pendingCustomIndex = 0;
+        editingCustomIndex = itemIndex;
+        resetCustomModalState();
+        loadPendingCustomIntoModal(existingItem);
     }
 
-    tailoringOptionsEl.addEventListener('click', (e) => {
-        const card = e.target.closest('.tp-tailoring-option');
-        if (!card) return;
-        tailoringOptionsEl.querySelectorAll('.tp-tailoring-option').forEach(x => x.classList.remove('selected'));
-        card.classList.add('selected');
+    function getTailoringTotalForItem(item) {
+        return (item.garments || []).reduce((sum, garment) => {
+            return sum + (Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0));
+        }, 0);
+    }
 
-        selectedTailoringBox.style.display = '';
-        selectedPackageNameEl.textContent = card.dataset.name || '-';
-        selectedPackagePriceEl.textContent = money(card.dataset.price || 0);
-    });
-
-    // Bill rendering + totals
     function renderBill() {
         billItemsEl.innerHTML = '';
 
@@ -1044,139 +1299,169 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const tailoringLines = [];
 
         billItems.forEach((item) => {
-            const lineTotal = Number(item.unitPrice || 0) * Number(item.qty || 0);
-
-            if (item.category === 'fabric' || item.category === 'readymade') subtotalFabric += lineTotal;
+            const lineTotal = Number(item.qty || 0) * Number(item.unitPrice || 0);
+            if (item.category === 'fabric' || item.category === 'readymade') {
+                subtotalFabric += lineTotal;
+            }
             if (item.category === 'custom') {
                 subtotalCustom += lineTotal;
-                if (item.tailoring && item.tailoring.amount) {
-                    totalTailoring += Number(item.tailoring.amount || 0);
-                    tailoringLines.push({ label: `${item.name} - ${item.tailoring.package}`, amount: Number(item.tailoring.amount || 0) });
-                }
+                (item.garments || []).forEach((garment) => {
+                    const garmentTailoring = Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0);
+                    totalTailoring += garmentTailoring;
+                    tailoringLines.push({
+                        label: `${item.name} - ${garment.title} - ${garment.tailoring?.package || 'Tailoring'} x ${money(garment.quantity)}`,
+                        amount: garmentTailoring,
+                    });
+                });
             }
 
             const [label, chipClass] = getCategoryLabel(item.category);
             const row = document.createElement('div');
             row.className = 'bill-item';
 
-            const unitLabel = item.unitLabel ? ` ${item.unitLabel}` : '';
+            let customSummary = '';
+            if (item.category === 'custom' && item.garments?.length) {
+                customSummary = item.garments.map((garment) => {
+                    const measurements = (garment.measurements || [])
+                        .slice(0, 3)
+                        .map((measurement) => `${measurement.type}: ${measurement.measurement}${measurement.unit ? ` ${measurement.unit}` : ''}`)
+                        .join(', ');
 
-            let measurementInfo = '';
-            if (item.measurements && item.measurements.length) {
-                measurementInfo = `<div class="item-sub"><i class="fas fa-ruler"></i> ${item.garmentTitle || 'Garment'} | ${item.measurements.slice(0,3).map(m => `${m.type}: ${m.measurement}${m.unit ? ' '+m.unit : ''}`).join(', ')}${item.measurements.length>3 ? ' ...' : ''}</div>`;
+                    return `
+                        <div class="stitching-detail">
+                            <div>
+                                <strong>${garment.title}</strong> x ${money(garment.quantity)}
+                                <div class="item-sub">${garment.tailoring?.package || 'Tailoring'} - NPR ${money(garment.tailoring?.amount || 0)} each</div>
+                                ${measurements ? `<div class="item-sub"><i class="fas fa-ruler"></i> ${measurements}${garment.measurements.length > 3 ? ' ...' : ''}</div>` : ''}
+                            </div>
+                            <div><strong>NPR ${money(Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0))}</strong></div>
+                        </div>
+                    `;
+                }).join('');
             }
+
+            const sizeSummary = item.category === 'readymade' && item.size
+                ? `<div class="item-sub"><i class="fas fa-ruler"></i> Size: ${item.size}</div>`
+                : '';
 
             row.innerHTML = `
                 <div class="item-details">
-                    <div>
+                    <div class="item-main">
                         <div>
                             ${item.name}
                             <span class="${chipClass}">${label}</span>
-                            <div class="item-sub">${money(item.qty)}${unitLabel} × NPR ${money(item.unitPrice)}</div>
-                            ${measurementInfo}
-                            ${item.tailoring ? `<div class="stitching-detail"><i class="fas fa-cut"></i> <strong>Tailoring:</strong> ${item.tailoring.package} - NPR ${money(item.tailoring.amount)}</div>` : ''}
+                            <div class="item-sub">${money(item.qty)} ${item.unitLabel || ''} × NPR ${money(item.unitPrice)}</div>
+                            ${sizeSummary}
+                            ${item.designNote ? `<div class="item-sub"><i class="fas fa-note-sticky"></i> ${item.designNote}</div>` : ''}
                         </div>
                         <div class="product-actions">
                             <button type="button" class="btn-secondary" data-action="edit" data-id="${item.id}">Edit</button>
                             <button type="button" class="btn-danger" data-action="remove" data-id="${item.id}">Remove</button>
                         </div>
                     </div>
-                    <div><strong>NPR ${money(lineTotal)}</strong></div>
+                    <div class="item-price"><strong>NPR ${money(lineTotal)}</strong></div>
                 </div>
+                ${customSummary}
             `;
             billItemsEl.appendChild(row);
         });
 
-        // Tailoring breakdown
         if (!tailoringLines.length) {
             tailoringBreakdownEl.style.display = 'none';
             tailoringBreakdownEl.innerHTML = '';
         } else {
             tailoringBreakdownEl.style.display = '';
-            let html = `<h5><i class="fas fa-cut"></i> Tailoring Charges Breakdown</h5>`;
-            tailoringLines.forEach(l => {
-                html += `<div class="tailoring-item"><span>${l.label}</span><span>NPR ${money(l.amount)}</span></div>`;
+            let html = '<h5><i class="fas fa-cut"></i> Tailoring Charges Breakdown</h5>';
+            tailoringLines.forEach((line) => {
+                html += `<div class="tailoring-item"><span>${line.label}</span><span>NPR ${money(line.amount)}</span></div>`;
             });
             html += `<div class="tailoring-item tailoring-total"><span>Total Tailoring Charges</span><span>NPR ${money(totalTailoring)}</span></div>`;
             tailoringBreakdownEl.innerHTML = html;
         }
 
-        // Discount applies on (fabric + custom) in your current logic
         let discountAmount = 0;
-        if (discount.type === 'flat') discountAmount = Math.min(Number(discount.value || 0), (subtotalFabric + subtotalCustom));
+        if (discount.type === 'flat') discountAmount = Math.min(Number(discount.value || 0), subtotalFabric + subtotalCustom);
         if (discount.type === 'percent') discountAmount = (subtotalFabric + subtotalCustom) * (Number(discount.value || 0) / 100);
 
-        // VAT on taxableSubtotal
-        let vatAmount = 0;
         const taxableSubtotal = Math.max((subtotalFabric + subtotalCustom) - discountAmount, 0);
-        if (vatEnabled) vatAmount = taxableSubtotal * 0.13;
-
-        const grand = taxableSubtotal + vatAmount + totalTailoring;
+        const vatAmount = vatEnabled ? taxableSubtotal * 0.13 : 0;
+        const grandTotal = taxableSubtotal + vatAmount + totalTailoring;
 
         subtotalFabricEl.textContent = `NPR ${money(subtotalFabric)}`;
         subtotalCustomEl.textContent = `NPR ${money(subtotalCustom)}`;
         tailoringTotalEl.textContent = `NPR ${money(totalTailoring)}`;
         discountTotalEl.textContent = `NPR ${money(discountAmount)}`;
         vatAmountEl.textContent = `NPR ${money(vatAmount)}`;
-        grandTotalEl.textContent = `NPR ${money(grand)}`;
-        updatePaymentSummary(discountAmount, grand);
-
+        grandTotalEl.textContent = `NPR ${money(grandTotal)}`;
         vatRow.style.display = vatEnabled ? '' : 'none';
 
+        updatePaymentSummary(discountAmount);
         buildHiddenInputs();
+    }
+
+    function makeHidden(name, value) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value ?? '';
+        return input;
+    }
+
+    function appendFileInput(name, files) {
+        if (!files?.length) return;
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.name = name;
+        input.multiple = true;
+        input.style.display = 'none';
+
+        try {
+            const transfer = new DataTransfer();
+            files.forEach((file) => transfer.items.add(file));
+            input.files = transfer.files;
+            hiddenInputsHost.appendChild(input);
+        } catch (error) {}
     }
 
     function buildHiddenInputs() {
         hiddenInputsHost.innerHTML = '';
-
         hiddenInputsHost.appendChild(makeHidden('vat_enabled', vatEnabled ? '1' : '0'));
-        hiddenInputsHost.appendChild(makeHidden('discount_type', discount.type));
-        hiddenInputsHost.appendChild(makeHidden('discount_value', String(discount.value || 0)));
 
         billItems.forEach((item, idx) => {
-            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][item_category]`, item.category === 'fabric' ? 'fabric' : (item.category === 'readymade' ? 'readymade' : 'custom')));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][item_category]`, item.category));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][quantity]`, String(item.qty || 0)));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][unit_price]`, String(item.unitPrice || 0)));
 
             if (item.category !== 'custom') {
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][product_id]`, String(item.productId || '')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][quantity]`, String(item.qty || '1.00')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][unit_price]`, String(item.unitPrice || '0.00')));
-            } else {
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][quantity]`, String(item.qty || '1.00')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][unit_price]`, String(item.unitPrice || '0.00')));
-
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garment_type_id]`, String(item.garmentTypeId || '')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garment_title]`, String(item.garmentTitle || '')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_source]`, String(item.fabricSource || 'own')));
-
-                if (String(item.fabricSource || 'own') === 'stock') {
-                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
-                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || '0')));
+                if (item.category === 'readymade' && item.size) {
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][size]`, String(item.size)));
                 }
-
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][tailoring_package]`, String(item.tailoring?.package || '')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][tailoring_amount]`, String(item.tailoring?.amount || '0')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][tailoring_package_id]`, String(item.tailoring?.packageId || '')));
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][design_note]`, String(item.designNote || '')));
-
-                (item.measurements || []).forEach((m, mIdx) => {
-                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][measurements][${mIdx}][type]`, String(m.type || '')));
-                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][measurements][${mIdx}][measurement]`, String(m.measurement || '')));
-                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][measurements][${mIdx}][unit]`, String(m.unit || '')));
-                });
+                return;
             }
+
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_source]`, String(item.fabricSource || 'own')));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || item.qty || 0)));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][design_note]`, String(item.designNote || '')));
+
+            (item.garments || []).forEach((garment, garmentIndex) => {
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][garment_type_id]`, String(garment.garmentTypeId || '')));
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][garment_title]`, String(garment.title || '')));
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][quantity]`, String(garment.quantity || 1)));
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][tailoring_package_id]`, String(garment.tailoring?.packageId || '')));
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][tailoring_package]`, String(garment.tailoring?.package || '')));
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][tailoring_amount]`, String(garment.tailoring?.amount || 0)));
+
+                (garment.measurements || []).forEach((measurement, measurementIndex) => {
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][measurements][${measurementIndex}][type]`, String(measurement.type || '')));
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][measurements][${measurementIndex}][measurement]`, String(measurement.measurement || '')));
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][measurements][${measurementIndex}][unit]`, String(measurement.unit || '')));
+                });
+            });
+
+            appendFileInput(`items[${idx}][custom][design_images][]`, item.designFiles || []);
         });
-    }
-
-    function makeHidden(name, value) {
-        const i = document.createElement('input');
-        i.type = 'hidden';
-        i.name = name;
-        i.value = value ?? '';
-        return i;
-    }
-
-    function validateRequiredVariants() {
-        return true;
     }
 
     function validateHasItems() {
@@ -1185,212 +1470,244 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         return false;
     }
 
-    // Actions edit/remove
-    billItemsEl.addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-action]');
+    function updateCustomQueueFromSelection() {
+        const selectedIds = selectedCustomProductIds.slice();
+        return selectedIds.map((productId) => {
+            const product = productMap.get(String(productId));
+            const qtyValue = Number(customQuantityContainer.querySelector(`input[data-product-id="${productId}"]`)?.value || 0);
+            return {
+                productId,
+                qty: qtyValue,
+                unitPrice: resolveDefaultPrice(productId),
+                name: product ? `${product.name} (${product.code})` : 'Custom Product',
+                unitLabel: product?.unitLabel || '',
+            };
+        });
+    }
+
+    billItemsEl.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-action]');
         if (!btn) return;
 
-        const action = btn.dataset.action;
         const id = String(btn.dataset.id || '');
-        const index = billItems.findIndex(x => String(x.id) === id);
+        const index = billItems.findIndex((item) => String(item.id) === id);
         if (index === -1) return;
 
-        if (action === 'remove') {
+        if (btn.dataset.action === 'remove') {
             billItems.splice(index, 1);
             renderBill();
             return;
         }
 
-        if (action === 'edit') {
-            const item = billItems[index];
-            if (item.category === 'custom') {
-                const customPayload = {
-                    productId: item.productId,
-                    qty: Number(item.garmentQty || item.qty || 0), // keep pcs qty if you add garmentQty later
-                    unitPrice: Number(item.baseUnitPrice || item.unitPrice || 0),
-                    name: item.name,
-                    unitLabel: item.unitLabel || '',
-                };
-                openCustomMeasurementModal(customPayload, item, index);
-            } else {
-                const newQty = prompt(`Update quantity for ${item.name}:`, String(item.qty));
-                if (newQty && !isNaN(newQty) && Number(newQty) > 0) {
-                    item.qty = Number(newQty);
-                    renderBill();
-                }
-            }
+        const item = billItems[index];
+        if (item.category === 'custom') {
+            openCustomMeasurementModal([{
+                productId: item.productId,
+                qty: Number(item.fabricQuantity || item.qty || 0),
+                unitPrice: Number(item.baseUnitPrice || item.unitPrice || 0),
+                name: item.name,
+                unitLabel: item.unitLabel || '',
+            }], item, index);
+            return;
+        }
+
+        const nextQty = prompt(`Update quantity for ${item.name}:`, String(item.qty));
+        if (nextQty && !isNaN(nextQty) && Number(nextQty) > 0) {
+            item.qty = Number(nextQty);
+            renderBill();
         }
     });
 
-    // Add to bill
     addBtn.addEventListener('click', () => {
         const category = categorySelect.value;
-        const productId = productSelect.value;
-        const qty = Number(qtyInput.value || 0); // for custom: pcs qty
-        const unitPrice = resolveDefaultPrice(productId);
-
         if (!customerSelect.value) {
             alert('Check/select customer first.');
             customerPhoneInput.focus();
             return;
         }
 
-        if (!productId) { alert('Select a product.'); return; }
-        if (qty <= 0) { alert('Quantity must be > 0'); return; }
-        if (unitPrice < 0) { alert('Unit price must be >= 0'); return; }
-
-        const p = productMap.get(String(productId));
-
-        if (category !== 'custom' && p) {
-            const availableQty = Number(p.availableQty || 0);
-            if (qty > availableQty) {
-                alert(`Only ${money(availableQty)} ${p.unitLabel || ''} is available in current outlet.`);
+        if (category === 'custom') {
+            const queue = updateCustomQueueFromSelection().filter((item) => item.qty > 0 && item.productId);
+            if (!queue.length) {
+                alert('Select at least one custom fabric and enter quantity for each.');
                 return;
             }
-        }
 
-        if (category !== 'custom') {
-            billItems.push({
-                id: Date.now(),
-                category,
-                productId,
-                name: p ? `${p.name} (${p.code})` : 'Product',
-                unitLabel: p?.unitLabel || '',
-                qty,
-                unitPrice,
+            const invalidStock = queue.find((item) => {
+                const product = productMap.get(String(item.productId));
+                return Number(item.qty || 0) > Number(product?.availableQty || 0);
             });
-            renderBill();
+            if (invalidStock) {
+                const product = productMap.get(String(invalidStock.productId));
+                alert(`Only ${money(product?.availableQty || 0)} ${product?.unitLabel || ''} is available for ${product?.name || 'selected product'}.`);
+                return;
+            }
 
-            productSelect.value = '';
-            qtyInput.value = '1.00';
-            unitHint.textContent = '-';
+            openCustomMeasurementModal(queue);
             return;
         }
 
-        // Custom => open modal
-        const customPayload = {
-            productId,
-            qty, // pcs qty
-            unitPrice, // fabric per-unit price
-            name: p ? `${p.name} (${p.code})` : 'Custom Product',
-            unitLabel: p?.unitLabel || '',
-        };
-        openCustomMeasurementModal(customPayload, null, -1);
-    });
-
-    garmentTypeSelect.addEventListener('change', () => {
-        const gid = garmentTypeSelect.value;
-        renderMeasurementFields(gid);
-        renderTailoringOptions(gid);
-    });
-
-    customFabricOwnRadio?.addEventListener('change', updateCustomFabricSourceUI);
-    customFabricStockRadio?.addEventListener('change', updateCustomFabricSourceUI);
-
-    // ✅ MAIN FIX: when fabricSource=stock, use stockFabricQty for item.qty so (unitPrice * qty) becomes correct
-    saveMeasurementBtn.addEventListener('click', () => {
-        if (!pendingCustom) return;
-
-        const garmentTypeId = garmentTypeSelect.value;
-        if (!garmentTypeId) { alert('Select garment type.'); return; }
-
-        const tailoring = getSelectedTailoring();
-        if (!tailoring) { alert('Select tailoring package.'); return; }
-
-        const fabricSource = selectedCustomFabricSource();
-
-        // validate stock qty + available
-        let stockFabricQtyValue = 0;
-        if (fabricSource === 'stock') {
-            stockFabricQtyValue = Number(customStockFabricQty?.value || 0);
-            if (stockFabricQtyValue <= 0) { alert('Enter stock fabric quantity.'); return; }
-
-            const product = productMap.get(String(pendingCustom.productId || ''));
-            if (!product) { alert('Selected stock fabric product is invalid.'); return; }
-
-            let availableQty = Number(product.availableQty || 0);
-
-            if (stockFabricQtyValue > availableQty) {
-                alert(`Only ${money(availableQty)} ${product.unitLabel || ''} stock fabric is available.`);
-                return;
-            }
+        const productId = productSelect.value;
+        const qty = Number(qtyInput.value || 0);
+        if (!productId) {
+            alert('Select a product.');
+            return;
+        }
+        if (qty <= 0) {
+            alert('Quantity must be greater than zero.');
+            return;
         }
 
-        // gather measurements
-        const mInputs = Array.from(measurementFieldsEl.querySelectorAll('input.tp-input'));
-        const measurements = mInputs.map(i => ({
-            type: i.dataset.measureType || '',
-            measurement: i.value || '',
-            unit: i.dataset.measureUnit || '',
-        })).filter(m => String(m.type).trim() !== '');
+        const product = productMap.get(String(productId));
+        if (product && qty > Number(product.availableQty || 0)) {
+            alert(`Only ${money(product.availableQty)} ${product.unitLabel || ''} is available in current outlet.`);
+            return;
+        }
 
-        const invalid = measurements.some(m => !String(m.measurement).trim());
-        if (!measurements.length || invalid) { alert('Fill all measurement values.'); return; }
+        if (category === 'readymade' && !selectedReadymadeSize()) {
+            alert('Select a size for ready-made product.');
+            return;
+        }
 
-        const garmentTitle = garmentMap.get(String(garmentTypeId))?.title || 'Garment';
+        billItems.push({
+            id: `${Date.now()}-${Math.random()}`,
+            category,
+            productId,
+            name: product ? `${product.name} (${product.code})` : 'Product',
+            unitLabel: product?.unitLabel || '',
+            qty,
+            unitPrice: resolveDefaultPrice(productId),
+            size: category === 'readymade' ? selectedReadymadeSize() : null,
+        });
+        productSelect.value = '';
+        qtyInput.value = '1';
+        updateProductSelectionUI();
+        renderBill();
+    });
 
-        // base unit price (per meter/yard/etc). If own fabric, product charge is 0.
-        const baseUnitPrice = fabricSource === 'own' ? 0 : Number(pendingCustom.unitPrice || 0);
+    garmentTypeCheckboxes.addEventListener('change', (event) => {
+        if (event.target instanceof HTMLInputElement && event.target.type === 'checkbox') {
+            renderGarmentSections();
+        }
+    });
+    customFabricOwnRadio?.addEventListener('change', updateCustomFabricSourceUI);
+    customFabricStockRadio?.addEventListener('change', updateCustomFabricSourceUI);
+    customStockFabricQty?.addEventListener('input', updateCustomFabricSourceUI);
 
-        // ✅ qty used for product price calculation:
-        // - own fabric => keep qty = pcs (but unitPrice=0 so total product cost 0 anyway)
-        // - stock fabric => qty = stock fabric quantity so total = (stockQty × unitPrice)
-        const billQty = fabricSource === 'stock'
-            ? stockFabricQtyValue
-            : pendingCustom.qty;
+    saveMeasurementBtn.addEventListener('click', () => {
+        const pending = getCurrentPendingCustom();
+        if (!pending) return;
 
-        const customItemPayload = {
-            id: editingCustomIndex > -1 ? billItems[editingCustomIndex]?.id : Date.now(),
+        const selectedGarmentIds = getSelectedGarmentIds();
+        if (!selectedGarmentIds.length) {
+            alert('Select at least one garment type.');
+            return;
+        }
+
+        const fabricSource = selectedCustomFabricSource();
+        const fabricQuantity = fabricSource === 'stock'
+            ? Number(customStockFabricQty.value || 0)
+            : Number(pending.qty || 0);
+        if (fabricQuantity <= 0) {
+            alert('Fabric quantity must be greater than zero.');
+            return;
+        }
+
+        const product = productMap.get(String(pending.productId || ''));
+        if (fabricSource === 'stock' && fabricQuantity > Number(product?.availableQty || 0)) {
+            alert(`Only ${money(product?.availableQty || 0)} ${product?.unitLabel || ''} is available in stock.`);
+            return;
+        }
+
+        const garments = [];
+        let hasInvalidMeasurements = false;
+        Array.from(measurementFieldsEl.querySelectorAll('.tp-garment-section')).forEach((section) => {
+            const garmentTypeId = String(section.dataset.garmentTypeId || '');
+            const garmentType = garmentMap.get(garmentTypeId);
+            const garmentQuantity = Number(section.querySelector('input[data-garment-qty]')?.value || 0);
+            const tailoringSelect = section.querySelector('select[data-tailoring-for]');
+            const tailoringOption = tailoringSelect?.selectedOptions?.[0] || null;
+            const measurements = Array.from(section.querySelectorAll('input[data-measure-type]')).map((input) => ({
+                type: String(input.dataset.measureType || ''),
+                measurement: String(input.value || '').trim(),
+                unit: String(input.dataset.measureUnit || ''),
+            }));
+
+            if (garmentQuantity < 1) {
+                hasInvalidMeasurements = true;
+                return;
+            }
+
+            if (!tailoringOption || !tailoringOption.value) {
+                hasInvalidMeasurements = true;
+                return;
+            }
+
+            if (measurements.some((row) => !row.measurement)) {
+                hasInvalidMeasurements = true;
+                return;
+            }
+
+            garments.push({
+                garmentTypeId,
+                title: garmentType?.title || tailoringOption.dataset.packageName || 'Garment',
+                quantity: garmentQuantity,
+                measurements,
+                tailoring: {
+                    packageId: Number(tailoringOption.value || 0),
+                    package: tailoringOption.dataset.packageName || 'Tailoring',
+                    amount: Number(tailoringOption.dataset.packageAmount || 0),
+                },
+            });
+        });
+
+        if (hasInvalidMeasurements || !garments.length) {
+            alert('Complete garment quantities, tailoring package, and all measurements.');
+            return;
+        }
+
+        const designFiles = Array.from(customDesignImages.files || []);
+        const payload = {
+            id: editingCustomIndex > -1 ? billItems[editingCustomIndex]?.id : `${Date.now()}-${Math.random()}`,
             category: 'custom',
-
-            productId: pendingCustom.productId,
-
-            name: pendingCustom.name,
-            unitLabel: pendingCustom.unitLabel,
-
-            // ✅ this is what renderBill uses in lineTotal = qty * unitPrice
-            qty: billQty,
-            unitPrice: baseUnitPrice,
-
-            // keep pcs qty for edit/reference (optional)
-            garmentQty: Number(pendingCustom.qty || 1),
-            baseUnitPrice: Number(pendingCustom.unitPrice || 0),
-
+            productId: pending.productId,
+            name: pending.name,
+            unitLabel: pending.unitLabel,
+            qty: fabricQuantity,
+            unitPrice: fabricSource === 'stock' ? Number(pending.unitPrice || 0) : 0,
+            baseUnitPrice: Number(pending.unitPrice || 0),
             fabricSource,
-            fabricQuantity: fabricSource === 'stock' ? stockFabricQtyValue : 0,
-
-            garmentTypeId,
-            garmentTitle,
-            measurements,
-
-            tailoring: {
-                packageId: tailoring.packageId,
-                package: tailoring.name,
-                amount: tailoring.price, // already per pcs × pendingCustom.qty
-            },
-
+            fabricQuantity,
+            garments,
             designNote: customDesignNote.value || '',
+            designFiles,
         };
 
         if (editingCustomIndex > -1 && billItems[editingCustomIndex]) {
-            billItems[editingCustomIndex] = customItemPayload;
-        } else {
-            billItems.push(customItemPayload);
+            if (!designFiles.length) {
+                payload.designFiles = billItems[editingCustomIndex].designFiles || [];
+            }
+            billItems[editingCustomIndex] = payload;
+            closeModal();
+            renderBill();
+            return;
         }
 
-        closeModal();
-        renderBill();
+        billItems.push(payload);
+        pendingCustomIndex += 1;
+        if (pendingCustomIndex >= pendingCustomQueue.length) {
+            closeModal();
+            renderBill();
+            return;
+        }
 
-        // reset entry fields
-        productSelect.value = '';
-        qtyInput.value = '1.00';
-        unitHint.textContent = '-';
+        resetCustomModalState();
+        loadPendingCustomIntoModal();
     });
 
     closeModalBtn.addEventListener('click', closeModal);
     cancelMeasurementBtn.addEventListener('click', closeModal);
 
-    // Discounts
     discountTypeEl.addEventListener('change', () => {
         discountValueEl.disabled = discountTypeEl.value === 'none';
         if (discountTypeEl.value === 'none') discountValueEl.value = '';
@@ -1398,24 +1715,20 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     applyDiscountBtn.addEventListener('click', () => {
         const type = discountTypeEl.value;
-        const val = Number(discountValueEl.value || 0);
-        discount = { type, value: (type === 'none' ? 0 : val) };
-
+        const value = Number(discountValueEl.value || 0);
+        discount = { type, value: type === 'none' ? 0 : value };
         if (type === 'none') discountDisplayEl.textContent = '';
-        if (type === 'flat') discountDisplayEl.textContent = `Flat discount: NPR ${money(val)}`;
-        if (type === 'percent') discountDisplayEl.textContent = `Percent discount: ${money(val)}%`;
-
+        if (type === 'flat') discountDisplayEl.textContent = `Flat discount: NPR ${money(value)}`;
+        if (type === 'percent') discountDisplayEl.textContent = `Percent discount: ${money(value)}%`;
         renderBill();
     });
 
-    // VAT
     vatToggle.addEventListener('change', () => {
         vatEnabled = vatToggle.checked;
         billTypeEl.textContent = vatEnabled ? 'VAT Bill' : 'Estimated Bill';
         renderBill();
     });
 
-    // Clear
     clearBillBtn.addEventListener('click', () => {
         if (!confirm('Clear the entire bill?')) return;
         billItems = [];
@@ -1432,7 +1745,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     printBillBtn.addEventListener('click', () => {
         if (!validateHasItems()) return;
-        if (!validateRequiredVariants()) return;
         if (printBillInput) printBillInput.value = '1';
         orderForm?.requestSubmit();
     });
@@ -1442,27 +1754,10 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     });
 
     orderForm?.addEventListener('submit', (event) => {
-        if (!validateHasItems()) { event.preventDefault(); return; }
-        if (!validateRequiredVariants()) event.preventDefault();
-    });
-
-    // Customer display
-    function updateCustomerDisplay() {
-        const customer = customersById.get(String(customerSelect.value || ''));
-        if (!customer) {
-            billCustomerEl.textContent = '-';
-            return;
+        if (!validateHasItems()) {
+            event.preventDefault();
         }
-
-        const customerName = customer.phone
-            ? `${customer.name} (${customer.phone})`
-            : customer.name;
-
-        billCustomerEl.innerHTML = `
-            <div><strong>Customer:</strong> ${customerName}</div>
-            <div><strong>Type:</strong> ${formatCustomerTypeLabel(customer.customerType)}</div>
-        `;
-    }
+    });
 
     checkCustomerBtn.addEventListener('click', () => {
         const normalizedPhone = normalizePhone(customerPhoneInput.value);
@@ -1471,9 +1766,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             return;
         }
 
-        const foundCustomer = customersByPhone.get(normalizedPhone);
-        if (foundCustomer) {
-            selectCustomer(foundCustomer);
+        const existingCustomer = customersByPhone.get(normalizedPhone);
+        if (existingCustomer) {
+            selectCustomer(existingCustomer);
             return;
         }
 
@@ -1492,22 +1787,37 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             address: (newCustomerAddress.value || '').trim(),
         };
 
-        if (payload.phone.length < 7) { alert('Enter a valid phone number before creating customer.'); return; }
-        if (!payload.name || !payload.email || !payload.address) { alert('Name, email and address are required to create customer.'); return; }
+        if (payload.phone.length < 7) {
+            alert('Enter a valid phone number before creating customer.');
+            return;
+        }
+        if (!payload.name || !payload.email || !payload.address) {
+            alert('Name, email and address are required to create customer.');
+            return;
+        }
 
         createCustomerBtn.disabled = true;
         try {
             const response = await fetch(resolveCustomerUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
                 body: JSON.stringify(payload),
             });
-
             const data = await response.json();
-            if (!response.ok) { alert(data?.message || 'Unable to create customer.'); return; }
+            if (!response.ok) {
+                alert(data?.message || 'Unable to create customer.');
+                return;
+            }
 
             const customer = data?.customer;
-            if (!customer?.id) { alert('Customer response was invalid. Please try again.'); return; }
+            if (!customer?.id) {
+                alert('Customer response was invalid. Please try again.');
+                return;
+            }
 
             upsertCustomerIndex(customer);
             selectCustomer(customer);
@@ -1524,21 +1834,27 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (event.target === createCustomerModal) closeCustomerCreateModal();
     });
 
-    // Product selection listeners
-    bindOrderSelectChange(categorySelect, updateProductOptions);
-    bindOrderSelectChange(productSelect, updateVariantOptions);
+    bindSelect2Change(categorySelect, () => rebuildProductSelect(categorySelect.value));
+    bindSelect2Change(productSelect, () => {
+        if (categorySelect.value !== 'custom') {
+            updateProductSelectionUI();
+        }
+    });
 
-    // Init
-    initOrderSelect2(productSelect, 'Select or scan barcode');
+    setupOrderSelect2(productSelect, 'Select or scan barcode');
+    fillGarmentTypeOptions();
     customerDirectory.forEach(upsertCustomerIndex);
     if (customerSelect.value) {
         const customer = customersById.get(String(customerSelect.value));
-        if (customer?.phone) customerPhoneInput.value = customer.phone;
+        if (customer?.phone) {
+            customerPhoneInput.value = customer.phone;
+        }
     }
+
     vatToggle.checked = vatEnabled;
     billTypeEl.textContent = vatEnabled ? 'VAT Bill' : 'Estimated Bill';
     updateCustomerDisplay();
-    updateProductOptions();
+    rebuildProductSelect(categorySelect.value);
     renderBill();
 })();
 </script>

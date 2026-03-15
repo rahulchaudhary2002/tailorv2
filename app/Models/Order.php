@@ -40,6 +40,7 @@ class Order extends Model
         'vat_enabled',
         'vat_amount',
         'subtotal_amount',
+        'tailoring_amount',
         'notes',
         'created_by',
     ];
@@ -58,6 +59,7 @@ class Order extends Model
         'vat_enabled' => 'boolean',
         'vat_amount' => 'decimal:2',
         'subtotal_amount' => 'decimal:2',
+        'tailoring_amount' => 'decimal:2',
     ];
 
     public function outlet()

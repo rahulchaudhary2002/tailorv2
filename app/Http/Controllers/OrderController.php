@@ -15,7 +15,6 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -230,36 +229,10 @@ class OrderController extends Controller
                 ->first(['id']);
         }
 
-        $productDefaultPrices = [];
         $productAvailableQty = [];
         $productIds = $products->pluck('id')->values();
 
-        $buildPriceMaps = function ($rows) use (&$productDefaultPrices): void {
-            foreach ($rows as $row) {
-                if ($row->special_price === null && $row->base_price === null) {
-                    continue;
-                }
-
-                $price = $row->special_price !== null
-                    ? (float) $row->special_price
-                    : (float) $row->base_price;
-
-                $productId = (int) $row->product_id;
-                if (!array_key_exists($productId, $productDefaultPrices)) {
-                    $productDefaultPrices[$productId] = $price;
-                }
-            }
-        };
-
         if ($outletLocation) {
-            $outletPriceRows = InventoryStock::query()
-                ->where('location_id', (int) $outletLocation->id)
-                ->whereIn('product_id', $productIds)
-                ->orderByDesc('id')
-                ->get(['product_id', 'base_price', 'special_price']);
-
-            $buildPriceMaps($outletPriceRows);
-
             $outletStockRows = InventoryStock::query()
                 ->where('location_id', (int) $outletLocation->id)
                 ->whereIn('product_id', $productIds)
@@ -275,23 +248,6 @@ class OrderController extends Controller
                 }
                 $productAvailableQty[$productId] += $qty;
             }
-        }
-
-        $allLocationPriceRows = InventoryStock::query()
-            ->whereIn('product_id', $productIds)
-            ->orderByDesc('id')
-            ->get(['product_id', 'base_price', 'special_price']);
-
-        $buildPriceMaps($allLocationPriceRows);
-
-        foreach ($products as $product) {
-            $productId = (int) $product->id;
-
-            if (array_key_exists($productId, $productDefaultPrices)) {
-                continue;
-            }
-
-            $productDefaultPrices[$productId] = (float) ($product->amount ?? 0);
         }
 
         $customers = Customer::query()
@@ -321,7 +277,6 @@ class OrderController extends Controller
             'garmentTypes',
             'selectedCustomerId',
             'workers',
-            'productDefaultPrices',
             'productAvailableQty'
         ));
     }
@@ -422,15 +377,19 @@ class OrderController extends Controller
 
         $validated = $request->validated();
         $items = collect($validated['items'])->values();
-        $effectiveProductPrices = $this->resolveProductDefaultPricesForOutlet(
-            $items
-                ->filter(fn ($item) => (string) ($item['item_category'] ?? '') !== 'custom')
-                ->map(fn ($item) => (int) ($item['product_id'] ?? 0))
-                ->filter(fn ($id) => $id > 0)
-                ->unique()
-                ->values(),
-            (int) $outletLocation->id
-        );
+        $effectiveProductPrices = Product::query()
+            ->whereIn(
+                'id',
+                $items
+                    ->filter(fn ($item) => (string) ($item['item_category'] ?? '') !== 'custom')
+                    ->map(fn ($item) => (int) ($item['product_id'] ?? 0))
+                    ->filter(fn ($id) => $id > 0)
+                    ->unique()
+                    ->values()
+            )
+            ->pluck('amount', 'id')
+            ->map(fn ($amount) => (float) $amount)
+            ->all();
 
         $productIds = $items
             ->flatMap(function ($item) {
@@ -555,7 +514,10 @@ class OrderController extends Controller
             $garmentTypes = GarmentType::query()
                 ->whereIn(
                     'id',
-                    $items->map(fn ($item) => (int) data_get($item, 'custom.garment_type_id', 0))
+                    $items->flatMap(function ($item) {
+                        return collect((array) data_get($item, 'custom.garments', []))
+                            ->map(fn ($garment) => (int) ($garment['garment_type_id'] ?? 0));
+                    })
                         ->filter(fn ($id) => $id > 0)
                         ->unique()
                         ->values()
@@ -571,38 +533,11 @@ class OrderController extends Controller
                 ->unique()
                 ->values();
 
-            $productFabricPriceMap = [];
-            if ($customStockFabricProductIds->isNotEmpty()) {
-                $buildFabricPriceMap = function ($rows) use (&$productFabricPriceMap): void {
-                    foreach ($rows as $row) {
-                        if ($row->special_price === null && $row->base_price === null) {
-                            continue;
-                        }
-
-                        $price = $row->special_price !== null
-                            ? (float) $row->special_price
-                            : (float) $row->base_price;
-
-                        $productId = (int) $row->product_id;
-                        if (!array_key_exists($productId, $productFabricPriceMap)) {
-                            $productFabricPriceMap[$productId] = $price;
-                        }
-                    }
-                };
-
-                $outletFabricPriceRows = InventoryStock::query()
-                    ->where('location_id', (int) $outletLocation->id)
-                    ->whereIn('product_id', $customStockFabricProductIds)
-                    ->orderByDesc('id')
-                    ->get(['product_id', 'base_price', 'special_price']);
-                $buildFabricPriceMap($outletFabricPriceRows);
-
-                $allLocationFabricPriceRows = InventoryStock::query()
-                    ->whereIn('product_id', $customStockFabricProductIds)
-                    ->orderByDesc('id')
-                    ->get(['product_id', 'base_price', 'special_price']);
-                $buildFabricPriceMap($allLocationFabricPriceRows);
-            }
+            $productFabricPriceMap = Product::query()
+                ->whereIn('id', $customStockFabricProductIds)
+                ->pluck('amount', 'id')
+                ->map(fn ($amount) => (float) $amount)
+                ->all();
 
             DB::transaction(function () use ($request, $validated, $items, $products, $outletLocation, $inventoryTypeId, $outletId, $garmentTypes, $productFabricPriceMap, $vatEnabled, &$createdOrder): void {
                 $status = (string) $validated['status'];
@@ -644,46 +579,70 @@ class OrderController extends Controller
                     'vat_enabled' => $vatEnabled,
                     'vat_amount' => 0,
                     'subtotal_amount' => 0,
+                    'tailoring_amount' => 0,
                     'notes' => $validated['notes'] ?? null,
                     'created_by' => (int) auth()->id(),
                 ]);
 
                 $subtotal = 0.0;
+                $tailoringTotal = 0.0;
 
                 foreach ($items as $itemIndex => $item) {
                     $itemCategory = (string) ($item['item_category'] ?? 'readymade');
                     $quantity = (float) $item['quantity'];
                     $unitPrice = (float) $item['unit_price'];
+                    $itemTailoringTotal = 0.0;
                     if ($itemCategory === 'custom') {
                         $custom = (array) ($item['custom'] ?? []);
-                        $garmentTypeId = (int) ($custom['garment_type_id'] ?? 0);
-                        $garmentType = $garmentTypes->get($garmentTypeId);
-                        $tailoringPackageId = !empty($custom['tailoring_package_id']) ? (int) $custom['tailoring_package_id'] : null;
-                        $tailoringPackageName = trim((string) ($custom['tailoring_package'] ?? ''));
-                        $garmentStitchingPrice = (float) ($custom['tailoring_amount'] ?? ($garmentType?->amount ?? 0));
-                        $garmentTaxPercent = (float) ($garmentType?->tax ?? 0);
-                        $garmentTaxAmount = $garmentTaxPercent > 0
-                            ? round($garmentStitchingPrice * ($garmentTaxPercent / 100), 2)
-                            : 0.0;
                         $fabricSource = (string) ($custom['fabric_source'] ?? 'own');
                         $fabricProductId = !empty($custom['fabric_product_id']) ? (int) $custom['fabric_product_id'] : null;
-                        $fabricQuantity = (float) ($custom['fabric_quantity'] ?? 0);
+                        $fabricQuantity = (float) ($custom['fabric_quantity'] ?? $quantity);
                         $fabricUnitPrice = 0.0;
-                        // Customer fabric: no product/fabric charge, only tailoring charge is tracked separately.
+
                         if ($fabricSource === 'own') {
                             $unitPrice = 0.0;
                         }
+
                         if ($fabricSource === 'stock') {
                             if ($fabricProductId && array_key_exists($fabricProductId, $productFabricPriceMap)) {
                                 $fabricUnitPrice = (float) $productFabricPriceMap[$fabricProductId];
                             }
 
-                            // Enforce custom stock pricing: stitching + (fabric qty * selected stock unit price).
-                            $unitPrice = $garmentStitchingPrice + ($fabricQuantity * $fabricUnitPrice);
+                            $unitPrice = $fabricUnitPrice;
                         }
 
-                        $lineTotal = $quantity * $unitPrice;
+                        $lineTotal = $fabricQuantity * $unitPrice;
                         $fabricQuantityUnit = 'm';
+                        $garments = collect((array) ($custom['garments'] ?? []))
+                            ->values()
+                            ->map(function ($garment) use ($garmentTypes) {
+                                $garmentTypeId = (int) ($garment['garment_type_id'] ?? 0);
+                                $garmentType = $garmentTypes->get($garmentTypeId);
+                                $garmentQty = (float) ($garment['quantity'] ?? 1);
+                                $tailoringAmount = (float) ($garment['tailoring_amount'] ?? ($garmentType?->amount ?? 0));
+                                $taxPercent = (float) ($garmentType?->tax ?? 0);
+                                $tailoringTotal = $garmentQty * $tailoringAmount;
+
+                                return [
+                                    'garment_type_id' => $garmentTypeId,
+                                    'garment_title' => $garment['garment_title'] ?? $garmentType?->title,
+                                    'quantity' => $garmentQty,
+                                    'measurements' => array_values((array) ($garment['measurements'] ?? [])),
+                                    'tailoring_package_id' => !empty($garment['tailoring_package_id'])
+                                        ? (int) $garment['tailoring_package_id']
+                                        : null,
+                                    'tailoring_package' => filled($garment['tailoring_package'] ?? null)
+                                        ? (string) $garment['tailoring_package']
+                                        : null,
+                                    'tailoring_amount' => $tailoringAmount,
+                                    'tailoring_total_amount' => $tailoringTotal,
+                                    'garment_tax_percent' => $taxPercent,
+                                    'garment_tax_amount' => $taxPercent > 0
+                                        ? round($tailoringTotal * ($taxPercent / 100), 2)
+                                        : 0.0,
+                                ];
+                            });
+                        $itemTailoringTotal = (float) $garments->sum(fn ($garment) => (float) ($garment['tailoring_total_amount'] ?? 0));
                         $designImagePaths = [];
                         $designImages = (array) $request->file("items.{$itemIndex}.custom.design_images", []);
                         foreach ($designImages as $designImage) {
@@ -701,25 +660,21 @@ class OrderController extends Controller
                             'item_category' => 'custom',
                             'product_id' => null,
                             'unit_id' => null,
-                            'quantity' => $quantity,
+                            'quantity' => $fabricQuantity,
                             'unit_price' => $unitPrice,
                             'line_total' => $lineTotal,
                             'custom_details' => [
-                                'garment_type_id' => $garmentTypeId,
-                                'garment_title' => $garmentType?->title,
-                                'tailoring_package_id' => $tailoringPackageId,
-                                'tailoring_package' => $tailoringPackageName !== '' ? $tailoringPackageName : null,
-                                'garment_stitching_price' => $garmentStitchingPrice,
-                                'garment_tax_percent' => $garmentTaxPercent,
-                                'garment_tax_amount' => $garmentTaxAmount,
-                                'measurements' => array_values((array) ($custom['measurements'] ?? [])),
+                                'garment_title' => $garments->pluck('garment_title')->filter()->implode(', '),
+                                'garments' => $garments->all(),
+                                'measurements' => $garments->flatMap(fn ($garment) => (array) ($garment['measurements'] ?? []))->values()->all(),
                                 'fabric_source' => $fabricSource,
                                 'fabric_product_id' => $fabricProductId,
                                 'fabric_quantity' => $fabricQuantity,
                                 'fabric_quantity_unit' => $fabricQuantityUnit,
                                 'fabric_unit_price' => $fabricSource === 'stock' ? $fabricUnitPrice : null,
                                 'fabric_total_price' => $fabricSource === 'stock' ? ($fabricQuantity * $fabricUnitPrice) : null,
-                                'quantity_unit' => 'pcs',
+                                'quantity_unit' => $fabricQuantityUnit,
+                                'tailoring_total_price' => $itemTailoringTotal,
                                 'design_note' => $custom['design_note'] ?? null,
                                 'design_images' => $designImagePaths,
                                 'design_image' => $designImagePaths[0] ?? null,
@@ -768,6 +723,9 @@ class OrderController extends Controller
                             'quantity' => $quantity,
                             'unit_price' => $unitPrice,
                             'line_total' => $lineTotal,
+                            'custom_details' => $itemCategory === 'readymade'
+                                ? ['size' => $item['size'] ?? null]
+                                : null,
                         ]);
 
                         $averageCost = $this->deductFromOutletStock(
@@ -798,6 +756,9 @@ class OrderController extends Controller
                     }
 
                     $subtotal += $lineTotal;
+                    if ($itemCategory === 'custom') {
+                        $tailoringTotal += $itemTailoringTotal;
+                    }
                 }
 
                 $discountAmount = (float) ($validated['discount_amount'] ?? 0);
@@ -807,6 +768,7 @@ class OrderController extends Controller
                     : 0.0;
 
                 $order->subtotal_amount = $subtotal;
+                $order->tailoring_amount = $tailoringTotal;
                 $order->vat_amount = $vatAmount;
                 $order->save();
                 $createdOrder = $order;
@@ -825,80 +787,6 @@ class OrderController extends Controller
         return redirect()
             ->route('order.index')
             ->with('success', 'Order created successfully.');
-    }
-
-    /**
-     * Resolve the selling price to use for each selected product.
-     *
-     * Prefers the current outlet stock price, then any stock price, then the product amount.
-     *
-     * @param  \Illuminate\Support\Collection<int, int>  $productIds
-     * @return array<int, float>
-     */
-    private function resolveProductDefaultPricesForOutlet(Collection $productIds, int $outletLocationId): array
-    {
-        $productIds = $productIds
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->unique()
-            ->values();
-
-        if ($productIds->isEmpty()) {
-            return [];
-        }
-
-        $prices = [];
-
-        $applyRows = function ($rows) use (&$prices): void {
-            foreach ($rows as $row) {
-                $productId = (int) $row->product_id;
-
-                if (array_key_exists($productId, $prices)) {
-                    continue;
-                }
-
-                if ($row->special_price === null && $row->base_price === null) {
-                    continue;
-                }
-
-                $prices[$productId] = $row->special_price !== null
-                    ? (float) $row->special_price
-                    : (float) $row->base_price;
-            }
-        };
-
-        if ($outletLocationId > 0) {
-            $applyRows(
-                InventoryStock::query()
-                    ->where('location_id', $outletLocationId)
-                    ->whereIn('product_id', $productIds)
-                    ->orderByDesc('id')
-                    ->get(['product_id', 'base_price', 'special_price'])
-            );
-        }
-
-        $applyRows(
-            InventoryStock::query()
-                ->whereIn('product_id', $productIds)
-                ->orderByDesc('id')
-                ->get(['product_id', 'base_price', 'special_price'])
-        );
-
-        $fallbackAmounts = Product::query()
-            ->whereIn('id', $productIds)
-            ->pluck('amount', 'id');
-
-        foreach ($productIds as $productId) {
-            $productId = (int) $productId;
-
-            if (array_key_exists($productId, $prices)) {
-                continue;
-            }
-
-            $prices[$productId] = (float) ($fallbackAmounts[$productId] ?? 0.0);
-        }
-
-        return $prices;
     }
 
     /**
@@ -988,9 +876,17 @@ class OrderController extends Controller
         $customItems = $items->filter(fn ($item) => (string) $item->item_category === 'custom')->values();
         $fabricItems = $items->filter(fn ($item) => in_array((string) $item->item_category, ['custom', 'fabric'], true))->values();
 
-        $stitchingCharges = (float) $customItems->sum(function ($item) {
-            return (float) data_get($item->custom_details, 'garment_stitching_price', 0) * (float) $item->quantity;
-        });
+        $stitchingCharges = (float) ($order->tailoring_amount ?? 0);
+        if ($stitchingCharges <= 0) {
+            $stitchingCharges = (float) $customItems->sum(function ($item) {
+                $garments = collect((array) data_get($item->custom_details, 'garments', []));
+                if ($garments->isNotEmpty()) {
+                    return (float) $garments->sum(fn ($garment) => (float) ($garment['tailoring_total_amount'] ?? 0));
+                }
+
+                return (float) data_get($item->custom_details, 'garment_stitching_price', 0) * (float) $item->quantity;
+            });
+        }
 
         $taxAmount = (bool) $order->vat_enabled
             ? (float) ($order->vat_amount ?? 0)
@@ -998,7 +894,7 @@ class OrderController extends Controller
 
         $subtotal = (float) $order->subtotal_amount;
         $discount = (float) ($order->discount_amount ?? 0);
-        $netPayable = max(0.0, ($subtotal - $discount) + $taxAmount);
+        $netPayable = max(0.0, ($subtotal - $discount) + $taxAmount + $stitchingCharges);
         $paidAmount = (float) ($order->advance_payment_amount ?? 0);
         if ((string) $order->payment_status === Order::PAYMENT_STATUS_PAID) {
             $paidAmount = $netPayable;
