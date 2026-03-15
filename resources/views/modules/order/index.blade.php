@@ -41,7 +41,6 @@
                     <th>Delivery</th>
                     <th>Worker</th>
                     <th>Status</th>
-                    <th>Job Workflow</th>
                     <th>Payment</th>
                     <th>Total Amount</th>
                     <th>Action</th>
@@ -72,15 +71,19 @@
                             : (($canViewAssignedJobs && $isOwnAssignedOrder)
                                 ? collect($nextStatuses)->filter(fn ($s) => in_array($s, $workerVisibleStatuses, true))->values()->all()
                                 : []);
-                        $workerName = $order->worker?->name ?: '-';
-                        $workflowStatuses = [
+                        $isEditable = !in_array((string) $order->status, [
                             \App\Models\Order::STATUS_ASSIGNED,
                             \App\Models\Order::STATUS_IN_PROGRESS,
                             \App\Models\Order::STATUS_NEAR_COMPLETION,
                             \App\Models\Order::STATUS_COMPLETED,
                             \App\Models\Order::STATUS_DELIVERED,
-                        ];
-                        $currentWorkflowIndex = array_search($order->status, $workflowStatuses, true);
+                            \App\Models\Order::STATUS_CANCELLED,
+                        ], true);
+                        $canEditDeliveryDate = !in_array((string) $order->status, [
+                            \App\Models\Order::STATUS_DELIVERED,
+                            \App\Models\Order::STATUS_CANCELLED,
+                        ], true);
+                        $workerName = $order->worker?->name ?: '-';
                     @endphp
                     <tr>
                         <td>
@@ -99,7 +102,38 @@
                             @endif
                         </td>
                         <td>
-                            <div>Due: {{ $order->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</div>
+                            <div class="order-delivery-cell">
+                                <span>Due: {{ $order->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</span>
+                                @if (($canManageOrders || $authUser?->hasPermission('create-orders')) && $canEditDeliveryDate)
+                                    <button
+                                        type="button"
+                                        class="order-delivery-edit-btn"
+                                        data-delivery-toggle
+                                        aria-label="Edit delivery date"
+                                        title="Edit delivery date"
+                                    >
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                @endif
+                            </div>
+                            @if (($canManageOrders || $authUser?->hasPermission('create-orders')) && $canEditDeliveryDate)
+                                <form action="{{ route('order.deliveryDate.update', $order) }}" method="POST" class="order-delivery-edit-form" style="display:none;">
+                                    @csrf
+                                    @method('PUT')
+                                    <input
+                                        type="datetime-local"
+                                        name="delivery_due_at"
+                                        class="outlet-input"
+                                        value="{{ $order->delivery_due_at?->format('Y-m-d\TH:i') }}"
+                                        min="{{ $order->ordered_at?->format('Y-m-d\TH:i') }}"
+                                        required
+                                    >
+                                    <div class="order-delivery-edit-actions">
+                                        <button type="submit" class="btn btn-sm btn-secondary">Save</button>
+                                        <button type="button" class="btn btn-sm btn-light" data-delivery-cancel>Cancel</button>
+                                    </div>
+                                </form>
+                            @endif
                             <small>Delivered: {{ $order->delivered_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
                         <td>
@@ -108,22 +142,6 @@
                             <small style="display:block;">Fabric Issued: {{ $order->fabric_issued_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
                         <td>{{ $statusLabels[$order->status] ?? ucfirst($order->status ?: '-') }}</td>
-                        <td>
-                            <div class="order-lifecycle">
-                                @foreach ($workflowStatuses as $workflowStatus)
-                                    @php
-                                        $isActive = $order->status === $workflowStatus;
-                                        $stepIndex = array_search($workflowStatus, $workflowStatuses, true);
-                                        $isDone = $stepIndex !== false
-                                            && $currentWorkflowIndex !== false
-                                            && $stepIndex <= $currentWorkflowIndex;
-                                    @endphp
-                                    <span class="order-lifecycle-step {{ $isDone ? 'is-done' : '' }} {{ $isActive ? 'is-active' : '' }}">
-                                        {{ $statusLabels[$workflowStatus] ?? ucfirst($workflowStatus) }}
-                                    </span>
-                                @endforeach
-                            </div>
-                        </td>
                         <td>
                             {{ ucfirst($order->payment_status ?: '-') }}
                             @if ($order->payment_method)
@@ -135,72 +153,83 @@
                         </td>
                         <td>{{ number_format(max(0, (float) $order->subtotal_amount - (float) ($order->discount_amount ?? 0)), 2) }}</td>
                         <td>
-                            @if (empty($visibleNextStatuses))
-                                <span>Locked</span>
-                            @else
-                                <form action="{{ route('order.status.update', $order) }}" method="POST" class="order-status-update-form" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                                    @csrf
-                                    @method('PUT')
+                            <details class="order-actions-menu">
+                                <summary class="order-actions-toggle" aria-label="Open order actions">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </summary>
 
-                                    <select name="status" class="outlet-input order-status-select" style="min-width:160px;" required>
-                                        <option value="" disabled selected>Select Next Status</option>
-                                        @foreach ($visibleNextStatuses as $status)
-                                            <option value="{{ $status }}">{{ $statusLabels[$status] ?? ucfirst($status) }}</option>
-                                        @endforeach
-                                    </select>
+                                <div class="order-actions-dropdown">
+                                    @if (!empty($visibleNextStatuses))
+                                        <form action="{{ route('order.status.update', $order) }}" method="POST" class="order-status-update-form order-actions-form">
+                                            @csrf
+                                            @method('PUT')
 
-                                    <input type="hidden" class="remaining-due-value" value="{{ number_format($remainingDue, 2, '.', '') }}">
+                                            <div class="order-actions-section-title">Update Status</div>
 
-                                    <div class="worker-assign-wrap" style="display:none; gap:8px; align-items:center; flex-wrap:wrap;">
-                                        <select name="worker_id" class="outlet-input" style="min-width:160px;">
-                                            <option value="">Select Worker</option>
-                                            @foreach ($workers as $worker)
-                                                <option value="{{ $worker->id }}" @selected((int) $order->worker_id === (int) $worker->id)>{{ $worker->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <input
-                                            name="worker_deadline_at"
-                                            type="datetime-local"
-                                            class="outlet-input"
-                                            style="min-width:180px;"
-                                            value="{{ old('worker_deadline_at', $order->worker_deadline_at?->format('Y-m-d\TH:i') ?: $order->delivery_due_at?->format('Y-m-d\TH:i')) }}"
-                                        >
+                                            <select name="status" class="outlet-input order-status-select" required>
+                                                <option value="" disabled selected>Select Next Status</option>
+                                                @foreach ($visibleNextStatuses as $status)
+                                                    <option value="{{ $status }}">{{ $statusLabels[$status] ?? ucfirst($status) }}</option>
+                                                @endforeach
+                                            </select>
+
+                                            <input type="hidden" class="remaining-due-value" value="{{ number_format($remainingDue, 2, '.', '') }}">
+
+                                            <div class="worker-assign-wrap order-actions-hidden-row">
+                                                <select name="worker_id" class="outlet-input">
+                                                    <option value="">Select Worker</option>
+                                                    @foreach ($workers as $worker)
+                                                        <option value="{{ $worker->id }}" @selected((int) $order->worker_id === (int) $worker->id)>{{ $worker->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <input
+                                                    name="worker_deadline_at"
+                                                    type="datetime-local"
+                                                    class="outlet-input"
+                                                    value="{{ old('worker_deadline_at', $order->worker_deadline_at?->format('Y-m-d\TH:i') ?: $order->delivery_due_at?->format('Y-m-d\TH:i')) }}"
+                                                >
+                                            </div>
+
+                                            <div class="remaining-payment-wrap order-actions-hidden-row">
+                                                <input
+                                                    name="remaining_payment_amount"
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    class="outlet-input remaining-payment-input"
+                                                    placeholder="Remaining payment"
+                                                    value="{{ number_format($remainingDue, 2, '.', '') }}"
+                                                >
+                                                <input
+                                                    name="payment_method"
+                                                    type="text"
+                                                    class="outlet-input"
+                                                    placeholder="Payment method"
+                                                >
+                                            </div>
+
+                                            <button type="submit" class="btn btn-sm btn-secondary">Update</button>
+                                        </form>
+                                    @else
+                                        <div class="order-actions-locked">Locked</div>
+                                    @endif
+
+                                    <div class="order-actions-links">
+                                        @if (($canManageOrders || $authUser?->hasPermission('create-orders')) && $isEditable)
+                                            <a href="{{ route('order.edit', $order) }}" class="order-actions-link">Edit</a>
+                                        @endif
+                                        @if ($canManageOrders || $canViewOrders)
+                                            <a href="{{ route('order.bill.customer', $order) }}" target="_blank" class="order-actions-link">Customer Bill</a>
+                                        @endif
+                                        @if ($canManageOrders || ($canViewAssignedJobs && $isOwnAssignedOrder))
+                                            <a href="{{ route('order.bill.worker', $order) }}" target="_blank" class="order-actions-link">Worker Slip</a>
+                                        @endif
+                                        @if ($canManageOrders)
+                                            <a href="{{ route('order.bill.office', $order) }}" target="_blank" class="order-actions-link">Office Bill</a>
+                                        @endif
                                     </div>
-
-                                    <div class="remaining-payment-wrap" style="display:none; gap:8px; align-items:center; flex-wrap:wrap;">
-                                        <input
-                                            name="remaining_payment_amount"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            class="outlet-input remaining-payment-input"
-                                            placeholder="Remaining payment"
-                                            style="min-width:150px;"
-                                            value="{{ number_format($remainingDue, 2, '.', '') }}"
-                                        >
-                                        <input
-                                            name="payment_method"
-                                            type="text"
-                                            class="outlet-input"
-                                            placeholder="Payment method"
-                                            style="min-width:150px;"
-                                        >
-                                    </div>
-
-                                    <button type="submit" class="btn btn-sm btn-secondary">Update</button>
-                                </form>
-                            @endif
-                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
-                                @if ($canManageOrders || $canViewOrders)
-                                    <a href="{{ route('order.bill.customer', $order) }}" target="_blank" class="btn btn-sm btn-outline-primary">Customer Bill</a>
-                                @endif
-                                @if ($canManageOrders || ($canViewAssignedJobs && $isOwnAssignedOrder))
-                                    <a href="{{ route('order.bill.worker', $order) }}" target="_blank" class="btn btn-sm btn-outline-secondary">Worker Slip</a>
-                                @endif
-                                @if ($canManageOrders)
-                                    <a href="{{ route('order.bill.office', $order) }}" target="_blank" class="btn btn-sm btn-outline-dark">Office Bill</a>
-                                @endif
-                            </div>
+                                </div>
+                            </details>
                         </td>
                     </tr>
                 @empty
@@ -222,34 +251,135 @@
 
 @section('page-specific-style')
 <style>
-    .order-lifecycle {
+    .order-actions-menu {
+        position: relative;
+        display: inline-block;
+    }
+
+    .order-actions-menu summary {
+        list-style: none;
+    }
+
+    .order-actions-menu summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .order-actions-toggle {
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #d7dfeb;
+        border-radius: 10px;
+        background: #fff;
+        color: #334155;
+        cursor: pointer;
+    }
+
+    .order-actions-toggle:hover {
+        background: #f8fafc;
+    }
+
+    .order-actions-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        z-index: 20;
+        width: 280px;
+        padding: 14px;
+        border: 1px solid #d7dfeb;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    }
+
+    .order-actions-form {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .order-actions-form .outlet-input {
+        min-width: 100%;
+    }
+
+    .order-actions-hidden-row {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .order-actions-section-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+
+    .order-actions-links {
+        display: flex;
+        flex-direction: column;
         gap: 6px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e5eaf1;
     }
 
-    .order-lifecycle-step {
-        font-size: 11px;
-        line-height: 1;
-        padding: 6px 8px;
+    .order-actions-link {
+        display: block;
+        padding: 8px 10px;
+        border-radius: 10px;
+        color: #1e293b;
+        text-decoration: none;
+        background: #f8fafc;
+    }
+
+    .order-actions-link:hover {
+        background: #eef2f7;
+        color: #0f172a;
+    }
+
+    .order-actions-locked {
+        font-size: 13px;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+
+    .order-delivery-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .order-delivery-edit-btn {
+        width: 26px;
+        height: 26px;
+        border: 1px solid #d7dfeb;
         border-radius: 999px;
-        border: 1px solid #c9d3df;
-        color: #5f6d7b;
-        background: #f5f8fb;
-        white-space: nowrap;
+        background: #fff;
+        color: #475569;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
     }
 
-    .order-lifecycle-step.is-done {
-        border-color: #84b49f;
-        color: #1e6a4c;
-        background: #e8f7ef;
+    .order-delivery-edit-btn:hover {
+        background: #f8fafc;
     }
 
-    .order-lifecycle-step.is-active {
-        border-color: #4b78c2;
-        color: #1f4f9a;
-        background: #e9f1ff;
-        font-weight: 600;
+    .order-delivery-edit-form {
+        margin: 8px 0 4px;
+        display: grid;
+        gap: 8px;
+        max-width: 220px;
+    }
+
+    .order-delivery-edit-actions {
+        display: flex;
+        gap: 8px;
     }
 </style>
 @endsection
@@ -257,7 +387,63 @@
 @section('page-specific-script')
 <script>
     (function () {
+        const actionMenus = document.querySelectorAll('.order-actions-menu');
         const forms = document.querySelectorAll('.order-status-update-form');
+
+        actionMenus.forEach((menu) => {
+            menu.addEventListener('toggle', () => {
+                if (!menu.open) {
+                    return;
+                }
+
+                actionMenus.forEach((otherMenu) => {
+                    if (otherMenu !== menu) {
+                        otherMenu.open = false;
+                    }
+                });
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            actionMenus.forEach((menu) => {
+                if (!menu.open) {
+                    return;
+                }
+
+                if (!menu.contains(event.target)) {
+                    menu.open = false;
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-delivery-toggle]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const cell = button.closest('td');
+                const form = cell?.querySelector('.order-delivery-edit-form');
+
+                document.querySelectorAll('.order-delivery-edit-form').forEach((otherForm) => {
+                    if (otherForm !== form) {
+                        otherForm.style.display = 'none';
+                    }
+                });
+
+                if (!form) {
+                    return;
+                }
+
+                form.style.display = form.style.display === 'none' || form.style.display === '' ? 'grid' : 'none';
+            });
+        });
+
+        document.querySelectorAll('[data-delivery-cancel]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.order-delivery-edit-form');
+                if (form) {
+                    form.style.display = 'none';
+                }
+            });
+        });
+
         forms.forEach((form) => {
             const statusSelect = form.querySelector('.order-status-select');
             const remainingWrap = form.querySelector('.remaining-payment-wrap');

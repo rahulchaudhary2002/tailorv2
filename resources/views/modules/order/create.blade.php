@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Create Order')
+@section('title', $editingOrder ? 'Edit Order' : 'Create Order')
 
 @section('content')
 @php
@@ -72,22 +72,25 @@ $customerLookupPayload = $customers->map(function ($customer) {
 })->values();
 @endphp
 
-<form id="orderForm" action="{{ route('order.store') }}" method="POST" enctype="multipart/form-data">
+<form id="orderForm" action="{{ $editingOrder ? route('order.update', $editingOrder) : route('order.store') }}" method="POST" enctype="multipart/form-data">
     @csrf
+    @if ($editingOrder)
+        @method('PUT')
+    @endif
 
     {{-- Hidden container where bill items are converted to items[i][...] --}}
     <div id="itemsHiddenInputs"></div>
     <input type="hidden" id="print_bill" name="print_bill" value="{{ old('print_bill', '0') }}">
-    <input type="hidden" id="ordered_at" name="ordered_at" value="{{ old('ordered_at', now()->format('Y-m-d H:i:s')) }}">
-    <input type="hidden" id="delivery_due_at" name="delivery_due_at" value="{{ old('delivery_due_at', now()->addDays(7)->format('Y-m-d H:i:s')) }}">
-    <input type="hidden" id="status" name="status" value="{{ old('status', \App\Models\Order::STATUS_CONFIRMED) }}">
-    <input type="hidden" id="worker_id" name="worker_id" value="{{ old('worker_id') }}">
-    <input type="hidden" id="worker_deadline_at" name="worker_deadline_at" value="{{ old('worker_deadline_at') }}">
-    <input type="hidden" id="notes" name="notes" value="{{ old('notes') }}">
-    <input type="hidden" id="payment_status" name="payment_status" value="{{ old('payment_status', \App\Models\Order::PAYMENT_STATUS_UNPAID) }}">
-    <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method') }}">
-    <input type="hidden" id="advance_payment_amount" name="advance_payment_amount" value="{{ old('advance_payment_amount', '0') }}">
-    <input type="hidden" id="discount_amount" name="discount_amount" value="{{ old('discount_amount', '0') }}">
+    <input type="hidden" id="ordered_at" name="ordered_at" value="{{ old('ordered_at', $editingOrder?->ordered_at?->format('Y-m-d H:i:s') ?: now()->format('Y-m-d H:i:s')) }}">
+    <input type="hidden" id="delivery_due_at" name="delivery_due_at" value="{{ old('delivery_due_at', $editingOrder?->delivery_due_at?->format('Y-m-d H:i:s') ?: now()->addDays(7)->format('Y-m-d H:i:s')) }}">
+    <input type="hidden" id="status" name="status" value="{{ old('status', $editingOrder?->status ?: \App\Models\Order::STATUS_CONFIRMED) }}">
+    <input type="hidden" id="worker_id" name="worker_id" value="{{ old('worker_id', $editingOrder?->worker_id) }}">
+    <input type="hidden" id="worker_deadline_at" name="worker_deadline_at" value="{{ old('worker_deadline_at', $editingOrder?->worker_deadline_at?->format('Y-m-d H:i:s')) }}">
+    <input type="hidden" id="notes" name="notes" value="{{ old('notes', $editingOrder?->notes) }}">
+    <input type="hidden" id="payment_status" name="payment_status" value="{{ old('payment_status', $editingOrder?->payment_status ?: \App\Models\Order::PAYMENT_STATUS_UNPAID) }}">
+    <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method', $editingOrder?->payment_method) }}">
+    <input type="hidden" id="advance_payment_amount" name="advance_payment_amount" value="{{ old('advance_payment_amount', (string) ($editingOrder?->advance_payment_amount ?? '0')) }}">
+    <input type="hidden" id="discount_amount" name="discount_amount" value="{{ old('discount_amount', (string) ($editingOrder?->discount_amount ?? '0')) }}">
 
     <div class="tp-container">
         @if (session('error'))
@@ -108,12 +111,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
         @endif
 
         <section class="demo-section">
-            <h2><i class="fas fa-desktop"></i> Enhanced Live Billing Interface</h2>
-            <div class="instructions">
-                <i class="fas fa-info-circle"></i> <strong>New Features:</strong>
-                1. Select "Custom" product category to trigger measurement popup.
-                2. Tailoring charges appear separately in bill items (not included in product price).
-            </div>
+            <h2><i class="fas fa-desktop"></i> {{ $editingOrder ? 'Update Order' : 'Enhanced Live Billing Interface' }}</h2>
 
             <div class="demo-layout">
             {{-- LEFT: Order entry --}}
@@ -131,7 +129,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                             id="customer_id"
                             name="customer_id"
                             type="hidden"
-                            value="{{ old('customer_id', $selectedCustomerId ?? '') }}">
+                            value="{{ old('customer_id', $editingOrder?->customer_id ?? $selectedCustomerId ?? '') }}">
                     </div>
                 </div>
 
@@ -248,7 +246,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                         <i class="fas fa-print"></i> Print Bill
                     </button>
                     <button type="submit" id="saveOrder" class="btn-secondary">
-                        <i class="fas fa-file-export"></i> Save Order
+                        <i class="fas fa-file-export"></i> {{ $editingOrder ? 'Update Order' : 'Save Order' }}
                     </button>
                     <button type="button" id="clearBill" class="btn-danger">
                         <i class="fas fa-trash-alt"></i> Clear Bill
@@ -627,13 +625,24 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 @endsection
 
 @section('page-specific-script')
+@php
+    $resolvedInitialOrderState = $initialOrderState ?? [
+        'items' => [],
+        'discount' => [
+            'type' => 'none',
+            'value' => 0,
+        ],
+        'vatEnabled' => false,
+    ];
+@endphp
 <script>
 (function() {
     const products = @json($productPayload);
     const garmentTypes = @json($garmentPayload);
     const customerMeasurements = @json($customerMeasurementPayload);
     const customerDirectory = @json($customerLookupPayload);
-    const initialVatEnabled = @json(old('vat_enabled', '0') === '1');
+    const initialOrderState = @json($resolvedInitialOrderState);
+    const initialVatEnabled = Boolean(initialOrderState?.vatEnabled);
     const resolveCustomerUrl = @json(route('order.customer.resolve'));
     const csrfToken = @json(csrf_token());
 
@@ -711,8 +720,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const customDesignNote = document.getElementById('customDesignNote');
     const customDesignImages = document.getElementById('customDesignImages');
 
-    let billItems = [];
-    let discount = { type: 'none', value: 0 };
+    let billItems = Array.isArray(initialOrderState?.items) ? initialOrderState.items : [];
+    let discount = initialOrderState?.discount || { type: 'none', value: 0 };
     let vatEnabled = Boolean(initialVatEnabled);
     let pendingCustomQueue = [];
     let pendingCustomIndex = 0;
@@ -1162,13 +1171,17 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             return;
         }
 
+        const stockUnitPrice = Number(pending.unitPrice || resolveDefaultPrice(pending.productId) || 0);
+
         if (source === 'stock') {
+            modalProductPrice.textContent = money(stockUnitPrice);
             modalProductQuantity.textContent = money(Number(customStockFabricQty.value || 0));
             const product = productMap.get(String(pending.productId || ''));
             customStockFabricHint.textContent = product
                 ? `Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim()
                 : 'Selected stock fabric is unavailable.';
         } else {
+            modalProductPrice.textContent = money(0);
             modalProductQuantity.textContent = money(Number(pending.qty || 0));
             customStockFabricHint.textContent = '';
         }
@@ -1444,6 +1457,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || item.qty || 0)));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][design_note]`, String(item.designNote || '')));
+            (item.existingDesignImages || []).forEach((path, pathIndex) => {
+                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][existing_design_images][${pathIndex}]`, String(path || '')));
+            });
 
             (item.garments || []).forEach((garment, garmentIndex) => {
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][garment_type_id]`, String(garment.garmentTypeId || '')));
@@ -1504,7 +1520,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             openCustomMeasurementModal([{
                 productId: item.productId,
                 qty: Number(item.fabricQuantity || item.qty || 0),
-                unitPrice: Number(item.baseUnitPrice || item.unitPrice || 0),
+                unitPrice: Number(item.baseUnitPrice || item.unitPrice || resolveDefaultPrice(item.productId) || 0),
                 name: item.name,
                 unitLabel: item.unitLabel || '',
             }], item, index);
@@ -1667,6 +1683,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         const designFiles = Array.from(customDesignImages.files || []);
+        const stockUnitPrice = Number(pending.unitPrice || resolveDefaultPrice(pending.productId) || 0);
         const payload = {
             id: editingCustomIndex > -1 ? billItems[editingCustomIndex]?.id : `${Date.now()}-${Math.random()}`,
             category: 'custom',
@@ -1674,19 +1691,21 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             name: pending.name,
             unitLabel: pending.unitLabel,
             qty: fabricQuantity,
-            unitPrice: fabricSource === 'stock' ? Number(pending.unitPrice || 0) : 0,
-            baseUnitPrice: Number(pending.unitPrice || 0),
+            unitPrice: fabricSource === 'stock' ? stockUnitPrice : 0,
+            baseUnitPrice: stockUnitPrice,
             fabricSource,
             fabricQuantity,
             garments,
             designNote: customDesignNote.value || '',
             designFiles,
+            existingDesignImages: [],
         };
 
         if (editingCustomIndex > -1 && billItems[editingCustomIndex]) {
             if (!designFiles.length) {
                 payload.designFiles = billItems[editingCustomIndex].designFiles || [];
             }
+            payload.existingDesignImages = billItems[editingCustomIndex].existingDesignImages || [];
             billItems[editingCustomIndex] = payload;
             closeModal();
             renderBill();
@@ -1759,10 +1778,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
     });
 
-    checkCustomerBtn.addEventListener('click', () => {
+    function handleCustomerLookup() {
         const normalizedPhone = normalizePhone(customerPhoneInput.value);
         if (normalizedPhone.length < 7) {
             alert('Enter a valid phone number before checking.');
+            customerPhoneInput.focus();
             return;
         }
 
@@ -1775,6 +1795,16 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         customerSelect.value = '';
         updateCustomerDisplay();
         openCustomerCreateModal(normalizedPhone);
+    }
+
+    checkCustomerBtn.addEventListener('click', handleCustomerLookup);
+    customerPhoneInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') {
+            return;
+        }
+
+        event.preventDefault();
+        handleCustomerLookup();
     });
 
     createCustomerBtn.addEventListener('click', async () => {
@@ -1853,6 +1883,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     vatToggle.checked = vatEnabled;
     billTypeEl.textContent = vatEnabled ? 'VAT Bill' : 'Estimated Bill';
+    discountTypeEl.value = discount.type || 'none';
+    discountValueEl.value = discount.type === 'none' ? '' : Number(discount.value || 0);
+    discountValueEl.disabled = discount.type === 'none';
+    if (discount.type === 'flat') discountDisplayEl.textContent = `Flat discount: NPR ${money(discount.value)}`;
+    if (discount.type === 'percent') discountDisplayEl.textContent = `Percent discount: ${money(discount.value)}%`;
     updateCustomerDisplay();
     rebuildProductSelect(categorySelect.value);
     renderBill();

@@ -50,6 +50,8 @@ class StoreRequest extends FormRequest
             'items.*.custom.fabric_product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.custom.fabric_quantity' => ['nullable', 'numeric', 'min:0.01'],
             'items.*.custom.design_note' => ['nullable', 'string', 'max:1000'],
+            'items.*.custom.existing_design_images' => ['nullable', 'array'],
+            'items.*.custom.existing_design_images.*' => ['nullable', 'string', 'max:255'],
             'items.*.custom.design_images' => ['nullable', 'array'],
             'items.*.custom.design_images.*' => ['nullable', 'image', 'max:5120'],
             'items.*.custom.garments' => ['nullable', 'array'],

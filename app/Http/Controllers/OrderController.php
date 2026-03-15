@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Order\StoreRequest;
+use App\Http\Requests\Order\UpdateDeliveryDateRequest;
 use App\Http\Requests\Order\UpdateStatusRequest;
 use App\Models\Customer;
 use App\Models\GarmentType;
@@ -15,6 +16,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -207,6 +209,22 @@ class OrderController extends Controller
      */
     public function create(Request $request)
     {
+        return view('modules.order.create', $this->buildOrderFormData($request));
+    }
+
+    /**
+     * Show order edit form.
+     */
+    public function edit(Request $request, Order $order)
+    {
+        $this->ensureOrderBelongsToCurrentOutlet($order);
+        $this->ensureOrderIsEditable($order);
+
+        return view('modules.order.create', $this->buildOrderFormData($request, $order));
+    }
+
+    private function buildOrderFormData(Request $request, ?Order $editingOrder = null): array
+    {
         $user = auth()->user();
         $outletId = (int) ($user?->current_outlet_id ?? 0);
 
@@ -237,11 +255,11 @@ class OrderController extends Controller
                 ->where('location_id', (int) $outletLocation->id)
                 ->whereIn('product_id', $productIds)
                 ->where('on_hand_qty', '>', 0)
-                ->get(['product_id', 'on_hand_qty']);
+                ->get(['product_id', 'on_hand_qty', 'reserved_qty']);
 
             foreach ($outletStockRows as $row) {
                 $productId = (int) $row->product_id;
-                $qty = (float) $row->on_hand_qty;
+                $qty = max(0, (float) $row->on_hand_qty - (float) $row->reserved_qty);
 
                 if (!array_key_exists($productId, $productAvailableQty)) {
                     $productAvailableQty[$productId] = 0.0;
@@ -271,14 +289,18 @@ class OrderController extends Controller
         $selectedCustomerId = $request->query('customer_id');
         $workers = $this->assignableWorkers($outletId);
 
-        return view('modules.order.create', compact(
+        $initialOrderState = $this->buildInitialOrderState($request, $products, $garmentTypes, $editingOrder);
+
+        return compact(
             'products',
             'customers',
             'garmentTypes',
             'selectedCustomerId',
             'workers',
-            'productAvailableQty'
-        ));
+            'productAvailableQty',
+            'editingOrder',
+            'initialOrderState'
+        );
     }
 
     public function resolveCustomer(Request $request)
@@ -341,11 +363,48 @@ class OrderController extends Controller
      */
     public function store(StoreRequest $request)
     {
+        return $this->persistOrder($request);
+    }
+
+    /**
+     * Update an existing order.
+     */
+    public function update(StoreRequest $request, Order $order)
+    {
+        $this->ensureOrderBelongsToCurrentOutlet($order);
+        $this->ensureOrderIsEditable($order);
+
+        return $this->persistOrder($request, $order);
+    }
+
+    public function updateDeliveryDate(UpdateDeliveryDateRequest $request, Order $order)
+    {
+        $this->ensureOrderBelongsToCurrentOutlet($order);
+        $this->ensureOrderDeliveryDateIsEditable($order);
+
+        $validated = $request->validated();
+        $deliveryDueAt = $validated['delivery_due_at'];
+
+        $order->delivery_due_at = $deliveryDueAt;
+
+        if ($order->worker_deadline_at && $order->worker_deadline_at->gt($order->delivery_due_at)) {
+            $order->worker_deadline_at = $order->delivery_due_at;
+        }
+
+        $order->save();
+
+        return redirect()
+            ->route('order.index')
+            ->with('success', 'Delivery date updated successfully.');
+    }
+
+    private function persistOrder(StoreRequest $request, ?Order $existingOrder = null)
+    {
         $user = auth()->user();
         $outletId = (int) ($user?->current_outlet_id ?? 0);
         $printBill = $request->boolean('print_bill');
         $vatEnabled = $request->boolean('vat_enabled');
-        $createdOrder = null;
+        $savedOrder = null;
 
         if ($outletId < 1) {
             return redirect()
@@ -425,6 +484,10 @@ class OrderController extends Controller
             }
         }
 
+        $existingOrderStock = $existingOrder
+            ? $this->getOrderCommittedStockMap($existingOrder)
+            : [];
+
         $requiredBySku = [];
 
         foreach ($items as $item) {
@@ -472,8 +535,7 @@ class OrderController extends Controller
             $availableStockRows = InventoryStock::query()
                 ->where('location_id', (int) $outletLocation->id)
                 ->whereIn('product_id', $requiredProductIds)
-                ->where('on_hand_qty', '>', 0)
-                ->get(['product_id', 'on_hand_qty']);
+                ->get(['product_id', 'on_hand_qty', 'reserved_qty']);
 
             $availableMap = [];
             foreach ($availableStockRows as $row) {
@@ -481,7 +543,7 @@ class OrderController extends Controller
                 if (!array_key_exists($stockKey, $availableMap)) {
                     $availableMap[$stockKey] = 0.0;
                 }
-                $availableMap[$stockKey] += (float) $row->on_hand_qty;
+                $availableMap[$stockKey] += max(0, (float) $row->on_hand_qty - (float) $row->reserved_qty);
             }
 
             $productNameMap = Product::query()
@@ -490,7 +552,7 @@ class OrderController extends Controller
 
             foreach ($requiredCollection as $requiredRow) {
                 $stockKey = (string) ((int) $requiredRow['product_id']);
-                $availableQty = (float) ($availableMap[$stockKey] ?? 0);
+                $availableQty = (float) ($availableMap[$stockKey] ?? 0) + (float) ($existingOrderStock[$stockKey] ?? 0);
                 $requiredQty = (float) ($requiredRow['required_qty'] ?? 0);
 
                 if ($availableQty + 0.000001 >= $requiredQty) {
@@ -539,7 +601,7 @@ class OrderController extends Controller
                 ->map(fn ($amount) => (float) $amount)
                 ->all();
 
-            DB::transaction(function () use ($request, $validated, $items, $products, $outletLocation, $inventoryTypeId, $outletId, $garmentTypes, $productFabricPriceMap, $vatEnabled, &$createdOrder): void {
+            DB::transaction(function () use ($request, $validated, $items, $products, $outletLocation, $inventoryTypeId, $outletId, $garmentTypes, $productFabricPriceMap, $vatEnabled, $existingOrder, &$savedOrder): void {
                 $status = (string) $validated['status'];
                 $workerId = (int) ($validated['worker_id'] ?? 0);
                 $hasAssignedOrLaterStatus = in_array($status, [
@@ -556,22 +618,33 @@ class OrderController extends Controller
                     Order::STATUS_COMPLETED,
                 ], true);
 
-                $order = Order::query()->create([
-                    'order_number' => $this->generateOrderNumber(),
+                if ($existingOrder) {
+                    if ($this->orderHasIssuedStock($existingOrder)) {
+                        $this->restoreOrderInventory($existingOrder);
+                    } else {
+                        $this->releaseReservedStockForOrder($existingOrder, (int) $outletLocation->id);
+                    }
+                    $existingOrder->items()->delete();
+                }
+
+                $order = $existingOrder ?: new Order();
+
+                $order->fill([
+                    'order_number' => $order->exists ? $order->order_number : $this->generateOrderNumber(),
                     'outlet_id' => $outletId,
                     'customer_id' => (int) $validated['customer_id'],
                     'worker_id' => $workerId > 0 ? $workerId : null,
                     'worker_assigned_at' => $hasAssignedOrLaterStatus
-                        ? now()
+                        ? ($order->worker_assigned_at ?? now())
                         : null,
                     'worker_deadline_at' => $validated['worker_deadline_at'] ?? null,
                     'ordered_at' => $validated['ordered_at'],
                     'delivery_due_at' => $validated['delivery_due_at'],
                     'status' => $status,
                     'fabric_issued_at' => $hasFabricIssuedOrLaterStatus
-                        ? now()
+                        ? ($order->fabric_issued_at ?? now())
                         : null,
-                    'completed_at' => $status === Order::STATUS_COMPLETED ? now() : null,
+                    'completed_at' => $status === Order::STATUS_COMPLETED ? ($order->completed_at ?? now()) : null,
                     'payment_status' => (string) $validated['payment_status'],
                     'payment_method' => $validated['payment_method'] ?? null,
                     'advance_payment_amount' => (float) ($validated['advance_payment_amount'] ?? 0),
@@ -581,8 +654,9 @@ class OrderController extends Controller
                     'subtotal_amount' => 0,
                     'tailoring_amount' => 0,
                     'notes' => $validated['notes'] ?? null,
-                    'created_by' => (int) auth()->id(),
+                    'created_by' => $order->exists ? (int) ($order->created_by ?? auth()->id()) : (int) auth()->id(),
                 ]);
+                $order->save();
 
                 $subtotal = 0.0;
                 $tailoringTotal = 0.0;
@@ -643,7 +717,11 @@ class OrderController extends Controller
                                 ];
                             });
                         $itemTailoringTotal = (float) $garments->sum(fn ($garment) => (float) ($garment['tailoring_total_amount'] ?? 0));
-                        $designImagePaths = [];
+                        $designImagePaths = collect((array) ($custom['existing_design_images'] ?? []))
+                            ->map(fn ($path) => trim((string) $path))
+                            ->filter()
+                            ->values()
+                            ->all();
                         $designImages = (array) $request->file("items.{$itemIndex}.custom.design_images", []);
                         foreach ($designImages as $designImage) {
                             if (!$designImage || !$designImage->isValid()) {
@@ -681,33 +759,6 @@ class OrderController extends Controller
                             ],
                         ]);
 
-                        if ($fabricSource === 'stock' && $fabricProductId && $fabricQuantity > 0) {
-                            $averageCost = $this->deductFromOutletStock(
-                                locationId: (int) $outletLocation->id,
-                                productId: $fabricProductId,
-                                requiredQty: $fabricQuantity
-                            );
-
-                            $transaction = InventoryTransaction::query()->create([
-                                'inventory_type_id' => $inventoryTypeId,
-                                'trx_type' => InventoryTransaction::TYPE_OUT,
-                                'reference_type' => 'order',
-                                'reference_id' => $order->id,
-                                'from_location_id' => $outletLocation->id,
-                                'to_location_id' => null,
-                                'vendor_id' => null,
-                                'trx_date' => $validated['ordered_at'],
-                                'notes' => 'Order ' . $order->order_number . ' custom fabric stock deduction',
-                                'created_by' => (int) auth()->id(),
-                            ]);
-
-                            $transaction->items()->create([
-                                'product_id' => $fabricProductId,
-                                'qty' => $fabricQuantity,
-                                'unit_cost' => $averageCost,
-                                'total_cost' => $averageCost !== null ? $averageCost * $fabricQuantity : null,
-                            ]);
-                        }
                     } else {
                         $productId = (int) $item['product_id'];
                         $product = $products->get($productId);
@@ -728,31 +779,6 @@ class OrderController extends Controller
                                 : null,
                         ]);
 
-                        $averageCost = $this->deductFromOutletStock(
-                            locationId: (int) $outletLocation->id,
-                            productId: $productId,
-                            requiredQty: $quantity
-                        );
-
-                        $transaction = InventoryTransaction::query()->create([
-                            'inventory_type_id' => $inventoryTypeId,
-                            'trx_type' => InventoryTransaction::TYPE_OUT,
-                            'reference_type' => 'order',
-                            'reference_id' => $order->id,
-                            'from_location_id' => $outletLocation->id,
-                            'to_location_id' => null,
-                            'vendor_id' => null,
-                            'trx_date' => $validated['ordered_at'],
-                            'notes' => 'Order ' . $order->order_number . ' stock deduction',
-                            'created_by' => (int) auth()->id(),
-                        ]);
-
-                        $transaction->items()->create([
-                            'product_id' => $productId,
-                            'qty' => $quantity,
-                            'unit_cost' => $averageCost,
-                            'total_cost' => $averageCost !== null ? $averageCost * $quantity : null,
-                        ]);
                     }
 
                     $subtotal += $lineTotal;
@@ -771,7 +797,20 @@ class OrderController extends Controller
                 $order->tailoring_amount = $tailoringTotal;
                 $order->vat_amount = $vatAmount;
                 $order->save();
-                $createdOrder = $order;
+
+                if ($this->orderHasIssuedStock($order)) {
+                    $this->issueStockForOrder(
+                        $order,
+                        (int) $outletLocation->id,
+                        (int) $inventoryTypeId,
+                        $validated['ordered_at'],
+                        (int) auth()->id()
+                    );
+                } else {
+                    $this->reserveStockForOrder($order, (int) $outletLocation->id);
+                }
+
+                $savedOrder = $order;
             });
         } catch (\RuntimeException $exception) {
             return back()
@@ -779,14 +818,14 @@ class OrderController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
-        if ($printBill && $createdOrder) {
+        if ($printBill && $savedOrder) {
             return redirect()
-                ->route('order.bill.customer', ['order' => $createdOrder, 'autoprint' => 1]);
+                ->route('order.bill.customer', ['order' => $savedOrder, 'autoprint' => 1]);
         }
 
         return redirect()
             ->route('order.index')
-            ->with('success', 'Order created successfully.');
+            ->with('success', $existingOrder ? 'Order updated successfully.' : 'Order created successfully.');
     }
 
     /**
@@ -835,7 +874,40 @@ class OrderController extends Controller
         }
 
         try {
-            app(OrderWorkflowService::class)->transition($order, $validated);
+            DB::transaction(function () use ($order, $validated): void {
+                $targetStatus = (string) ($validated['status'] ?? '');
+                $outletLocationId = $this->resolveOutletLocationId((int) $order->outlet_id);
+
+                if ($outletLocationId < 1) {
+                    throw new \RuntimeException('No active inventory location found for this order outlet.');
+                }
+
+                if ($targetStatus === Order::STATUS_FABRIC_ISSUED) {
+                    $inventoryTypeId = $this->resolveOutletInventoryTypeId();
+
+                    if ($inventoryTypeId < 1) {
+                        throw new \RuntimeException('Inventory type outlet is missing. Run inventory type seeder.');
+                    }
+
+                    $this->issueStockForOrder(
+                        $order,
+                        $outletLocationId,
+                        $inventoryTypeId,
+                        now(),
+                        (int) auth()->id()
+                    );
+                }
+
+                if ($targetStatus === Order::STATUS_CANCELLED) {
+                    if ($this->orderHasIssuedStock($order)) {
+                        $this->restoreOrderInventory($order);
+                    } else {
+                        $this->releaseReservedStockForOrder($order, $outletLocationId);
+                    }
+                }
+
+                app(OrderWorkflowService::class)->transition($order, $validated);
+            });
         } catch (\RuntimeException $exception) {
             return redirect()
                 ->route($redirectRoute)
@@ -940,12 +1012,13 @@ class OrderController extends Controller
         $stocks = InventoryStock::query()
             ->where('location_id', $locationId)
             ->where('product_id', $productId)
-            ->where('on_hand_qty', '>', 0)
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
 
-        $availableQty = (float) $stocks->sum('on_hand_qty');
+        $availableQty = (float) $stocks->sum(function (InventoryStock $stock) {
+            return max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
+        });
 
         if ($availableQty < $requiredQty) {
             throw new \RuntimeException('Insufficient stock for one or more order items at current outlet.');
@@ -960,13 +1033,13 @@ class OrderController extends Controller
                 break;
             }
 
-            $stockQty = (float) $stock->on_hand_qty;
-            if ($stockQty <= 0) {
+            $availableStockQty = max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
+            if ($availableStockQty <= 0) {
                 continue;
             }
 
-            $deductQty = min($remainingQty, $stockQty);
-            $stock->on_hand_qty = $stockQty - $deductQty;
+            $deductQty = min($remainingQty, $availableStockQty);
+            $stock->on_hand_qty = (float) $stock->on_hand_qty - $deductQty;
             $stock->save();
 
             $cost = (float) $stock->avg_cost;
@@ -980,6 +1053,464 @@ class OrderController extends Controller
         }
 
         return $totalCost / $consumedQty;
+    }
+
+    private function reserveStockForOrder(Order $order, int $locationId): void
+    {
+        foreach ($this->getOrderCommittedStockMap($order) as $productId => $qty) {
+            $this->reserveOutletStock($locationId, (int) $productId, (float) $qty);
+        }
+    }
+
+    private function releaseReservedStockForOrder(Order $order, int $locationId): void
+    {
+        foreach ($this->getOrderCommittedStockMap($order) as $productId => $qty) {
+            $this->releaseReservedOutletStock($locationId, (int) $productId, (float) $qty);
+        }
+    }
+
+    private function issueStockForOrder(
+        Order $order,
+        int $locationId,
+        int $inventoryTypeId,
+        mixed $trxDate,
+        int $createdBy
+    ): void {
+        $requirements = $this->getOrderCommittedStockMap($order);
+
+        foreach ($requirements as $productId => $qty) {
+            $this->releaseReservedOutletStock($locationId, (int) $productId, (float) $qty);
+
+            $averageCost = $this->deductFromOutletStock(
+                locationId: $locationId,
+                productId: (int) $productId,
+                requiredQty: (float) $qty
+            );
+
+            $transaction = InventoryTransaction::query()->create([
+                'inventory_type_id' => $inventoryTypeId,
+                'trx_type' => InventoryTransaction::TYPE_OUT,
+                'reference_type' => 'order',
+                'reference_id' => $order->id,
+                'from_location_id' => $locationId,
+                'to_location_id' => null,
+                'vendor_id' => null,
+                'trx_date' => $trxDate,
+                'notes' => 'Order ' . $order->order_number . ' stock deduction',
+                'created_by' => $createdBy,
+            ]);
+
+            $transaction->items()->create([
+                'product_id' => (int) $productId,
+                'qty' => (float) $qty,
+                'unit_cost' => $averageCost,
+                'total_cost' => $averageCost !== null ? $averageCost * (float) $qty : null,
+            ]);
+        }
+    }
+
+    private function reserveOutletStock(int $locationId, int $productId, float $requiredQty): void
+    {
+        $remainingQty = $requiredQty;
+
+        $stocks = InventoryStock::query()
+            ->where('location_id', $locationId)
+            ->where('product_id', $productId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $availableQty = (float) $stocks->sum(function (InventoryStock $stock) {
+            return max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
+        });
+
+        if ($availableQty + 0.000001 < $requiredQty) {
+            throw new \RuntimeException('Insufficient stock for one or more order items at current outlet.');
+        }
+
+        foreach ($stocks as $stock) {
+            if ($remainingQty <= 0) {
+                break;
+            }
+
+            $availableStockQty = max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
+            if ($availableStockQty <= 0) {
+                continue;
+            }
+
+            $reserveQty = min($remainingQty, $availableStockQty);
+            $stock->reserved_qty = (float) $stock->reserved_qty + $reserveQty;
+            $stock->save();
+            $remainingQty -= $reserveQty;
+        }
+    }
+
+    private function releaseReservedOutletStock(int $locationId, int $productId, float $qtyToRelease): void
+    {
+        if ($qtyToRelease <= 0) {
+            return;
+        }
+
+        $remainingQty = $qtyToRelease;
+
+        $stocks = InventoryStock::query()
+            ->where('location_id', $locationId)
+            ->where('product_id', $productId)
+            ->where('reserved_qty', '>', 0)
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($stocks as $stock) {
+            if ($remainingQty <= 0) {
+                break;
+            }
+
+            $reservedQty = (float) $stock->reserved_qty;
+            if ($reservedQty <= 0) {
+                continue;
+            }
+
+            $releaseQty = min($remainingQty, $reservedQty);
+            $stock->reserved_qty = $reservedQty - $releaseQty;
+            $stock->save();
+            $remainingQty -= $releaseQty;
+        }
+    }
+
+    private function restoreOrderInventory(Order $order): void
+    {
+        $transactions = InventoryTransaction::query()
+            ->where('reference_type', 'order')
+            ->where('reference_id', (int) $order->id)
+            ->where('trx_type', InventoryTransaction::TYPE_OUT)
+            ->with('items')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $locationId = (int) ($transaction->from_location_id ?? 0);
+            if ($locationId < 1) {
+                $transaction->items()->delete();
+                $transaction->delete();
+                continue;
+            }
+
+            foreach ($transaction->items as $transactionItem) {
+                $productId = (int) ($transactionItem->product_id ?? 0);
+                $qty = (float) ($transactionItem->qty ?? 0);
+                $unitCost = (float) ($transactionItem->unit_cost ?? 0);
+
+                if ($productId < 1 || $qty <= 0) {
+                    continue;
+                }
+
+                $stock = InventoryStock::query()
+                    ->where('location_id', $locationId)
+                    ->where('product_id', $productId)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$stock) {
+                    $stock = InventoryStock::query()->create([
+                        'location_id' => $locationId,
+                        'product_id' => $productId,
+                        'vendor_id' => null,
+                        'unit_id' => null,
+                        'on_hand_qty' => 0,
+                        'reserved_qty' => 0,
+                        'avg_cost' => $unitCost,
+                        'base_price' => 0,
+                        'special_price' => null,
+                    ]);
+                }
+
+                $currentQty = (float) $stock->on_hand_qty;
+                $currentValue = $currentQty * (float) $stock->avg_cost;
+                $incomingValue = $qty * $unitCost;
+                $newQty = $currentQty + $qty;
+
+                $stock->avg_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+                $stock->on_hand_qty = $newQty;
+                $stock->save();
+            }
+
+            $transaction->items()->delete();
+            $transaction->delete();
+        }
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    private function getOrderCommittedStockMap(Order $order): array
+    {
+        $order->loadMissing('items');
+
+        $requirements = [];
+
+        foreach ($order->items as $item) {
+            $itemCategory = (string) ($item->item_category ?? '');
+
+            if ($itemCategory === 'custom') {
+                if ((string) data_get($item->custom_details, 'fabric_source') !== 'stock') {
+                    continue;
+                }
+
+                $productId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
+                $qty = (float) data_get($item->custom_details, 'fabric_quantity', $item->quantity);
+            } else {
+                $productId = (int) ($item->product_id ?? 0);
+                $qty = (float) ($item->quantity ?? 0);
+            }
+
+            if ($productId < 1 || $qty <= 0) {
+                continue;
+            }
+
+            $stockKey = (string) $productId;
+            if (!array_key_exists($stockKey, $requirements)) {
+                $requirements[$stockKey] = 0.0;
+            }
+
+            $requirements[$stockKey] += $qty;
+        }
+
+        return $requirements;
+    }
+
+    private function orderHasIssuedStock(Order $order): bool
+    {
+        return in_array((string) $order->status, [
+            Order::STATUS_FABRIC_ISSUED,
+            Order::STATUS_ASSIGNED,
+            Order::STATUS_IN_PROGRESS,
+            Order::STATUS_NEAR_COMPLETION,
+            Order::STATUS_COMPLETED,
+            Order::STATUS_DELIVERED,
+        ], true);
+    }
+
+    private function resolveOutletLocationId(int $outletId): int
+    {
+        if ($outletId < 1) {
+            return 0;
+        }
+
+        return (int) (InventoryLocation::query()
+            ->where('outlet_id', $outletId)
+            ->where('type', InventoryLocation::TYPE_OUTLET)
+            ->where('is_active', true)
+            ->value('id') ?? 0);
+    }
+
+    private function resolveOutletInventoryTypeId(): int
+    {
+        return (int) (InventoryType::query()
+            ->where('code', InventoryType::OUTLET)
+            ->value('id') ?? 0);
+    }
+
+    private function ensureOrderIsEditable(Order $order): void
+    {
+        if (in_array((string) $order->status, [
+            Order::STATUS_ASSIGNED,
+            Order::STATUS_IN_PROGRESS,
+            Order::STATUS_NEAR_COMPLETION,
+            Order::STATUS_COMPLETED,
+            Order::STATUS_DELIVERED,
+            Order::STATUS_CANCELLED,
+        ], true)) {
+            abort(403, 'Assigned, completed, delivered, or cancelled orders cannot be edited.');
+        }
+    }
+
+    private function ensureOrderDeliveryDateIsEditable(Order $order): void
+    {
+        if (in_array((string) $order->status, [
+            Order::STATUS_DELIVERED,
+            Order::STATUS_CANCELLED,
+        ], true)) {
+            abort(403, 'Delivered or cancelled orders cannot be updated.');
+        }
+    }
+
+    private function buildInitialOrderState(Request $request, Collection $products, Collection $garmentTypes, ?Order $editingOrder = null): array
+    {
+        $productLookup = $products->keyBy('id');
+        $garmentLookup = $garmentTypes->keyBy('id');
+
+        $inputItems = $request->old('items');
+        if (is_array($inputItems)) {
+            return [
+                'items' => collect($inputItems)
+                    ->values()
+                    ->map(fn ($item, $index) => $this->mapBillItemFromInput((array) $item, $index, $productLookup, $garmentLookup))
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'discount' => [
+                    'type' => (float) $request->old('discount_amount', 0) > 0 ? 'flat' : 'none',
+                    'value' => (float) $request->old('discount_amount', 0),
+                ],
+                'vatEnabled' => $request->old('vat_enabled', '0') === '1',
+            ];
+        }
+
+        if (!$editingOrder) {
+            return [
+                'items' => [],
+                'discount' => ['type' => 'none', 'value' => 0],
+                'vatEnabled' => false,
+            ];
+        }
+
+        $editingOrder->loadMissing(['items.product:id,name,code']);
+        $customProductIds = $editingOrder->items
+            ->pluck('custom_details.fabric_product_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $customProducts = Product::query()
+            ->whereIn('id', $customProductIds)
+            ->get(['id', 'name', 'code'])
+            ->keyBy('id');
+
+        return [
+            'items' => $editingOrder->items
+                ->values()
+                ->map(function ($item) use ($customProducts) {
+                    if ((string) $item->item_category !== 'custom') {
+                        return [
+                            'id' => 'existing-' . $item->id,
+                            'category' => (string) $item->item_category,
+                            'productId' => (int) $item->product_id,
+                            'name' => $item->product
+                                ? trim($item->product->name . ' (' . $item->product->code . ')')
+                                : 'Product',
+                            'unitLabel' => (string) $item->item_category === 'fabric' ? 'm' : 'pcs',
+                            'qty' => (float) $item->quantity,
+                            'unitPrice' => (float) $item->unit_price,
+                            'size' => data_get($item->custom_details, 'size'),
+                        ];
+                    }
+
+                    $fabricProductId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
+                    $fabricProduct = $customProducts->get($fabricProductId);
+                    $fabricSource = (string) data_get($item->custom_details, 'fabric_source', 'own');
+                    $fabricQuantity = (float) data_get($item->custom_details, 'fabric_quantity', $item->quantity);
+
+                    return [
+                        'id' => 'existing-' . $item->id,
+                        'category' => 'custom',
+                        'productId' => $fabricProductId,
+                        'name' => $fabricProduct
+                            ? trim($fabricProduct->name . ' (' . $fabricProduct->code . ')')
+                            : 'Custom Product',
+                        'unitLabel' => 'm',
+                        'qty' => $fabricQuantity,
+                        'unitPrice' => $fabricSource === 'stock' ? (float) $item->unit_price : 0,
+                        'baseUnitPrice' => (float) data_get($item->custom_details, 'fabric_unit_price', $item->unit_price),
+                        'fabricSource' => $fabricSource,
+                        'fabricQuantity' => $fabricQuantity,
+                        'designNote' => (string) data_get($item->custom_details, 'design_note', ''),
+                        'existingDesignImages' => array_values((array) data_get($item->custom_details, 'design_images', [])),
+                        'garments' => collect((array) data_get($item->custom_details, 'garments', []))
+                            ->map(function ($garment) {
+                                return [
+                                    'garmentTypeId' => (int) ($garment['garment_type_id'] ?? 0),
+                                    'title' => (string) ($garment['garment_title'] ?? 'Garment'),
+                                    'quantity' => (float) ($garment['quantity'] ?? 1),
+                                    'measurements' => array_values((array) ($garment['measurements'] ?? [])),
+                                    'tailoring' => [
+                                        'packageId' => (int) ($garment['tailoring_package_id'] ?? 0),
+                                        'package' => (string) ($garment['tailoring_package'] ?? 'Tailoring'),
+                                        'amount' => (float) ($garment['tailoring_amount'] ?? 0),
+                                    ],
+                                ];
+                            })
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->all(),
+            'discount' => [
+                'type' => (float) ($editingOrder->discount_amount ?? 0) > 0 ? 'flat' : 'none',
+                'value' => (float) ($editingOrder->discount_amount ?? 0),
+            ],
+            'vatEnabled' => (bool) ($editingOrder->vat_enabled ?? false),
+        ];
+    }
+
+    private function mapBillItemFromInput(array $item, int $index, Collection $productLookup, Collection $garmentLookup): ?array
+    {
+        $category = (string) ($item['item_category'] ?? '');
+        if (!in_array($category, ['custom', 'fabric', 'readymade'], true)) {
+            return null;
+        }
+
+        if ($category !== 'custom') {
+            $productId = (int) ($item['product_id'] ?? 0);
+            $product = $productLookup->get($productId);
+
+            return [
+                'id' => 'old-' . $index,
+                'category' => $category,
+                'productId' => $productId,
+                'name' => $product
+                    ? trim($product->name . ' (' . $product->code . ')')
+                    : 'Product',
+                'unitLabel' => $category === 'fabric' ? 'm' : 'pcs',
+                'qty' => (float) ($item['quantity'] ?? 0),
+                'unitPrice' => (float) ($item['unit_price'] ?? 0),
+                'size' => $item['size'] ?? null,
+            ];
+        }
+
+        $custom = (array) ($item['custom'] ?? []);
+        $productId = (int) ($custom['fabric_product_id'] ?? 0);
+        $product = $productLookup->get($productId);
+        $fabricSource = (string) ($custom['fabric_source'] ?? 'own');
+        $submittedUnitPrice = (float) ($item['unit_price'] ?? 0);
+        $unitPrice = $fabricSource === 'stock' ? $submittedUnitPrice : 0;
+
+        return [
+            'id' => 'old-' . $index,
+            'category' => 'custom',
+            'productId' => $productId,
+            'name' => $product
+                ? trim($product->name . ' (' . $product->code . ')')
+                : 'Custom Product',
+            'unitLabel' => 'm',
+            'qty' => (float) ($custom['fabric_quantity'] ?? ($item['quantity'] ?? 0)),
+            'unitPrice' => $unitPrice,
+            'baseUnitPrice' => $submittedUnitPrice,
+            'fabricSource' => $fabricSource,
+            'fabricQuantity' => (float) ($custom['fabric_quantity'] ?? ($item['quantity'] ?? 0)),
+            'designNote' => (string) ($custom['design_note'] ?? ''),
+            'existingDesignImages' => array_values((array) ($custom['existing_design_images'] ?? [])),
+            'garments' => collect((array) ($custom['garments'] ?? []))
+                ->map(function ($garment) use ($garmentLookup) {
+                    $garmentTypeId = (int) ($garment['garment_type_id'] ?? 0);
+                    $garmentType = $garmentLookup->get($garmentTypeId);
+
+                    return [
+                        'garmentTypeId' => $garmentTypeId,
+                        'title' => (string) ($garment['garment_title'] ?? ($garmentType?->title ?? 'Garment')),
+                        'quantity' => (float) ($garment['quantity'] ?? 1),
+                        'measurements' => array_values((array) ($garment['measurements'] ?? [])),
+                        'tailoring' => [
+                            'packageId' => (int) ($garment['tailoring_package_id'] ?? 0),
+                            'package' => (string) ($garment['tailoring_package'] ?? 'Tailoring'),
+                            'amount' => (float) ($garment['tailoring_amount'] ?? 0),
+                        ],
+                    ];
+                })
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

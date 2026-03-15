@@ -124,7 +124,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('index')->middleware('can:view-orders,manage-orders');
         Route::get('/assigned-jobs', [OrderController::class, 'assignedJobs'])->name('assignedJobs')->middleware('can:view-assigned-jobs,manage-orders');
         Route::get('/create', [OrderController::class, 'create'])->name('create')->middleware('can:create-orders,manage-orders');
+        Route::get('/edit/{order}', [OrderController::class, 'edit'])->name('edit')->middleware('can:create-orders,manage-orders');
         Route::post('/', [OrderController::class, 'store'])->name('store')->middleware('can:create-orders,manage-orders');
+        Route::put('/update/{order}', [OrderController::class, 'update'])->name('update')->middleware('can:create-orders,manage-orders');
+        Route::put('/delivery-date/{order}', [OrderController::class, 'updateDeliveryDate'])->name('deliveryDate.update')->middleware('can:create-orders,manage-orders');
         Route::post('/customer/resolve', [OrderController::class, 'resolveCustomer'])->name('customer.resolve')->middleware('can:create-orders,manage-orders');
         Route::get('/{order}/bill/customer', [OrderController::class, 'customerBill'])->name('bill.customer')->middleware('can:view-orders,manage-orders');
         Route::get('/{order}/bill/worker', [OrderController::class, 'workerBill'])->name('bill.worker')->middleware('can:view-assigned-jobs,manage-orders');
