@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Order\StoreRequest;
 use App\Http\Requests\Order\UpdateDeliveryDateRequest;
+use App\Http\Requests\Order\UpdatePaymentRequest;
 use App\Http\Requests\Order\UpdateStatusRequest;
 use App\Models\Customer;
 use App\Models\GarmentType;
@@ -917,6 +918,48 @@ class OrderController extends Controller
         return redirect()
             ->route($redirectRoute)
             ->with('success', 'Order status updated successfully.');
+    }
+
+    public function updatePayment(UpdatePaymentRequest $request, Order $order)
+    {
+        $this->ensureOrderBelongsToCurrentOutlet($order);
+
+        if ((string) $order->status === Order::STATUS_CANCELLED) {
+            return redirect()
+                ->route('order.index')
+                ->with('error', 'Cancelled orders cannot receive payments.');
+        }
+
+        $validated = $request->validated();
+        $paymentAmount = (float) $validated['payment_amount'];
+        $currentPaid = (float) ($order->advance_payment_amount ?? 0);
+        $payableAmount = $order->payableAmount();
+        $dueAmount = max(0.0, $payableAmount - $currentPaid);
+
+        if ($paymentAmount - 0.0001 > $dueAmount) {
+            return redirect()
+                ->route('order.index')
+                ->with('error', 'Payment amount cannot be greater than due amount.');
+        }
+
+        $updatedPaid = $currentPaid + $paymentAmount;
+        $paymentStatus = Order::PAYMENT_STATUS_UNPAID;
+
+        if ($updatedPaid > 0.0001 && $updatedPaid + 0.0001 < $payableAmount) {
+            $paymentStatus = Order::PAYMENT_STATUS_PARTIAL;
+        } elseif ($updatedPaid + 0.0001 >= $payableAmount) {
+            $paymentStatus = Order::PAYMENT_STATUS_PAID;
+            $updatedPaid = $payableAmount;
+        }
+
+        $order->advance_payment_amount = $updatedPaid;
+        $order->payment_method = (string) $validated['payment_method'];
+        $order->payment_status = $paymentStatus;
+        $order->save();
+
+        return redirect()
+            ->route('order.index')
+            ->with('success', 'Payment recorded successfully.');
     }
 
     private function generateOrderNumber(): string

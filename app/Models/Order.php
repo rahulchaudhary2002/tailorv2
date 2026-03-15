@@ -87,6 +87,32 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function payableAmount(): float
+    {
+        $subtotal = (float) ($this->subtotal_amount ?? 0);
+        $discount = (float) ($this->discount_amount ?? 0);
+        $tailoring = (float) ($this->tailoring_amount ?? 0);
+        $vat = (bool) $this->vat_enabled
+            ? (float) ($this->vat_amount ?? 0)
+            : 0.0;
+
+        return max(0.0, ($subtotal - $discount) + $tailoring + $vat);
+    }
+
+    public function paidAmount(): float
+    {
+        if ((string) $this->payment_status === self::PAYMENT_STATUS_PAID) {
+            return $this->payableAmount();
+        }
+
+        return (float) ($this->advance_payment_amount ?? 0);
+    }
+
+    public function dueAmount(): float
+    {
+        return max(0.0, $this->payableAmount() - $this->paidAmount());
+    }
+
     /**
      * @return array<int, string>
      */

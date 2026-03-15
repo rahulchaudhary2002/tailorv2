@@ -54,11 +54,12 @@
                         $canViewOrders = (bool) $authUser?->hasPermission('view-orders');
                         $canViewAssignedJobs = (bool) $authUser?->hasPermission('view-assigned-jobs');
                         $isOwnAssignedOrder = (int) ($order->worker_id ?? 0) === (int) ($authUser?->id ?? 0);
-                        $remainingDue = max(
-                            0,
-                            ((float) $order->subtotal_amount - (float) ($order->discount_amount ?? 0))
-                            - (float) ($order->advance_payment_amount ?? 0)
-                        );
+                        $netPayable = $order->payableAmount();
+                        $paidAmount = $order->paidAmount();
+                        $remainingDue = $order->dueAmount();
+                        $canTakePayment = $canManageOrders
+                            && (string) $order->status !== \App\Models\Order::STATUS_CANCELLED
+                            && $remainingDue > 0;
                         $nextStatuses = $nextStatusesByOrderId[$order->id] ?? [];
                         $workerVisibleStatuses = [
                             \App\Models\Order::STATUS_IN_PROGRESS,
@@ -143,15 +144,55 @@
                         </td>
                         <td>{{ $statusLabels[$order->status] ?? ucfirst($order->status ?: '-') }}</td>
                         <td>
-                            {{ ucfirst($order->payment_status ?: '-') }}
-                            @if ($order->payment_method)
-                                <div>{{ $order->payment_method }}</div>
+                            <div class="order-payment-cell">
+                                <span>{{ ucfirst($order->payment_status ?: '-') }}</span>
+                                @if ($canTakePayment)
+                                    <button
+                                        type="button"
+                                        class="order-payment-btn"
+                                        data-payment-toggle
+                                        aria-label="Record payment"
+                                        title="Record payment"
+                                    >
+                                        <i class="fas fa-money-bill-wave"></i>
+                                    </button>
+                                @endif
+                            </div>
+                            @if ($canTakePayment)
+                                <form action="{{ route('order.payment.update', $order) }}" method="POST" class="order-payment-form" style="display:none;">
+                                    @csrf
+                                    @method('PUT')
+                                    <input
+                                        type="number"
+                                        name="payment_amount"
+                                        class="outlet-input"
+                                        min="0.01"
+                                        max="{{ number_format($remainingDue, 2, '.', '') }}"
+                                        step="0.01"
+                                        value="{{ number_format($remainingDue, 2, '.', '') }}"
+                                        placeholder="Payment amount"
+                                        required
+                                    >
+                                    <input
+                                        type="text"
+                                        name="payment_method"
+                                        class="outlet-input"
+                                        placeholder="Payment method"
+                                        value="{{ old('payment_method', $order->payment_method) }}"
+                                        required
+                                    >
+                                    <div class="order-payment-hint">
+                                        Due: {{ number_format($remainingDue, 2) }} | Paid: {{ number_format($paidAmount, 2) }}
+                                    </div>
+                                    <div class="order-payment-actions">
+                                        <button type="submit" class="btn btn-sm btn-secondary">Pay</button>
+                                        <button type="button" class="btn btn-sm btn-light" data-payment-full data-full-amount="{{ number_format($remainingDue, 2, '.', '') }}">Full</button>
+                                        <button type="button" class="btn btn-sm btn-light" data-payment-cancel>Cancel</button>
+                                    </div>
+                                </form>
                             @endif
-                            <div>Discount: {{ number_format((float) ($order->discount_amount ?? 0), 2) }}</div>
-                            <div>Advance: {{ number_format((float) ($order->advance_payment_amount ?? 0), 2) }}</div>
-                            <div>Due: {{ number_format($remainingDue, 2) }}</div>
                         </td>
-                        <td>{{ number_format(max(0, (float) $order->subtotal_amount - (float) ($order->discount_amount ?? 0)), 2) }}</td>
+                        <td>{{ number_format($netPayable, 2) }}</td>
                         <td>
                             <details class="order-actions-menu">
                                 <summary class="order-actions-toggle" aria-label="Open order actions">
@@ -381,6 +422,47 @@
         display: flex;
         gap: 8px;
     }
+
+    .order-payment-cell {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .order-payment-btn {
+        width: 26px;
+        height: 26px;
+        border: 1px solid #d7dfeb;
+        border-radius: 999px;
+        background: #fff;
+        color: #475569;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .order-payment-btn:hover {
+        background: #f8fafc;
+    }
+
+    .order-payment-form {
+        margin-top: 8px;
+        display: grid;
+        gap: 8px;
+        max-width: 220px;
+    }
+
+    .order-payment-hint {
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .order-payment-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
 </style>
 @endsection
 
@@ -483,6 +565,46 @@
 
             statusSelect.addEventListener('change', toggleFields);
             toggleFields();
+        });
+
+        document.querySelectorAll('[data-payment-toggle]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const cell = button.closest('td');
+                const form = cell?.querySelector('.order-payment-form');
+
+                document.querySelectorAll('.order-payment-form').forEach((otherForm) => {
+                    if (otherForm !== form) {
+                        otherForm.style.display = 'none';
+                    }
+                });
+
+                if (!form) {
+                    return;
+                }
+
+                form.style.display = form.style.display === 'none' || form.style.display === '' ? 'grid' : 'none';
+            });
+        });
+
+        document.querySelectorAll('[data-payment-cancel]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.order-payment-form');
+                if (form) {
+                    form.style.display = 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-payment-full]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.order-payment-form');
+                const amountInput = form?.querySelector('input[name="payment_amount"]');
+
+                if (amountInput) {
+                    amountInput.value = button.getAttribute('data-full-amount') || '0.00';
+                    amountInput.focus();
+                }
+            });
         });
     })();
 </script>

@@ -39,11 +39,7 @@ class OrderWorkflowService
         }
 
         if ($toStatus === Order::STATUS_DELIVERED) {
-            $remainingDue = max(
-                0.0,
-                ((float) $order->subtotal_amount - (float) ($order->discount_amount ?? 0))
-                - (float) ($order->advance_payment_amount ?? 0)
-            );
+            $remainingDue = $order->dueAmount();
 
             $remainingPayment = (float) ($payload['remaining_payment_amount'] ?? 0);
             if ($remainingPayment + 0.0001 < $remainingDue) {

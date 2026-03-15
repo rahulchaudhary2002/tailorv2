@@ -132,6 +132,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{order}/bill/customer', [OrderController::class, 'customerBill'])->name('bill.customer')->middleware('can:view-orders,manage-orders');
         Route::get('/{order}/bill/worker', [OrderController::class, 'workerBill'])->name('bill.worker')->middleware('can:view-assigned-jobs,manage-orders');
         Route::get('/{order}/bill/office', [OrderController::class, 'officeBill'])->name('bill.office')->middleware('can:manage-orders');
+        Route::put('/payment/{order}', [OrderController::class, 'updatePayment'])->name('payment.update')->middleware('can:manage-orders');
         Route::put('/status/{order}', [OrderController::class, 'updateStatus'])->name('status.update')->middleware('can:manage-orders,view-assigned-jobs');
     });
 
