@@ -14,6 +14,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VendorController;
+use App\Http\Controllers\WorkerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -58,6 +59,16 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/update-roles/{user}', [UserController::class, 'updateRoles'])->name('updateRoles')->middleware('can:edit-users,manage-users');
         Route::put('/update-permissions/{user}', [UserController::class, 'updatePermissions'])->name('updatePermissions')->middleware('can:edit-users,manage-users');
         Route::delete('/delete/{user}', [UserController::class, 'destroy'])->name('destroy')->middleware('can:delete-users,manage-users');
+    });
+
+    Route::group(['prefix' => 'worker', 'as' => 'worker.'], function () {
+        Route::get('/', [WorkerController::class, 'index'])->name('index')->middleware('can:view-users,manage-users');
+        Route::get('/create', [WorkerController::class, 'create'])->name('create')->middleware('can:create-users,manage-users');
+        Route::post('/', [WorkerController::class, 'store'])->name('store')->middleware('can:create-users,manage-users');
+        Route::get('/edit/{worker}', [WorkerController::class, 'edit'])->name('edit')->middleware('can:edit-users,manage-users');
+        Route::put('/update/{worker}', [WorkerController::class, 'update'])->name('update')->middleware('can:edit-users,manage-users');
+        Route::put('/update-permissions/{worker}', [WorkerController::class, 'updatePermissions'])->name('updatePermissions')->middleware('can:edit-users,manage-users');
+        Route::delete('/delete/{worker}', [WorkerController::class, 'destroy'])->name('destroy')->middleware('can:delete-users,manage-users');
     });
 
     Route::group(['prefix' => 'unit', 'as' => 'unit.'], function () {

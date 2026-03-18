@@ -46,8 +46,16 @@
             </thead>
             <tbody>
                 @forelse ($roles as $role)
+                    @php
+                        $isFixedRole = $role->isFixed();
+                    @endphp
                     <tr>
-                        <td>{{ $role->name }}</td>
+                        <td>
+                            {{ $role->name }}
+                            @if ($isFixedRole)
+                                <span class="role-chip">Fixed</span>
+                            @endif
+                        </td>
                         <td>{{ $role->description ?: '-' }}</td>
                         <td>
                             <div class="role-chip-list">
@@ -62,10 +70,13 @@
                         <td>
                             <div class="actions">
                                 @canany(['manage-roles', 'edit-roles'])
+                                    @unless ($isFixedRole)
                                     <a href="{{ route('role.edit', $role) }}" class="btn btn-sm btn-secondary">Edit</a>
+                                    @endunless
                                 @endcanany
 
                                 @canany(['manage-roles', 'delete-roles'])
+                                    @unless ($isFixedRole)
                                     <form
                                         action="{{ route('role.destroy', $role) }}"
                                         method="POST"
@@ -76,6 +87,7 @@
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                     </form>
+                                    @endunless
                                 @endcanany
                             </div>
                         </td>

@@ -9,6 +9,7 @@
         ->map(fn($id) => (int) $id)
         ->all();
     $activeTab = request('tab', 'details');
+    $isFixedRole = $role->isFixed();
 @endphp
 
 <div class="page-header">
@@ -20,6 +21,10 @@
 
 @if (session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
+@endif
+
+@if ($isFixedRole)
+    <div class="alert alert-info">{{ $role->name }} is a fixed system role. Its details and permissions cannot be changed.</div>
 @endif
 
 <div class="role-tabs">
@@ -59,6 +64,7 @@
                         value="{{ old('name', $role->name) }}"
                         placeholder="Manager"
                         required
+                        @disabled($isFixedRole)
                     >
                 </div>
 
@@ -70,13 +76,16 @@
                         class="role-input"
                         rows="3"
                         placeholder="Role summary and access scope"
+                        @disabled($isFixedRole)
                     >{{ old('description', $role->description) }}</textarea>
                 </div>
             </div>
 
             <div class="role-form-actions">
                 <a href="{{ route('role.index') }}" class="btn btn-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary">Save Role Details</button>
+                @unless ($isFixedRole)
+                    <button type="submit" class="btn btn-primary">Save Role Details</button>
+                @endunless
             </div>
         </div>
     </form>
@@ -121,7 +130,7 @@
 
             <div class="role-permission-controls">
                 <label class="role-permission-toggle">
-                    <input type="checkbox" id="role-select-all-permissions">
+                    <input type="checkbox" id="role-select-all-permissions" @disabled($isFixedRole)>
                     <span>Select All Permissions</span>
                 </label>
             </div>
@@ -144,6 +153,7 @@
                                         type="checkbox"
                                         class="js-role-select-group"
                                         data-group="{{ $groupSlug }}"
+                                        @disabled($isFixedRole)
                                     >
                                     <span>Select All</span>
                                 </label>
@@ -164,6 +174,7 @@
                                             class="js-role-permission-checkbox"
                                             data-group="{{ $groupSlug }}"
                                             @checked(in_array($permission->id, $selectedPermissionIds, true))
+                                            @disabled($isFixedRole)
                                         >
                                         <span class="role-switch-slider"></span>
                                     </span>
@@ -178,7 +189,9 @@
 
             <div class="role-form-actions">
                 <a href="{{ route('role.index') }}" class="btn btn-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary">Save Permissions</button>
+                @unless ($isFixedRole)
+                    <button type="submit" class="btn btn-primary">Save Permissions</button>
+                @endunless
             </div>
         </div>
     </form>

@@ -17,6 +17,11 @@ use Illuminate\Support\Facades\Storage;
 
 class UserController extends Controller
 {
+    private function workerRoleId(): int
+    {
+        return (int) (Role::query()->where('name', 'Worker')->value('id') ?? 0);
+    }
+
     private function ensureUserEditable(User $user)
     {
         if ($user->is_super_admin) {
@@ -34,9 +39,18 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $workerRoleId = $this->workerRoleId();
 
         $usersQuery = User::query()
             ->where('is_super_admin', false)
+            ->when($workerRoleId > 0, function ($query) use ($workerRoleId): void {
+                $query->whereNotExists(function ($subQuery) use ($workerRoleId): void {
+                    $subQuery->selectRaw('1')
+                        ->from('user_role')
+                        ->whereColumn('user_role.user_id', 'users.id')
+                        ->where('user_role.role_id', $workerRoleId);
+                });
+            })
             ->with('currentOutlet:id,name')
             ->withCount('outlets');
 
@@ -112,7 +126,10 @@ class UserController extends Controller
         $user->load(['outlets:id,name,address']);
 
         $outlets = Outlet::query()->orderBy('name')->get(['id', 'name', 'address']);
-        $roles = Role::query()->orderBy('name')->get(['id', 'name', 'description']);
+        $roles = Role::query()
+            ->where('name', '!=', 'Worker')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description']);
         $permissionsByGroup = Permission::query()
             ->orderBy('group')
             ->orderBy('name')
@@ -241,7 +258,11 @@ class UserController extends Controller
         }
 
         $user->outlets()->syncWithoutDetaching([$outletId]);
-        $roleIds = collect($validated['role_ids'] ?? [])->map(fn($id) => (int) $id)->all();
+        $workerRoleId = $this->workerRoleId();
+        $roleIds = collect($validated['role_ids'] ?? [])
+            ->map(fn($id) => (int) $id)
+            ->reject(fn($id) => $workerRoleId > 0 && $id === $workerRoleId)
+            ->all();
 
         DB::table('user_role')
             ->where('user_id', $user->id)

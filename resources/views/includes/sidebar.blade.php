@@ -66,6 +66,14 @@
                     </a>
                 </li>
             @endcanany
+            @canany(['view-users', 'manage-users'])
+                <li class="nav-item">
+                    <a href="{{ route('worker.index') }}" class="nav-link {{ request()->routeIs('worker.*') ? 'active' : '' }}">
+                        <i class="fas fa-user-gear nav-icon"></i>
+                        <span class="nav-text">Worker Management</span>
+                    </a>
+                </li>
+            @endcanany
         </ul>
 
         <div class="nav-title">Business Management</div>

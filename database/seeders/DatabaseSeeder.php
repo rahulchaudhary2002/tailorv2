@@ -24,12 +24,6 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             VendorTypeSeeder::class,
             VendorSeeder::class,
-            RoleSeeder::class,
-            PermissionSeeder::class,
-            RolePermissionSeeder::class,
-            UserSeeder::class,
-            OutletUserSeeder::class,
-            UserRoleSeeder::class,
         ]);
     }
 }

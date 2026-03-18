@@ -11,6 +11,17 @@ use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
+    private function ensureRoleEditable(Role $role)
+    {
+        if ($role->isFixed()) {
+            return redirect()
+                ->route('role.index')
+                ->with('error', sprintf('%s is a fixed system role and cannot be modified.', $role->name));
+        }
+
+        return null;
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -110,6 +121,10 @@ class RoleController extends Controller
      */
     public function update(UpdateRequest $request, Role $role)
     {
+        if ($response = $this->ensureRoleEditable($role)) {
+            return $response;
+        }
+
         $validated = $request->validated();
 
         $role->update([
@@ -127,6 +142,10 @@ class RoleController extends Controller
      */
     public function updatePermissions(UpdatePermissionsRequest $request, Role $role)
     {
+        if ($response = $this->ensureRoleEditable($role)) {
+            return $response;
+        }
+
         $validated = $request->validated();
 
         $role->permissions()->sync($validated['permissions'] ?? []);
@@ -141,6 +160,10 @@ class RoleController extends Controller
      */
     public function destroy(Role $role)
     {
+        if ($response = $this->ensureRoleEditable($role)) {
+            return $response;
+        }
+
         if ($role->users()->exists()) {
             return redirect()
                 ->route('role.index')
