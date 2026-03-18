@@ -89,7 +89,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/delete/{product}', [ProductController::class, 'destroy'])->name('destroy')->middleware('can:delete-products,manage-products');
     });
 
-    Route::group(['prefix' => 'vendor', 'as' => 'vendor.'], function () {
+    Route::group(['prefix' => 'vendor-management', 'as' => 'vendor.'], function () {
         Route::get('/', [VendorController::class, 'index'])->name('index')->middleware('can:view-vendors,manage-vendors');
         Route::get('/create', [VendorController::class, 'create'])->name('create')->middleware('can:create-vendors,manage-vendors');
         Route::post('/', [VendorController::class, 'store'])->name('store')->middleware('can:create-vendors,manage-vendors');
