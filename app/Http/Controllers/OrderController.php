@@ -818,6 +818,8 @@ class OrderController extends Controller
                 $order->vat_amount = $vatAmount;
                 $order->save();
 
+                $this->syncCustomerMeasurementsFromOrderItems((int) $validated['customer_id'], $items);
+
                 if ($this->orderHasIssuedStock($order)) {
                     $this->issueStockForOrder(
                         $order,
@@ -1589,6 +1591,72 @@ class OrderController extends Controller
             ->get(['id', 'name'])
             ->filter(fn (User $user) => $user->hasPermission(self::WORKER_PERMISSION_KEY, $scopeOutletId))
             ->values();
+    }
+
+    private function syncCustomerMeasurementsFromOrderItems(int $customerId, Collection $items): void
+    {
+        if ($customerId < 1) {
+            return;
+        }
+
+        $garmentsByType = [];
+
+        foreach ($items as $item) {
+            if ((string) ($item['item_category'] ?? '') !== 'custom') {
+                continue;
+            }
+
+            foreach ((array) data_get($item, 'custom.garments', []) as $garment) {
+                $garmentTypeId = (int) ($garment['garment_type_id'] ?? 0);
+                if ($garmentTypeId < 1) {
+                    continue;
+                }
+
+                $measurements = collect((array) ($garment['measurements'] ?? []))
+                    ->map(function ($measurement) {
+                        return [
+                            'type' => trim((string) ($measurement['type'] ?? '')),
+                            'measurement' => trim((string) ($measurement['measurement'] ?? '')),
+                            'unit' => trim((string) ($measurement['unit'] ?? '')),
+                        ];
+                    })
+                    ->filter(fn (array $measurement) => $measurement['type'] !== '' && $measurement['measurement'] !== '' && $measurement['unit'] !== '')
+                    ->values()
+                    ->all();
+
+                if (empty($measurements)) {
+                    continue;
+                }
+
+                $garmentsByType[$garmentTypeId] = $measurements;
+            }
+        }
+
+        if (empty($garmentsByType)) {
+            return;
+        }
+
+        $customer = Customer::query()->find($customerId);
+        if (!$customer) {
+            return;
+        }
+
+        foreach ($garmentsByType as $garmentTypeId => $measurements) {
+            $customerGarmentType = $customer->customerGarmentTypes()->firstOrCreate([
+                'garment_type_id' => (int) $garmentTypeId,
+            ]);
+
+            $customerGarmentType->measurements()->delete();
+
+            foreach ($measurements as $index => $measurement) {
+                $customerGarmentType->measurements()->create([
+                    'type' => $measurement['type'],
+                    'measurement' => $measurement['measurement'],
+                    'unit' => $measurement['unit'],
+                    'order' => $index + 1,
+                ]);
+            }
+        }
     }
 
     private function currentOutletId(): int
