@@ -326,16 +326,26 @@
     }
 
     .order-actions-dropdown {
-        position: absolute;
-        top: calc(100% + 8px);
-        right: 0;
-        z-index: 20;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1100;
         width: 280px;
+        max-height: min(420px, 70vh);
+        overflow-y: auto;
         padding: 14px;
         border: 1px solid #d7dfeb;
         border-radius: 14px;
         background: #fff;
         box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+    }
+
+    .order-actions-menu.open-up .order-actions-dropdown {
+        top: auto;
+    }
+
+    .order-actions-menu.open-down .order-actions-dropdown {
+        bottom: auto;
     }
 
     .order-actions-form {
@@ -474,10 +484,49 @@
     (function () {
         const actionMenus = document.querySelectorAll('.order-actions-menu');
         const forms = document.querySelectorAll('.order-status-update-form');
+        const viewportGap = 16;
+
+        const positionActionMenu = (menu) => {
+            const dropdown = menu.querySelector('.order-actions-dropdown');
+            const toggle = menu.querySelector('.order-actions-toggle');
+            if (!dropdown) {
+                return;
+            }
+
+            menu.classList.remove('open-up', 'open-down');
+            dropdown.style.maxHeight = '';
+            dropdown.style.top = '';
+            dropdown.style.bottom = '';
+
+            if (!toggle) {
+                return;
+            }
+
+            const summaryRect = toggle.getBoundingClientRect();
+            const dropdownRect = dropdown.getBoundingClientRect();
+            const availableBelow = window.innerHeight - summaryRect.bottom - viewportGap;
+            const availableAbove = summaryRect.top - viewportGap;
+            const shouldOpenUp = availableBelow < Math.min(dropdownRect.height, 320) && availableAbove > availableBelow;
+            const availableHeight = Math.max(180, shouldOpenUp ? availableAbove - 8 : availableBelow - 8);
+            const desiredLeft = summaryRect.right - dropdownRect.width;
+            const maxLeft = window.innerWidth - dropdownRect.width - viewportGap;
+            const resolvedLeft = Math.max(viewportGap, Math.min(desiredLeft, maxLeft));
+
+            menu.classList.add(shouldOpenUp ? 'open-up' : 'open-down');
+            dropdown.style.maxHeight = `${availableHeight}px`;
+            dropdown.style.left = `${resolvedLeft}px`;
+
+            if (shouldOpenUp) {
+                dropdown.style.bottom = `${window.innerHeight - summaryRect.top + 8}px`;
+            } else {
+                dropdown.style.top = `${summaryRect.bottom + 8}px`;
+            }
+        };
 
         actionMenus.forEach((menu) => {
             menu.addEventListener('toggle', () => {
                 if (!menu.open) {
+                    menu.classList.remove('open-up', 'open-down');
                     return;
                 }
 
@@ -486,8 +535,21 @@
                         otherMenu.open = false;
                     }
                 });
+
+                positionActionMenu(menu);
             });
         });
+
+        const repositionOpenMenus = () => {
+            actionMenus.forEach((menu) => {
+                if (menu.open) {
+                    positionActionMenu(menu);
+                }
+            });
+        };
+
+        window.addEventListener('resize', repositionOpenMenus);
+        window.addEventListener('scroll', repositionOpenMenus, true);
 
         document.addEventListener('click', (event) => {
             actionMenus.forEach((menu) => {
