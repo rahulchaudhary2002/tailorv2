@@ -26,4 +26,9 @@ class Customer extends Model
             'customer_garment_types'
         )->withTimestamps();
     }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
 }

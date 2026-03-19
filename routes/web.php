@@ -134,6 +134,7 @@ Route::middleware(['auth'])->group(function () {
     Route::group(['prefix' => 'order', 'as' => 'order.'], function () {
         Route::get('/', [OrderController::class, 'index'])->name('index')->middleware('can:view-orders,manage-orders');
         Route::get('/assigned-jobs', [OrderController::class, 'assignedJobs'])->name('assignedJobs')->middleware('can:view-assigned-jobs,manage-orders');
+        Route::get('/show/{order}', [OrderController::class, 'show'])->name('show')->middleware('can:view-orders,manage-orders');
         Route::get('/create', [OrderController::class, 'create'])->name('create')->middleware('can:create-orders,manage-orders');
         Route::get('/edit/{order}', [OrderController::class, 'edit'])->name('edit')->middleware('can:create-orders,manage-orders');
         Route::post('/', [OrderController::class, 'store'])->name('store')->middleware('can:create-orders,manage-orders');

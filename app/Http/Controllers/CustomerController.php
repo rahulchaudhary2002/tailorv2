@@ -7,6 +7,7 @@ use App\Http\Requests\Customer\UpdateMeasurementsRequest;
 use App\Http\Requests\Customer\UpdateRequest;
 use App\Models\Customer;
 use App\Models\GarmentType;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -76,12 +77,49 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
+        $currentOutletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+
         $customer->load([
             'customerGarmentTypes.garmentType:id,title',
             'customerGarmentTypes.measurements',
         ]);
 
-        return view('modules.customer.show', compact('customer'));
+        $ordersQuery = $customer->orders()
+            ->with(['outlet:id,name', 'worker:id,name'])
+            ->when($currentOutletId > 0, function ($query) use ($currentOutletId): void {
+                $query->where('outlet_id', $currentOutletId);
+            });
+
+        $recentOrders = (clone $ordersQuery)
+            ->latest('ordered_at')
+            ->limit(10)
+            ->get([
+                'id',
+                'order_number',
+                'outlet_id',
+                'worker_id',
+                'ordered_at',
+                'delivery_due_at',
+                'status',
+                'payment_status',
+                'subtotal_amount',
+                'discount_amount',
+                'tailoring_amount',
+                'vat_enabled',
+                'vat_amount',
+            ]);
+
+        $orderCount = (clone $ordersQuery)->count();
+        $totalSpent = (float) (clone $ordersQuery)->get()->sum(fn (Order $order) => $order->payableAmount());
+        $lastOrderDate = (clone $ordersQuery)->latest('ordered_at')->value('ordered_at');
+
+        return view('modules.customer.show', compact(
+            'customer',
+            'recentOrders',
+            'orderCount',
+            'totalSpent',
+            'lastOrderDate'
+        ));
     }
 
     /**

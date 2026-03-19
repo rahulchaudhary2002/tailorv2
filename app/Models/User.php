@@ -74,6 +74,10 @@ class User extends Authenticatable
 
     public function effectivePermissions(?int $outletId = null)
     {
+        if ($this->is_super_admin) {
+            return Permission::pluck('key');
+        }
+
         $outletId = $outletId ?? $this->current_outlet_id;
 
         if (!$outletId) {

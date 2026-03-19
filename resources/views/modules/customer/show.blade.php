@@ -607,11 +607,11 @@ $measurementSetCount = $garmentMeasurementSets->count();
                     <div class="profile-meta">
                         <div class="meta-item">
                             <div class="meta-label">Total Orders</div>
-                            <div class="meta-value">12</div>
+                            <div class="meta-value">{{ number_format($orderCount) }}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Total Spent</div>
-                            <div class="meta-value">₹1,24,500</div>
+                            <div class="meta-value">₹{{ number_format($totalSpent, 2) }}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Member Since</div>
@@ -619,7 +619,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Last Order</div>
-                            <div class="meta-value">Jan 20, 2024</div>
+                            <div class="meta-value">{{ $lastOrderDate ? \Illuminate\Support\Carbon::parse($lastOrderDate)->format('M d, Y') : 'No orders yet' }}</div>
                         </div>
                     </div>
                 </div>
@@ -644,6 +644,10 @@ $measurementSetCount = $garmentMeasurementSets->count();
                 <button class="tab-btn" data-tab="measurements">
                     <i class="fas fa-ruler"></i> Measurement History
                     <span class="tab-badge">{{ $measurementSetCount }}</span>
+                </button>
+                <button class="tab-btn" data-tab="orders">
+                    <i class="fas fa-file-invoice"></i> Orders
+                    <span class="tab-badge">{{ $orderCount }}</span>
                 </button>
             </div>
 
@@ -732,6 +736,56 @@ $measurementSetCount = $garmentMeasurementSets->count();
                     </div>
                     @endforeach
                 </div>
+                @endif
+            </div>
+
+            <div class="tab-content" id="tab-orders">
+                @if ($recentOrders->isEmpty())
+                    <div class="info-section">
+                        <div class="info-value empty">No orders found for this customer in the current outlet.</div>
+                    </div>
+                @else
+                    <div class="info-section">
+                        <div class="section-header">
+                            <div class="section-title">
+                                <i class="fas fa-file-invoice"></i>
+                                Order History
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Order No</th>
+                                        <th>Ordered At</th>
+                                        <th>Delivery Due</th>
+                                        <th>Status</th>
+                                        <th>Payment</th>
+                                        <th>Amount</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($recentOrders as $order)
+                                        <tr>
+                                            <td>{{ $order->order_number }}</td>
+                                            <td>{{ $order->ordered_at?->format('M d, Y') ?? '-' }}</td>
+                                            <td>{{ $order->delivery_due_at?->format('M d, Y') ?? '-' }}</td>
+                                            <td>{{ \App\Models\Order::statusLabel((string) $order->status) }}</td>
+                                            <td>{{ ucfirst((string) $order->payment_status) }}</td>
+                                            <td>₹{{ number_format($order->payableAmount(), 2) }}</td>
+                                            <td>
+                                                @canany(['view-orders', 'manage-orders'])
+                                                    <a href="{{ route('order.show', $order) }}" class="btn btn-sm btn-info">View Order</a>
+                                                @endcanany
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 @endif
             </div>
         </div>

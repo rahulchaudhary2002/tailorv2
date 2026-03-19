@@ -256,6 +256,9 @@
                                     @endif
 
                                     <div class="order-actions-links">
+                                        @if ($canManageOrders || $canViewOrders || ($canViewAssignedJobs && $isOwnAssignedOrder))
+                                            <a href="{{ route('order.show', $order) }}" class="order-actions-link">View</a>
+                                        @endif
                                         @if (($canManageOrders || $authUser?->hasPermission('create-orders')) && $isEditable)
                                             <a href="{{ route('order.edit', $order) }}" class="order-actions-link">Edit</a>
                                         @endif

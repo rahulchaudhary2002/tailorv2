@@ -206,6 +206,25 @@ class OrderController extends Controller
     }
 
     /**
+     * Read-only order details.
+     */
+    public function show(Order $order)
+    {
+        $this->ensureOrderBelongsToCurrentOutlet($order);
+
+        $order->load([
+            'outlet:id,name',
+            'customer:id,name,phone,email,address',
+            'creator:id,name',
+            'worker:id,name',
+            'items.product:id,name,code',
+            'items.unit:id,name,symbol',
+        ]);
+
+        return view('modules.order.show', compact('order'));
+    }
+
+    /**
      * Show order creation form.
      */
     public function create(Request $request)
