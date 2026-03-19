@@ -110,14 +110,14 @@
                     </a>
                 </li>
             @endcanany
-            @canany(['view-manufacture-unit', 'manage-manufacture-unit'])
+            {{--@canany(['view-manufacture-unit', 'manage-manufacture-unit'])
                 <li class="nav-item">
                     <a href="{{ route('manufactureUnit.index') }}" class="nav-link {{ request()->routeIs('manufactureUnit.*') ? 'active' : '' }}">
                         <i class="fas fa-industry nav-icon"></i>
                         <span class="nav-text">Manufacture Unit</span>
                     </a>
                 </li>
-            @endcanany
+            @endcanany--}}
             @canany(['view-inventory', 'manage-inventory'])
                 <li class="nav-item">
                     <a href="{{ route('inventory.index') }}" class="nav-link {{ request()->routeIs('inventory.*') ? 'active' : '' }}">

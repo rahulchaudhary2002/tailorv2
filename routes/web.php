@@ -117,14 +117,14 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/update/{purchase}', [RawMaterialPurchaseController::class, 'updateProcurement'])->name('update')->middleware('can:manage-raw-material-purchases');
     });
 
-    Route::group(['prefix' => 'manufacture-unit', 'as' => 'manufactureUnit.'], function () {
-        Route::get('/', [ManufactureUnitController::class, 'index'])->name('index')->middleware('can:view-manufacture-unit,manage-manufacture-unit');
-        Route::post('/transfer/{stock}', [ManufactureUnitController::class, 'transferForProduction'])->name('transfer')->middleware('can:manage-manufacture-unit');
-        Route::post('/final-goods-transfer/{stock}', [ManufactureUnitController::class, 'transferFinalGoods'])->name('finalGoods.transfer')->middleware('can:manage-manufacture-unit');
-        Route::put('/transfer-status/{transaction}', [ManufactureUnitController::class, 'updateTransferStatus'])->name('transfer.status.update')->middleware('can:manage-manufacture-unit');
-        Route::post('/workflow', [ManufactureUnitController::class, 'storeWorkflow'])->name('workflow.store')->middleware('can:manage-manufacture-unit');
-        Route::post('/production-output-transfer/{transaction}', [ManufactureUnitController::class, 'transferProducedGoodsToCurrentOutlet'])->name('productionOutput.transfer')->middleware('can:manage-manufacture-unit');
-    });
+    // Route::group(['prefix' => 'manufacture-unit', 'as' => 'manufactureUnit.'], function () {
+    //     Route::get('/', [ManufactureUnitController::class, 'index'])->name('index')->middleware('can:view-manufacture-unit,manage-manufacture-unit');
+    //     Route::post('/transfer/{stock}', [ManufactureUnitController::class, 'transferForProduction'])->name('transfer')->middleware('can:manage-manufacture-unit');
+    //     Route::post('/final-goods-transfer/{stock}', [ManufactureUnitController::class, 'transferFinalGoods'])->name('finalGoods.transfer')->middleware('can:manage-manufacture-unit');
+    //     Route::put('/transfer-status/{transaction}', [ManufactureUnitController::class, 'updateTransferStatus'])->name('transfer.status.update')->middleware('can:manage-manufacture-unit');
+    //     Route::post('/workflow', [ManufactureUnitController::class, 'storeWorkflow'])->name('workflow.store')->middleware('can:manage-manufacture-unit');
+    //     Route::post('/production-output-transfer/{transaction}', [ManufactureUnitController::class, 'transferProducedGoodsToCurrentOutlet'])->name('productionOutput.transfer')->middleware('can:manage-manufacture-unit');
+    // });
 
     Route::group(['prefix' => 'inventory', 'as' => 'inventory.'], function () {
         Route::get('/', [InventoryController::class, 'index'])->name('index')->middleware('can:view-inventory,manage-inventory');
