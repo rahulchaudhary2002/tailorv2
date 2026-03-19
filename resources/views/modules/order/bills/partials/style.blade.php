@@ -164,6 +164,103 @@
         color: #1f3d5a;
     }
 
+    .bill-receipt {
+        width: min(100%, 420px);
+        margin: 0 auto 16px;
+        border: 1px solid #cfcfcf;
+        border-radius: 0;
+        padding: 18px 16px;
+        box-shadow: 0 10px 24px rgba(20, 20, 20, 0.08);
+        color: #202020;
+        font-family: "Courier New", Courier, monospace;
+        letter-spacing: 0.02em;
+    }
+
+    .bill-receipt-header,
+    .bill-receipt-footer {
+        text-align: center;
+        font-size: 14px;
+        line-height: 1.6;
+        text-transform: uppercase;
+    }
+
+    .bill-receipt-brand {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .bill-rule {
+        border-top: 2px dashed #444;
+        margin: 14px 0;
+    }
+
+    .bill-rule-tight {
+        margin: 10px 0;
+    }
+
+    .bill-receipt-meta,
+    .bill-receipt-totals {
+        display: grid;
+        gap: 8px;
+        font-size: 14px;
+    }
+
+    .bill-meta-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .bill-meta-row span:first-child {
+        flex: 0 0 auto;
+    }
+
+    .bill-meta-row span:last-child {
+        flex: 1 1 auto;
+        text-align: right;
+        word-break: break-word;
+    }
+
+    .bill-total-row {
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .bill-receipt-table {
+        margin-top: 0;
+    }
+
+    .bill-receipt-table th,
+    .bill-receipt-table td {
+        border: 0;
+        padding: 6px 4px;
+        font-size: 14px;
+        background: transparent;
+    }
+
+    .bill-receipt-table thead th {
+        border-bottom: 2px dashed #444;
+        padding-bottom: 10px;
+    }
+
+    .bill-receipt-table tbody tr:not(.bill-sub-row) td {
+        padding-top: 10px;
+    }
+
+    .bill-sub-row td {
+        padding-top: 2px;
+        color: #4e4e4e;
+        font-size: 13px;
+    }
+
+    .bill-item-subline {
+        color: #616161;
+        font-size: 12px;
+        margin-top: 2px;
+    }
+
     @media print {
         .bill-actions,
         .page-header {
@@ -181,6 +278,15 @@
             border-color: #bbb;
             page-break-inside: avoid;
         }
+
+        .bill-receipt {
+            width: 80mm;
+            max-width: 80mm;
+            border: 0;
+            box-shadow: none;
+            margin: 0 auto;
+            padding: 8px 6px;
+        }
     }
 
     @media (max-width: 900px) {
@@ -190,6 +296,12 @@
 
         .bill-kpi {
             grid-template-columns: repeat(2, minmax(140px, 1fr));
+        }
+    }
+
+    @media (max-width: 600px) {
+        .bill-receipt {
+            width: 100%;
         }
     }
 </style>

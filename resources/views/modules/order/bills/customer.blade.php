@@ -15,37 +15,64 @@
         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
     </div>
 
-    <div class="bill-card">
-        <div class="bill-head">
-            <div>
-                <h2 class="bill-title">Customer Bill</h2>
-                <div class="bill-muted">Order #{{ $order->order_number }}</div>
+    @php
+        $totalQty = (float) $items->sum('quantity');
+    @endphp
+
+    <div class="bill-card bill-receipt">
+        <div class="bill-receipt-header">
+            <div class="bill-receipt-brand">{{ strtoupper($order->outlet?->name ?: config('app.name', 'Tailor Shop')) }}</div>
+            <div>{{ strtoupper((string) config('app.name', 'Tailor Management System')) }}</div>
+            <div>CUSTOMER INVOICE</div>
+        </div>
+
+        <div class="bill-rule"></div>
+
+        <div class="bill-receipt-meta">
+            <div class="bill-meta-row">
+                <span>Bill #</span>
+                <span>{{ $order->order_number }}</span>
             </div>
-            <div class="bill-muted">
-                <div>Date: {{ $order->ordered_at?->format('M d, Y h:i A') ?: '-' }}</div>
-                <div>Outlet: {{ $order->outlet?->name ?: '-' }}</div>
+            <div class="bill-meta-row">
+                <span>Trans. Date</span>
+                <span>{{ $order->ordered_at?->format('d/m/Y h:i A') ?: '-' }}</span>
+            </div>
+            <div class="bill-meta-row">
+                <span>Invoice Date</span>
+                <span>{{ now()->format('d/m/Y') }}</span>
+            </div>
+            <div class="bill-meta-row">
+                <span>Payment Mode</span>
+                <span>{{ ucfirst((string) ($order->payment_method ?: 'Cash')) }}</span>
+            </div>
+            <div class="bill-meta-row">
+                <span>Customer</span>
+                <span>{{ $order->customer?->name ?: 'Walk-in' }}</span>
+            </div>
+            <div class="bill-meta-row">
+                <span>Phone</span>
+                <span>{{ $order->customer?->phone ?: '-' }}</span>
+            </div>
+            <div class="bill-meta-row">
+                <span>Delivery</span>
+                <span>{{ $order->delivery_due_at?->format('d/m/Y h:i A') ?: '-' }}</span>
             </div>
         </div>
 
-        <div class="bill-grid">
-            <div class="bill-grid-item"><span class="bill-grid-label">Customer:</span> {{ $order->customer?->name ?: 'Walk-in' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Phone:</span> {{ $order->customer?->phone ?: '-' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Email:</span> {{ $order->customer?->email ?: '-' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Delivery Due:</span> {{ $order->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</div>
-        </div>
+        <div class="bill-rule"></div>
 
-        <table class="bill-table">
+        <table class="bill-table bill-receipt-table">
             <thead>
                 <tr>
-                    <th>Item</th>
-                    <th>Category</th>
-                    <th>Qty</th>
-                    <th>Unit Price</th>
-                    <th>Total</th>
+                    <th>Sn</th>
+                    <th>Particulars</th>
+                    <th class="bill-right">Qty</th>
+                    <th class="bill-right">Rate</th>
+                    <th class="bill-right">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach ($items as $item)
+                @foreach ($items as $index => $item)
                     @php
                         $isCustom = (string) $item->item_category === 'custom';
                         $quantityUnit = $isCustom
@@ -59,206 +86,97 @@
                         if ((string) $item->item_category === 'readymade' && filled(data_get($item->custom_details, 'size'))) {
                             $itemName .= ' (Size: ' . data_get($item->custom_details, 'size') . ')';
                         }
+                        $lineAmount = (float) $item->line_total;
                     @endphp
                     <tr>
-                        <td>{{ $itemName }}</td>
-                        <td>{{ ucfirst((string) $item->item_category) }}</td>
-                        <td class="bill-right">{{ number_format((float) $item->quantity, 2) }} {{ $quantityUnit }}</td>
+                        <td>{{ $index + 1 }}</td>
+                        <td>
+                            <div>{{ strtoupper($itemName) }}</div>
+                            @if ($isCustom && $garments->isNotEmpty())
+                                <div class="bill-item-subline">
+                                    {{ $garments->pluck('tailoring_package')->filter()->implode(', ') ?: 'TAILORING' }}
+                                </div>
+                            @endif
+                        </td>
+                        <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }} {{ $quantityUnit }}</td>
                         <td class="bill-right">{{ number_format((float) $item->unit_price, 2) }}</td>
-                        <td class="bill-right">{{ number_format((float) $item->line_total, 2) }}</td>
+                        <td class="bill-right">{{ number_format($lineAmount, 2) }}</td>
                     </tr>
                     @if ($isCustom && $garments->isNotEmpty())
-                        <tr>
-                            <td colspan="5" style="padding: 12px;">
-                                <div class="bill-detail-box">
-                                    <div class="bill-detail-grid">
-                                        @foreach ($garments as $garment)
-                                            @php
-                                                $measurementSummary = collect((array) ($garment['measurements'] ?? []))
-                                                    ->map(function ($measurement) {
-                                                        $type = (string) ($measurement['type'] ?? '');
-                                                        $value = (string) ($measurement['measurement'] ?? '');
-                                                        $unit = (string) ($measurement['unit'] ?? '');
-
-                                                        return trim($type . ': ' . $value . ($unit !== '' ? ' ' . $unit : ''));
-                                                    })
-                                                    ->filter()
-                                                    ->implode(', ');
-                                                $garmentQty = (float) ($garment['quantity'] ?? 0);
-                                                $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
-                                            @endphp
-                                            <div class="bill-detail-row">
-                                                <div>
-                                                    <div class="bill-detail-name">
-                                                        {{ $garment['garment_title'] ?? 'Garment' }}
-                                                        x {{ number_format($garmentQty, 2) }}
-                                                    </div>
-                                                    <div class="bill-detail-meta">
-                                                        {{ $garment['tailoring_package'] ?? 'Tailoring' }}
-                                                        @if ($measurementSummary !== '')
-                                                            | {{ $measurementSummary }}
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="bill-detail-price">
-                                                    {{ number_format($garmentQty * $tailoringAmount, 2) }}
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
+                        @foreach ($garments as $garment)
+                            @php
+                                $garmentQty = (float) ($garment['quantity'] ?? 0);
+                                $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
+                            @endphp
+                            <tr class="bill-sub-row">
+                                <td></td>
+                                <td>{{ strtoupper((string) ($garment['garment_title'] ?? 'Tailoring')) }}</td>
+                                <td class="bill-right">{{ rtrim(rtrim(number_format($garmentQty, 2), '0'), '.') }}</td>
+                                <td class="bill-right">{{ number_format($tailoringAmount, 2) }}</td>
+                                <td class="bill-right">{{ number_format($garmentQty * $tailoringAmount, 2) }}</td>
+                            </tr>
+                        @endforeach
                     @endif
                 @endforeach
             </tbody>
         </table>
-    </div>
 
-    <div class="bill-card">
-        <h3 class="bill-title" style="font-size:18px;">Measurements Reference</h3>
-        @forelse ($customItems as $customItem)
-            @php
-                $garments = collect((array) data_get($customItem->custom_details, 'garments', []));
-            @endphp
-            <div class="bill-muted" style="margin-top:10px;">
-                {{ data_get($customItem->custom_details, 'garment_title', 'Custom Garment') }}
+        <div class="bill-rule"></div>
+
+        <div class="bill-receipt-totals">
+            <div class="bill-meta-row">
+                <span>Subtotal</span>
+                <span>{{ number_format($subtotal, 2) }}</span>
             </div>
-            @if ($garments->isNotEmpty())
-                @foreach ($garments as $garment)
-                    <div class="bill-muted" style="margin-top:8px;">
-                        {{ $garment['garment_title'] ?? 'Garment' }} x {{ number_format((float) ($garment['quantity'] ?? 1), 2) }}
-                        | {{ $garment['tailoring_package'] ?? 'Tailoring' }}
-                    </div>
-                    <table class="bill-table">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Measurement</th>
-                                <th>Unit</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ((array) ($garment['measurements'] ?? []) as $measurement)
-                                <tr>
-                                    <td>{{ $measurement['type'] ?? '-' }}</td>
-                                    <td>{{ $measurement['measurement'] ?? '-' }}</td>
-                                    <td>{{ $measurement['unit'] ?? '-' }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="3">No measurements captured.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                @endforeach
-            @else
-                <table class="bill-table">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Measurement</th>
-                            <th>Unit</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ((array) data_get($customItem->custom_details, 'measurements', []) as $measurement)
-                            <tr>
-                                <td>{{ $measurement['type'] ?? '-' }}</td>
-                                <td>{{ $measurement['measurement'] ?? '-' }}</td>
-                                <td>{{ $measurement['unit'] ?? '-' }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="3">No measurements captured.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            @endif
-
-            @php
-                $designImages = collect((array) data_get($customItem->custom_details, 'design_images', []))
-                    ->push(data_get($customItem->custom_details, 'design_image'))
-                    ->filter(fn ($path) => filled($path))
-                    ->unique()
-                    ->values();
-            @endphp
-            @if ($designImages->isNotEmpty())
-                <div class="bill-muted" style="margin-top:8px;">Design Images</div>
-                <div class="bill-design-grid" style="margin-top:6px;">
-                    @foreach ($designImages as $imagePath)
-                        @php
-                            $imagePath = (string) $imagePath;
-                            $imageUrl = str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')
-                                ? $imagePath
-                                : \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($imagePath, '/'));
-                        @endphp
-                        <a href="{{ $imageUrl }}" target="_blank" rel="noopener">
-                            <img src="{{ $imageUrl }}" alt="Design Image" class="bill-design-thumb">
-                        </a>
-                    @endforeach
+            <div class="bill-meta-row">
+                <span>Tailoring</span>
+                <span>{{ number_format($stitchingCharges, 2) }}</span>
+            </div>
+            @if ($discount > 0)
+                <div class="bill-meta-row">
+                    <span>Discount</span>
+                    <span>-{{ number_format($discount, 2) }}</span>
                 </div>
             @endif
-        @empty
-            <div class="bill-muted">No custom measurement data for this order.</div>
-        @endforelse
-    </div>
-
-    <div class="bill-card">
-        <h3 class="bill-title" style="font-size:18px;">Fabric Details</h3>
-        <table class="bill-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Source</th>
-                    <th>Fabric/Material</th>
-                    <th>Quantity</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($fabricItems as $item)
-                    @if ((string) $item->item_category === 'custom')
-                        @php
-                            $source = ucfirst((string) data_get($item->custom_details, 'fabric_source', 'own'));
-                            $fabricLabel = data_get($item->custom_details, 'fabric_source') === 'stock'
-                                ? ((string) data_get($item->custom_details, 'fabric_product_id') ? 'Stock Fabric' : 'Stock Fabric')
-                                : 'Customer Own Fabric';
-                            $customName = data_get($item->custom_details, 'garment_title')
-                                ?: (collect((array) data_get($item->custom_details, 'garments', []))->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment');
-                        @endphp
-                        <tr>
-                            <td>{{ $customName }}</td>
-                            <td>{{ $source }}</td>
-                            <td>{{ $fabricLabel }}</td>
-                            <td>{{ number_format((float) data_get($item->custom_details, 'fabric_quantity', 0), 2) }} {{ data_get($item->custom_details, 'fabric_quantity_unit', '') }}</td>
-                        </tr>
-                    @else
-                        <tr>
-                            <td>{{ $item->product?->name ?: '-' }}</td>
-                            <td>Stock</td>
-                            <td>{{ $item->product?->code ?: '-' }}</td>
-                            <td>{{ number_format((float) $item->quantity, 2) }} {{ data_get($item->custom_details, 'quantity_unit', '') }}</td>
-                        </tr>
-                    @endif
-                @empty
-                    <tr><td colspan="4">No fabric details available.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-
-    <div class="bill-card">
-        <h3 class="bill-title" style="font-size:18px;">Charges, VAT, Discounts, and Payment</h3>
-        <div class="bill-kpi">
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Subtotal</div><div class="bill-kpi-value">{{ number_format($subtotal, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Stitching Charges</div><div class="bill-kpi-value">{{ number_format($stitchingCharges, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">VAT (13%)</div><div class="bill-kpi-value">{{ number_format($taxAmount, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Discount</div><div class="bill-kpi-value">{{ number_format($discount, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Net Payable</div><div class="bill-kpi-value">{{ number_format($netPayable, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Paid Amount</div><div class="bill-kpi-value">{{ number_format($paidAmount, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Due Amount</div><div class="bill-kpi-value">{{ number_format($dueAmount, 2) }}</div></div>
-            <div class="bill-kpi-card"><div class="bill-kpi-label">Payment Status</div><div class="bill-kpi-value">{{ ucfirst((string) $order->payment_status) }}</div></div>
+            @if ($taxAmount > 0)
+                <div class="bill-meta-row">
+                    <span>VAT</span>
+                    <span>{{ number_format($taxAmount, 2) }}</span>
+                </div>
+            @endif
+            <div class="bill-rule bill-rule-tight"></div>
+            <div class="bill-meta-row bill-total-row">
+                <span>Net Amount</span>
+                <span>{{ number_format($netPayable, 2) }}</span>
+            </div>
+            <div class="bill-rule bill-rule-tight"></div>
+            <div class="bill-meta-row">
+                <span>Tender</span>
+                <span>{{ number_format($paidAmount, 2) }}</span>
+            </div>
+            <div class="bill-meta-row">
+                <span>Balance</span>
+                <span>{{ number_format($dueAmount, 2) }}</span>
+            </div>
+            <div class="bill-rule bill-rule-tight"></div>
+            <div class="bill-meta-row">
+                <span>Total Qty</span>
+                <span>{{ rtrim(rtrim(number_format($totalQty, 2), '0'), '.') }}</span>
+            </div>
         </div>
-        <div class="bill-muted" style="margin-top:8px;">Payment Method: {{ $order->payment_method ?: '-' }}</div>
+
+        <div class="bill-rule"></div>
+
+        <div class="bill-receipt-footer">
+            <div>THANK YOU FOR YOUR ORDER</div>
+            <div>PLEASE KEEP THIS INVOICE FOR DELIVERY</div>
+            @if (filled($order->customer?->address))
+                <div>{{ strtoupper($order->customer?->address) }}</div>
+            @endif
+            <div>{{ strtoupper((string) config('app.name', 'Tailor Management System')) }}</div>
+        </div>
     </div>
+
 </div>
 @endsection
 
