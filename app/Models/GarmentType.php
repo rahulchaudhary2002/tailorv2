@@ -8,8 +8,6 @@ class GarmentType extends Model
 {
     protected $fillable = [
         'title',
-        'amount',
-        'tax',
     ];
 
     public function measurements()

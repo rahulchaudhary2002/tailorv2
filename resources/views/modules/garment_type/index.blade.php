@@ -7,7 +7,7 @@
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Garment Type Management</h1>
-        <p>Manage garment types with base amount, tax, and measurement count.</p>
+        <p>Manage garment types with tailoring package and measurement count.</p>
     </div>
     @canany(['manage-garment-types', 'create-garment-types'])
         <div class="page-actions">
@@ -38,8 +38,6 @@
             <thead>
                 <tr>
                     <th>Title</th>
-                    <th>Amount</th>
-                    <th>Tax (%)</th>
                     <th>Tailoring Packages</th>
                     <th>Measurements</th>
                     <th>Created</th>
@@ -50,8 +48,6 @@
                 @forelse ($garmentTypes as $garmentType)
                     <tr>
                         <td>{{ $garmentType->title }}</td>
-                        <td>{{ number_format((float) $garmentType->amount, 2) }}</td>
-                        <td>{{ number_format((float) $garmentType->tax, 2) }}</td>
                         <td>{{ $garmentType->tailoring_packages_count }}</td>
                         <td>{{ $garmentType->measurements_count }}</td>
                         <td>{{ $garmentType->created_at->format('M d, Y') }}</td>
@@ -78,7 +74,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="empty">No garment types found.</td>
+                        <td colspan="5" class="empty">No garment types found.</td>
                     </tr>
                 @endforelse
             </tbody>

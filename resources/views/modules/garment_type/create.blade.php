@@ -7,7 +7,7 @@
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Create Garment Type</h1>
-        <p>Create garment type first, then add its measurements from the next tab.</p>
+        <p>Create garment type first, then add its measurements and tailoring packages from the next tab.</p>
     </div>
 </div>
 
@@ -37,19 +37,9 @@
             @endif
 
             <div class="role-form-grid">
-                <div class="role-form-group">
+                <div class="role-form-group role-form-group-full">
                     <label for="title">Title</label>
                     <input id="title" name="title" type="text" class="role-input" value="{{ old('title') }}" placeholder="Shirt Stitching" required>
-                </div>
-
-                <div class="role-form-group">
-                    <label for="amount">Amount</label>
-                    <input id="amount" name="amount" type="number" step="0.01" min="0" class="role-input" value="{{ old('amount') }}" placeholder="500.00" required>
-                </div>
-
-                <div class="role-form-group role-form-group-full">
-                    <label for="tax">Tax (%)</label>
-                    <input id="tax" name="tax" type="number" step="0.01" min="0" class="role-input" value="{{ old('tax') }}" placeholder="18.00" required>
                 </div>
             </div>
 

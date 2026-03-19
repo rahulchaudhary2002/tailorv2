@@ -27,8 +27,6 @@ class GarmentTypeSeeder extends Seeder
         $types = [
             [
                 'title' => 'Shirt Stitching',
-                'amount' => 500,
-                'tax' => 18,
                 'tailoring_packages' => [
                     ['name' => 'Basic Stitching', 'amount' => 500, 'description' => 'Standard finish', 'order' => 1, 'is_active' => true],
                     ['name' => 'Premium Stitching', 'amount' => 800, 'description' => 'Fine finish with extra fitting', 'order' => 2, 'is_active' => true],
@@ -44,8 +42,6 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Pant Stitching',
-                'amount' => 600,
-                'tax' => 18,
                 'tailoring_packages' => [
                     ['name' => 'Basic Stitching', 'amount' => 600, 'description' => 'Standard finish', 'order' => 1, 'is_active' => true],
                     ['name' => 'Premium Stitching', 'amount' => 950, 'description' => 'Fine finish with extra fitting', 'order' => 2, 'is_active' => true],
@@ -62,8 +58,6 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Blazer Stitching',
-                'amount' => 1800,
-                'tax' => 18,
                 'tailoring_packages' => [
                     ['name' => 'Basic Stitching', 'amount' => 1800, 'description' => 'Standard finish', 'order' => 1, 'is_active' => true],
                     ['name' => 'Premium Stitching', 'amount' => 2500, 'description' => 'Fine finish with extra fitting', 'order' => 2, 'is_active' => true],
@@ -83,10 +77,6 @@ class GarmentTypeSeeder extends Seeder
         foreach ($types as $data) {
             $garmentType = GarmentType::updateOrCreate(
                 ['title' => $data['title']],
-                [
-                    'amount' => $data['amount'],
-                    'tax' => $data['tax'],
-                ]
             );
 
             $garmentType->measurements()->delete();

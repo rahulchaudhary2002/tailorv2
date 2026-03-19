@@ -51,19 +51,9 @@ $activeTab = request('tab', 'details');
             @endif
 
             <div class="role-form-grid">
-                <div class="role-form-group">
+                <div class="role-form-group role-form-group-full">
                     <label for="title">Title</label>
                     <input id="title" name="title" type="text" class="role-input" value="{{ old('title', $garmentType->title) }}" required>
-                </div>
-
-                <div class="role-form-group">
-                    <label for="amount">Amount</label>
-                    <input id="amount" name="amount" type="number" min="0" step="0.01" class="role-input" value="{{ old('amount', $garmentType->amount) }}" required>
-                </div>
-
-                <div class="role-form-group role-form-group-full">
-                    <label for="tax">Tax (%)</label>
-                    <input id="tax" name="tax" type="number" min="0" step="0.01" class="role-input" value="{{ old('tax', $garmentType->tax) }}" required>
                 </div>
             </div>
 

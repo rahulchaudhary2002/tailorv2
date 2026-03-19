@@ -26,7 +26,6 @@ $garmentPayload = $garmentTypes->map(function ($garmentType) {
     return [
         'id' => $garmentType->id,
         'title' => $garmentType->title,
-        'amount' => (float) $garmentType->amount,
         'tailoringPackages' => $garmentType->tailoringPackages->map(function ($package) {
             return [
                 'id' => $package->id,

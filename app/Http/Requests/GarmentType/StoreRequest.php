@@ -23,8 +23,6 @@ class StoreRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:100'],
-            'amount' => ['required', 'numeric', 'min:0'],
-            'tax' => ['required', 'numeric', 'min:0'],
         ];
     }
 }

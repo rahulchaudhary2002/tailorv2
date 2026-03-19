@@ -304,7 +304,7 @@ class OrderController extends Controller
                 },
             ])
             ->orderBy('title')
-            ->get(['id', 'title', 'amount', 'tax']);
+            ->get(['id', 'title']);
 
         $selectedCustomerId = $request->query('customer_id');
         $workers = $this->assignableWorkers($outletId);
@@ -594,7 +594,7 @@ class OrderController extends Controller
                         ->unique()
                         ->values()
                 )
-                ->get(['id', 'title', 'amount', 'tax'])
+                ->get(['id', 'title'])
                 ->keyBy('id');
 
             $customStockFabricProductIds = $items
@@ -703,8 +703,8 @@ class OrderController extends Controller
                                 $garmentTypeId = (int) ($garment['garment_type_id'] ?? 0);
                                 $garmentType = $garmentTypes->get($garmentTypeId);
                                 $garmentQty = (float) ($garment['quantity'] ?? 1);
-                                $tailoringAmount = (float) ($garment['tailoring_amount'] ?? ($garmentType?->amount ?? 0));
-                                $taxPercent = (float) ($garmentType?->tax ?? 0);
+                                $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
+                                $taxPercent = 0.0;
                                 $tailoringTotal = $garmentQty * $tailoringAmount;
 
                                 return [
