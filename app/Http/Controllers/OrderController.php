@@ -328,8 +328,6 @@ class OrderController extends Controller
         $validated = $request->validate([
             'phone' => ['required', 'string', 'max:30'],
             'name' => ['nullable', 'string', 'max:100'],
-            'email' => ['nullable', 'email', 'max:100'],
-            'address' => ['nullable', 'string', 'max:255'],
             'customer_type' => ['nullable', 'in:retail,wholesale,custom'],
         ]);
 
@@ -347,29 +345,21 @@ class OrderController extends Controller
         }
 
         $name = trim((string) ($validated['name'] ?? ''));
-        $email = trim((string) ($validated['email'] ?? ''));
-        $address = trim((string) ($validated['address'] ?? ''));
         $customerType = (string) ($validated['customer_type'] ?? 'retail');
 
-        if ($name === '' || $email === '' || $address === '') {
+        if ($name === '') {
             return response()->json([
-                'message' => 'Name, email and address are required to create a new customer.',
-            ], 422);
-        }
-
-        $emailExists = Customer::query()->where('email', $email)->exists();
-        if ($emailExists) {
-            return response()->json([
-                'message' => 'Email already exists. Use a different email.',
-            ], 422);
+                'status' => 'missing',
+                'message' => 'Customer not found. Enter customer details to create one.',
+            ]);
         }
 
         $customer = Customer::query()->create([
             'name' => $name,
-            'email' => $email,
+            'email' => null,
             'phone' => $phone,
             'customer_type' => $customerType,
-            'address' => $address,
+            'address' => null,
         ]);
 
         return response()->json([

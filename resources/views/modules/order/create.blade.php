@@ -137,6 +137,21 @@ $customerLookupPayload = $customers->map(function ($customer) {
                             type="hidden"
                             value="{{ old('customer_id', $editingOrder?->customer_id ?? $selectedCustomerId ?? '') }}">
                     </div>
+                    <div id="customerCheckMessage" class="customer-check-message" style="display:none;"></div>
+                    <div id="customerDetails" class="customer-details" style="display:none;">
+                        <div class="form-group">
+                            <label for="customerName">Customer Name *</label>
+                            <input id="customerName" type="text" class="tp-input" placeholder="Enter full name">
+                        </div>
+                        <div class="form-group">
+                            <label for="customerType">Customer Type *</label>
+                            <select id="customerType" class="tp-input">
+                                <option value="retail">Retail Customer</option>
+                                <option value="wholesale">Wholesale Customer</option>
+                                <option value="custom">Custom Customer</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -262,48 +277,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
             </div>
             </div>
         </section>
-    </div>
-
-    {{-- Create Customer Modal --}}
-    <div class="tp-modal-overlay" id="createCustomerModal" style="display:none;">
-        <div class="tp-modal" style="max-width:640px;">
-            <div class="tp-modal-header">
-                <h3><i class="fas fa-user-plus"></i> Create Customer</h3>
-                <button type="button" class="tp-modal-close" id="closeCustomerModal">&times;</button>
-            </div>
-            <div class="tp-modal-body">
-                <div class="tp-form-grid">
-                    <div class="tp-form-group">
-                        <label for="newCustomerPhone">Phone *</label>
-                        <input id="newCustomerPhone" type="text" class="tp-input" readonly>
-                    </div>
-                    <div class="tp-form-group">
-                        <label for="newCustomerName">Customer Name *</label>
-                        <input id="newCustomerName" type="text" class="tp-input" placeholder="Full name">
-                    </div>
-                    <div class="tp-form-group">
-                        <label for="newCustomerEmail">Email *</label>
-                        <input id="newCustomerEmail" type="email" class="tp-input" placeholder="name@example.com">
-                    </div>
-                    <div class="tp-form-group">
-                        <label for="newCustomerType">Customer Type *</label>
-                        <select id="newCustomerType" class="tp-input">
-                            <option value="retail">Retail</option>
-                            <option value="wholesale">Wholesale</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                    </div>
-                    <div class="tp-form-group tp-form-group-full">
-                        <label for="newCustomerAddress">Address *</label>
-                        <input id="newCustomerAddress" type="text" class="tp-input" placeholder="Address">
-                    </div>
-                </div>
-            </div>
-            <div class="tp-modal-footer">
-                <button type="button" class="tp-btn tp-btn-secondary" id="cancelCustomerModal">Cancel</button>
-                <button type="button" id="createCustomerBtn" class="tp-btn tp-btn-success">Create Customer</button>
-            </div>
-        </div>
     </div>
 
     {{-- Measurement Modal --}}
@@ -531,6 +504,7 @@ label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
 .customer-check-row{display:flex;gap:10px;}
 .customer-check-row .tp-input{flex:1;}
 .customer-check-message{font-size:.9rem;margin-top:10px;padding:10px;border-radius:var(--radius);border-left:4px solid var(--accent);}
+.customer-details{display:none;background:#f0f7ff;padding:15px;border-radius:var(--radius);margin-top:15px;border-left:4px solid var(--accent);}
 .tp-size-radio-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
 .tp-size-radio-group label{display:flex;align-items:center;gap:6px;font-weight:500;background:#e9eef5;padding:8px 14px;border-radius:999px;cursor:pointer;color:var(--primary);}
 .tp-size-radio-group input[type="radio"]{width:auto;margin:0;}
@@ -666,15 +640,10 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const billCustomerEl = document.getElementById('billCustomer');
     const customerPhoneInput = document.getElementById('customerPhone');
     const checkCustomerBtn = document.getElementById('checkCustomerBtn');
-    const createCustomerModal = document.getElementById('createCustomerModal');
-    const closeCustomerModalBtn = document.getElementById('closeCustomerModal');
-    const cancelCustomerModalBtn = document.getElementById('cancelCustomerModal');
-    const newCustomerPhone = document.getElementById('newCustomerPhone');
-    const newCustomerName = document.getElementById('newCustomerName');
-    const newCustomerEmail = document.getElementById('newCustomerEmail');
-    const newCustomerType = document.getElementById('newCustomerType');
-    const newCustomerAddress = document.getElementById('newCustomerAddress');
-    const createCustomerBtn = document.getElementById('createCustomerBtn');
+    const customerCheckMessage = document.getElementById('customerCheckMessage');
+    const customerDetails = document.getElementById('customerDetails');
+    const customerNameInput = document.getElementById('customerName');
+    const customerTypeInput = document.getElementById('customerType');
 
     const discountTypeEl = document.getElementById('discountType');
     const discountValueEl = document.getElementById('discountValue');
@@ -725,6 +694,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     let pendingCustomIndex = 0;
     let editingCustomIndex = -1;
     let selectedCustomProductIds = [];
+    let customerSubmitInProgress = false;
 
     const customersByPhone = new Map();
     const customersById = new Map();
@@ -858,29 +828,91 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function selectCustomer(customer) {
         customerSelect.value = String(customer.id);
         customerPhoneInput.value = customer.phone || customerPhoneInput.value;
+        customerNameInput.value = customer.name || '';
+        customerTypeInput.value = customer.customerType || customer.customer_type || 'retail';
+        hideCustomerDetails();
+        setCustomerCheckMessage('');
         updateCustomerDisplay();
-        closeCustomerCreateModal();
     }
 
-    function openCustomerCreateModal(phone) {
-        newCustomerPhone.value = phone || '';
-        newCustomerName.value = '';
-        newCustomerEmail.value = '';
-        newCustomerAddress.value = '';
-        newCustomerType.value = 'retail';
-        createCustomerModal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+    function showCustomerDetails() {
+        customerDetails.style.display = 'block';
     }
 
-    function closeCustomerCreateModal() {
-        createCustomerModal.style.display = 'none';
-        document.body.style.overflow = '';
+    function hideCustomerDetails() {
+        customerDetails.style.display = 'none';
+    }
+
+    function setCustomerCheckMessage(message, type = 'info') {
+        if (!customerCheckMessage) {
+            return;
+        }
+
+        customerCheckMessage.textContent = message || '';
+        customerCheckMessage.style.display = message ? 'block' : 'none';
+        customerCheckMessage.style.borderLeftColor = type === 'success' ? 'var(--success)' : 'var(--accent)';
+        customerCheckMessage.style.background = type === 'success' ? '#edf9f0' : '#f0f7ff';
+    }
+
+    async function resolveOrCreateCustomer(options = {}) {
+        const normalizedPhone = normalizePhone(customerPhoneInput.value);
+        const shouldCreate = Boolean(options.createIfMissing);
+        const payload = {
+            phone: normalizedPhone,
+            name: (customerNameInput.value || '').trim(),
+            customer_type: customerTypeInput.value || 'retail',
+        };
+
+        if (payload.phone.length < 7) {
+            throw new Error('Enter a valid phone number first.');
+        }
+
+        const response = await fetch(resolveCustomerUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify(shouldCreate ? payload : { phone: payload.phone }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data?.message || 'Unable to resolve customer.');
+        }
+
+        if ((data?.status === 'existing' || data?.status === 'created') && data?.customer?.id) {
+            upsertCustomerIndex(data.customer);
+            selectCustomer(data.customer);
+            return data.customer;
+        }
+
+        if (data?.status === 'missing') {
+            customerSelect.value = '';
+            showCustomerDetails();
+            setCustomerCheckMessage('');
+            updateCustomerDisplay();
+            return null;
+        }
+
+        throw new Error('Customer response was invalid.');
     }
 
     function updateCustomerDisplay() {
         const customer = customersById.get(String(customerSelect.value || ''));
         if (!customer) {
-            billCustomerEl.textContent = '-';
+            const phone = normalizePhone(customerPhoneInput.value);
+            if (!phone) {
+                billCustomerEl.textContent = '-';
+                return;
+            }
+
+            const customerName = (customerNameInput.value || '').trim() || 'New Customer';
+            billCustomerEl.innerHTML = `
+            <div><strong>Customer:</strong> ${customerName} (${phone})</div>
+            <div><strong>Type:</strong> ${formatCustomerTypeLabel(customerTypeInput.value || 'retail')}</div>
+        `;
             return;
         }
 
@@ -1539,7 +1571,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     addBtn.addEventListener('click', () => {
         const category = categorySelect.value;
-        if (!customerSelect.value) {
+        const normalizedPhone = normalizePhone(customerPhoneInput.value);
+        if (!customerSelect.value && normalizedPhone.length < 7) {
             alert('Check/select customer first.');
             customerPhoneInput.focus();
             return;
@@ -1774,13 +1807,34 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (printBillInput) printBillInput.value = '0';
     });
 
-    orderForm?.addEventListener('submit', (event) => {
+    orderForm?.addEventListener('submit', async (event) => {
+        if (customerSubmitInProgress) {
+            return;
+        }
+
         if (!validateHasItems()) {
             event.preventDefault();
+            return;
         }
+
+        event.preventDefault();
+
+        try {
+            const customer = await resolveOrCreateCustomer({ createIfMissing: true });
+            if (!customer?.id) {
+                customerNameInput.focus();
+                return;
+            }
+        } catch (error) {
+            alert(error.message || 'Unable to attach customer.');
+            return;
+        }
+
+        customerSubmitInProgress = true;
+        HTMLFormElement.prototype.submit.call(orderForm);
     });
 
-    function handleCustomerLookup() {
+    async function handleCustomerLookup() {
         const normalizedPhone = normalizePhone(customerPhoneInput.value);
         if (normalizedPhone.length < 7) {
             alert('Enter a valid phone number before checking.');
@@ -1788,18 +1842,26 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             return;
         }
 
-        const existingCustomer = customersByPhone.get(normalizedPhone);
-        if (existingCustomer) {
-            selectCustomer(existingCustomer);
-            return;
+        checkCustomerBtn.disabled = true;
+        try {
+            const customer = await resolveOrCreateCustomer({ createIfMissing: false });
+            if (!customer) {
+                customerNameInput.focus();
+            }
+        } catch (error) {
+            alert(error.message || 'Unable to check customer.');
+        } finally {
+            checkCustomerBtn.disabled = false;
         }
-
-        customerSelect.value = '';
-        updateCustomerDisplay();
-        openCustomerCreateModal(normalizedPhone);
     }
 
     checkCustomerBtn.addEventListener('click', handleCustomerLookup);
+    customerPhoneInput.addEventListener('input', () => {
+        customerSelect.value = '';
+        setCustomerCheckMessage('');
+        hideCustomerDetails();
+        updateCustomerDisplay();
+    });
     customerPhoneInput.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') {
             return;
@@ -1807,63 +1869,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
         event.preventDefault();
         handleCustomerLookup();
-    });
-
-    createCustomerBtn.addEventListener('click', async () => {
-        const normalizedPhone = normalizePhone(newCustomerPhone.value || customerPhoneInput.value);
-        const payload = {
-            phone: normalizedPhone,
-            name: (newCustomerName.value || '').trim(),
-            email: (newCustomerEmail.value || '').trim(),
-            customer_type: newCustomerType.value || 'retail',
-            address: (newCustomerAddress.value || '').trim(),
-        };
-
-        if (payload.phone.length < 7) {
-            alert('Enter a valid phone number before creating customer.');
-            return;
-        }
-        if (!payload.name || !payload.email || !payload.address) {
-            alert('Name, email and address are required to create customer.');
-            return;
-        }
-
-        createCustomerBtn.disabled = true;
-        try {
-            const response = await fetch(resolveCustomerUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify(payload),
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                alert(data?.message || 'Unable to create customer.');
-                return;
-            }
-
-            const customer = data?.customer;
-            if (!customer?.id) {
-                alert('Customer response was invalid. Please try again.');
-                return;
-            }
-
-            upsertCustomerIndex(customer);
-            selectCustomer(customer);
-        } catch (error) {
-            alert('Unable to reach server. Please retry.');
-        } finally {
-            createCustomerBtn.disabled = false;
-        }
-    });
-
-    closeCustomerModalBtn.addEventListener('click', closeCustomerCreateModal);
-    cancelCustomerModalBtn.addEventListener('click', closeCustomerCreateModal);
-    createCustomerModal.addEventListener('click', (event) => {
-        if (event.target === createCustomerModal) closeCustomerCreateModal();
     });
 
     bindSelect2Change(categorySelect, () => rebuildProductSelect(categorySelect.value));
@@ -1881,7 +1886,15 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (customer?.phone) {
             customerPhoneInput.value = customer.phone;
         }
+        if (customer?.name) {
+            customerNameInput.value = customer.name;
+        }
+        if (customer?.customerType) {
+            customerTypeInput.value = customer.customerType;
+        }
     }
+    customerNameInput?.addEventListener('input', updateCustomerDisplay);
+    customerTypeInput?.addEventListener('change', updateCustomerDisplay);
 
     vatToggle.checked = vatEnabled;
     billTypeEl.textContent = vatEnabled ? 'VAT Bill' : 'Estimated Bill';
