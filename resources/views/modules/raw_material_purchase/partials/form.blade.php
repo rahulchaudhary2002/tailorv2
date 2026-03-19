@@ -59,8 +59,20 @@
 
     @php
         $allowMultipleItems = $allowMultipleItems ?? true;
+        $productTypeOptions = [
+            'fabrics' => 'Fabric',
+            'accessories' => 'Accessories',
+            'ready-made' => 'Ready-Made',
+        ];
+        $productLookup = $products->keyBy('id');
         $oldItems = $oldItems ?? old('items', [
-            ['product_id' => '', 'quantity' => 1, 'unit_price' => '0.00'],
+            [
+                'product_reference' => '',
+                'product_type' => 'fabrics',
+                'product_code' => '',
+                'quantity' => 1,
+                'unit_price' => '0.00',
+            ],
         ]);
     @endphp
 
@@ -75,34 +87,66 @@
         <table class="table" id="purchase-items-table">
             <thead>
                 <tr>
-                    <th>Raw Material</th>
+                    <th>Vendor Product</th>
+                    <th>Product Type</th>
+                    <th>Fabric Code</th>
+                    <th>Purchase Amount</th>
                     <th>Quantity</th>
-                    <th>Unit Price</th>
                     <th>Total</th>
                     <th>Action</th>
                 </tr>
             </thead>
             <tbody id="purchase-items-body">
                 @foreach ($oldItems as $index => $item)
+                    @php
+                        $selectedProduct = $productLookup->get((int) ($item['product_id'] ?? 0));
+                        $productReference = (string) ($item['product_reference'] ?? '');
+
+                        if ($productReference === '' && $selectedProduct) {
+                            $productReference = 'existing:' . $selectedProduct->id;
+                        }
+
+                        $isNewProduct = str_starts_with($productReference, 'new:');
+                        $typedProductName = $isNewProduct ? trim(substr($productReference, 4)) : '';
+                        $productType = (string) ($item['product_type'] ?? ($selectedProduct?->category?->slug ?? 'fabrics'));
+                        $productCode = (string) ($item['product_code'] ?? ($selectedProduct?->code ?? ''));
+                    @endphp
                     <tr class="purchase-item-row">
                         <td>
-                            <select name="items[{{ $index }}][product_id]" class="outlet-input item-product" required>
-                                <option value="">Select Raw Material</option>
+                            <select name="items[{{ $index }}][product_reference]" class="outlet-input item-product" required>
+                                <option value="">Select or type vendor product</option>
                                 @foreach ($products as $product)
-                                    <option value="{{ $product->id }}" @selected((string) ($item['product_id'] ?? '') === (string) $product->id)>
+                                    <option
+                                        value="existing:{{ $product->id }}"
+                                        data-product-type="{{ $product->category?->slug }}"
+                                        data-product-code="{{ $product->code }}"
+                                        data-product-amount="{{ number_format((float) $product->amount, 2, '.', '') }}"
+                                        @selected($productReference === 'existing:' . $product->id)
+                                    >
                                         {{ $product->name }} ({{ $product->code }})
                                     </option>
                                 @endforeach
+                                @if ($isNewProduct && $typedProductName !== '')
+                                    <option value="{{ $productReference }}" selected>{{ $typedProductName }}</option>
+                                @endif
                             </select>
                         </td>
                         <td>
+                            <select name="items[{{ $index }}][product_type]" class="outlet-input item-product-type" required>
+                                @foreach ($productTypeOptions as $typeValue => $typeLabel)
+                                    <option value="{{ $typeValue }}" @selected($productType === $typeValue)>{{ $typeLabel }}</option>
+                                @endforeach
+                            </select>
+                            <input type="hidden" class="item-product-type-hidden" value="{{ $productType }}">
+                        </td>
+                        <td>
                             <input
-                                name="items[{{ $index }}][quantity]"
-                                type="number"
-                                min="1"
-                                class="outlet-input item-quantity"
-                                value="{{ $item['quantity'] ?? 1 }}"
-                                required
+                                name="items[{{ $index }}][product_code]"
+                                type="text"
+                                class="outlet-input item-product-code"
+                                value="{{ $productCode }}"
+                                readonly
+                                placeholder="Auto generated"
                             >
                         </td>
                         <td>
@@ -113,6 +157,16 @@
                                 step="0.01"
                                 class="outlet-input item-unit-price"
                                 value="{{ $item['unit_price'] ?? '0.00' }}"
+                                required
+                            >
+                        </td>
+                        <td>
+                            <input
+                                name="items[{{ $index }}][quantity]"
+                                type="number"
+                                min="1"
+                                class="outlet-input item-quantity"
+                                value="{{ $item['quantity'] ?? 1 }}"
                                 required
                             >
                         </td>
@@ -142,19 +196,35 @@
             <tr class="purchase-item-row">
                 <td>
                     <select class="outlet-input item-product" required>
-                        <option value="">Select Raw Material</option>
+                        <option value="">Select or type vendor product</option>
                         @foreach ($products as $product)
-                            <option value="{{ $product->id }}">
+                            <option
+                                value="existing:{{ $product->id }}"
+                                data-product-type="{{ $product->category?->slug }}"
+                                data-product-code="{{ $product->code }}"
+                                data-product-amount="{{ number_format((float) $product->amount, 2, '.', '') }}"
+                            >
                                 {{ $product->name }} ({{ $product->code }})
                             </option>
                         @endforeach
                     </select>
                 </td>
                 <td>
-                    <input type="number" min="1" class="outlet-input item-quantity" value="1" required>
+                    <select class="outlet-input item-product-type" required>
+                        @foreach ($productTypeOptions as $typeValue => $typeLabel)
+                            <option value="{{ $typeValue }}" @selected($typeValue === 'fabrics')>{{ $typeLabel }}</option>
+                        @endforeach
+                    </select>
+                    <input type="hidden" class="item-product-type-hidden" value="fabrics">
+                </td>
+                <td>
+                    <input type="text" class="outlet-input item-product-code" value="" readonly placeholder="Auto generated">
                 </td>
                 <td>
                     <input type="number" min="0" step="0.01" class="outlet-input item-unit-price" value="0.00" required>
+                </td>
+                <td>
+                    <input type="number" min="1" class="outlet-input item-quantity" value="1" required>
                 </td>
                 <td class="item-total">0.00</td>
                 <td>

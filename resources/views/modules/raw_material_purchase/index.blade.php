@@ -43,7 +43,6 @@
                     <th>Unit Price</th>
                     <th>Total Amount</th>
                     <th>Inventory Location</th>
-                    <th>Inventory</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -58,7 +57,6 @@
                         <td>{{ number_format((float) $purchase->unit_price, 2) }}</td>
                         <td>{{ number_format((float) $purchase->total_amount, 2) }}</td>
                         <td>{{ $purchase->inventoryLocation?->name ?: '-' }}</td>
-                        <td>{{ $purchase->inventory_updated_at ? 'Updated' : 'Pending' }}</td>
                         <td>
                             @can('manage-raw-material-purchases')
                                 <a href="{{ route('rawMaterialPurchase.edit', $purchase) }}" class="btn btn-sm btn-secondary">Edit</a>

@@ -9,11 +9,13 @@ use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\Unit;
 use App\Models\Vendor;
 use App\Models\VendorRawMaterialPurchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class RawMaterialPurchaseController extends Controller
 {
@@ -68,11 +70,12 @@ class RawMaterialPurchaseController extends Controller
             ->get(['id', 'name']);
 
         $products = Product::query()
+            ->with('category:id,name,slug')
             ->whereHas('category', function ($query) {
-                $query->where('slug', 'fabrics');
+                $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'amount', 'product_category_id']);
 
         $selectedVendorId = (int) ($request->query('vendor_id') ?? 0);
 
@@ -93,58 +96,43 @@ class RawMaterialPurchaseController extends Controller
         }
 
         $items = collect($validated['items'] ?? [])->values();
-        $productIds = $items
-            ->pluck('product_id')
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
+        try {
+            DB::transaction(function () use ($validated, $items, $warehouseLocationId): void {
+                $now = now();
+                $preparedItems = $items->map(fn ($item) => $this->preparePurchaseItem((array) $item));
 
-        $products = Product::query()
-            ->whereIn('id', $productIds)
-            ->get(['id'])
-            ->keyBy('id');
+                foreach ($preparedItems as $item) {
+                    $productId = (int) $item['product_id'];
+                    $quantity = (int) $item['quantity'];
+                    $unitPrice = (float) $item['unit_price'];
+                    $unitId = $this->resolveInventoryUnitIdForProduct($productId);
 
-        foreach ($items as $item) {
-            $product = $products->get((int) ($item['product_id'] ?? 0));
+                    $purchase = VendorRawMaterialPurchase::query()->create([
+                        'vendor_id' => (int) $validated['vendor_id'],
+                        'product_id' => $productId,
+                        'unit_id' => $unitId,
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'total_amount' => $quantity * $unitPrice,
+                        'purchased_at' => $validated['purchased_at'],
+                        'notes' => $validated['notes'] ?? null,
+                        'inventory_location_id' => $warehouseLocationId,
+                    ]);
 
-            if (!$product) {
-                return back()
-                    ->withInput()
-                    ->with('error', 'One or more selected products is invalid.');
-            }
+                    $this->applyInventoryUpdate(
+                        $purchase,
+                        (int) $warehouseLocationId,
+                        $unitPrice,
+                        (string) ($validated['notes'] ?? 'Raw material purchase inventory update'),
+                        $now
+                    );
+                }
+            });
+        } catch (\RuntimeException $exception) {
+            return back()
+                ->withInput()
+                ->with('error', $exception->getMessage());
         }
-
-        DB::transaction(function () use ($validated, $items, $products, $warehouseLocationId): void {
-            $now = now();
-
-            foreach ($items as $item) {
-                $productId = (int) $item['product_id'];
-                $quantity = (int) $item['quantity'];
-                $unitPrice = (float) $item['unit_price'];
-                $unitId = $this->resolveInventoryUnitIdForProduct($productId);
-
-                $purchase = VendorRawMaterialPurchase::query()->create([
-                    'vendor_id' => (int) $validated['vendor_id'],
-                    'product_id' => $productId,
-                    'unit_id' => $unitId,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'total_amount' => $quantity * $unitPrice,
-                    'purchased_at' => $validated['purchased_at'],
-                    'notes' => $validated['notes'] ?? null,
-                    'inventory_location_id' => $warehouseLocationId,
-                ]);
-
-                $this->applyInventoryUpdate(
-                    $purchase,
-                    (int) $warehouseLocationId,
-                    $unitPrice,
-                    (string) ($validated['notes'] ?? 'Raw material purchase inventory update'),
-                    $now
-                );
-            }
-        });
 
         return redirect()
             ->route('rawMaterialPurchase.index')
@@ -158,7 +146,7 @@ class RawMaterialPurchaseController extends Controller
     {
         $this->ensurePurchaseBelongsToWarehouse($purchase);
 
-        $purchase->load(['vendor:id,name', 'product:id,name,code', 'unit:id,name,symbol', 'inventoryLocation:id,name,type']);
+        $purchase->load(['vendor:id,name', 'product:id,name,code,amount,product_category_id', 'product.category:id,slug', 'unit:id,name,symbol', 'inventoryLocation:id,name,type']);
 
         $vendors = Vendor::query()
             ->where('is_active', true)
@@ -166,11 +154,12 @@ class RawMaterialPurchaseController extends Controller
             ->get(['id', 'name']);
 
         $products = Product::query()
+            ->with('category:id,name,slug')
             ->whereHas('category', function ($query) {
-                $query->where('slug', 'fabrics');
+                $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'amount', 'product_category_id']);
 
         return view('modules.raw_material_purchase.edit', compact('purchase', 'vendors', 'products'));
     }
@@ -186,7 +175,7 @@ class RawMaterialPurchaseController extends Controller
 
         try {
             DB::transaction(function () use ($purchase, $validated): void {
-                $item = (array) collect($validated['items'] ?? [])->first();
+                $item = $this->preparePurchaseItem((array) collect($validated['items'] ?? [])->first());
                 $productId = (int) ($item['product_id'] ?? 0);
                 $quantity = (int) ($item['quantity'] ?? 0);
                 $unitPrice = (float) ($item['unit_price'] ?? 0);
@@ -238,6 +227,104 @@ class RawMaterialPurchaseController extends Controller
             ->with('success', 'Purchase updated successfully.');
     }
 
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, int|float|string>
+     */
+    private function preparePurchaseItem(array $item): array
+    {
+        $reference = trim((string) ($item['product_reference'] ?? ''));
+        $productType = trim((string) ($item['product_type'] ?? ''));
+        $quantity = max(1, (int) ($item['quantity'] ?? 0));
+        $unitPrice = max(0, (float) ($item['unit_price'] ?? 0));
+
+        if (str_starts_with($reference, 'existing:')) {
+            $productId = (int) substr($reference, strlen('existing:'));
+            $product = Product::query()
+                ->with('category:id,slug')
+                ->find($productId);
+
+            if (!$product || !in_array((string) $product->category?->slug, ['fabrics', 'accessories', 'ready-made'], true)) {
+                throw new \RuntimeException('One or more selected products is invalid.');
+            }
+
+            return [
+                'product_id' => (int) $product->id,
+                'product_type' => (string) $product->category?->slug,
+                'quantity' => $quantity,
+                'unit_price' => $unitPrice,
+            ];
+        }
+
+        $productName = trim(Str::after($reference, 'new:'));
+        if ($productName === '') {
+            throw new \RuntimeException('Enter a vendor product name.');
+        }
+
+        $product = $this->findOrCreatePurchaseProduct($productName, $productType, $unitPrice);
+
+        return [
+            'product_id' => (int) $product->id,
+            'product_type' => $productType,
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+        ];
+    }
+
+    private function findOrCreatePurchaseProduct(string $productName, string $productType, float $unitPrice): Product
+    {
+        $categoryId = (int) ProductCategory::query()
+            ->where('slug', $productType)
+            ->value('id');
+
+        if ($categoryId < 1) {
+            throw new \RuntimeException('Select a valid product type.');
+        }
+
+        $existingProduct = Product::query()
+            ->where('product_category_id', $categoryId)
+            ->whereRaw('LOWER(name) = ?', [Str::lower($productName)])
+            ->first();
+
+        if ($existingProduct) {
+            return $existingProduct;
+        }
+
+        return Product::query()->create([
+            'product_category_id' => $categoryId,
+            'name' => $productName,
+            'code' => $this->generateProductCode($productType),
+            'amount' => $unitPrice,
+        ]);
+    }
+
+    private function generateProductCode(string $productType): string
+    {
+        $prefix = match ($productType) {
+            'accessories' => 'ACC',
+            'ready-made' => 'RM',
+            default => 'FAB',
+        };
+
+        $maxSequence = 0;
+
+        Product::query()
+            ->where('code', 'like', $prefix . '-%')
+            ->pluck('code')
+            ->each(function ($code) use (&$maxSequence, $prefix): void {
+                if (preg_match('/^' . preg_quote($prefix, '/') . '-(\d+)$/', (string) $code, $matches) === 1) {
+                    $maxSequence = max($maxSequence, (int) $matches[1]);
+                }
+            });
+
+        do {
+            $maxSequence++;
+            $nextCode = sprintf('%s-%04d', $prefix, $maxSequence);
+        } while (Product::query()->where('code', $nextCode)->exists());
+
+        return $nextCode;
+    }
+
     private function currentWarehouseLocationId(): ?int
     {
         return InventoryLocation::query()
@@ -284,17 +371,6 @@ class RawMaterialPurchaseController extends Controller
 
     private function resolveInventoryUnitIdForProduct(int $productId): ?int
     {
-        $isFabric = Product::query()
-            ->whereKey($productId)
-            ->whereHas('category', function ($query) {
-                $query->where('slug', 'fabrics');
-            })
-            ->exists();
-
-        if (!$isFabric) {
-            return null;
-        }
-
         return Unit::query()
             ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
             ->orWhere('symbol', 'm')
