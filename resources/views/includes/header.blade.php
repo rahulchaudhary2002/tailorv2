@@ -25,6 +25,13 @@
                 <input type="text" placeholder="Search orders, customers, products...">
             </div>
 
+            @if ($user->hasPermission('create-orders') || $user->hasPermission('manage-orders'))
+                <a href="{{ route('order.create') }}" class="btn btn-primary">
+                    <i class="fas fa-cash-register"></i>
+                    <span>POS</span>
+                </a>
+            @endif
+
             <!-- Notifications -->
             <div class="notifications">
                 <button class="notification-btn">

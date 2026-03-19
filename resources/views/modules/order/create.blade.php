@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.pos')
 
 @section('title', $editingOrder ? 'Edit Order' : 'Create Order')
 
@@ -111,6 +111,12 @@ $customerLookupPayload = $customers->map(function ($customer) {
         @endif
 
         <section class="demo-section">
+            <div class="demo-section-header">
+                <a href="{{ route('order.index') }}" class="tp-back-link">
+                    <i class="fas fa-arrow-left"></i> Back to Orders
+                </a>
+            </div>
+
             <h2><i class="fas fa-desktop"></i> {{ $editingOrder ? 'Update Order' : 'Enhanced Live Billing Interface' }}</h2>
 
             <div class="demo-layout">
@@ -380,6 +386,9 @@ $customerLookupPayload = $customers->map(function ($customer) {
 .tp-alert-danger{background:#ffe8ea;color:#7a0b18;border:1px solid #ffccd1;}
 .tp-alert-success{background:#e7f7ed;color:#0d5a2b;border:1px solid #bfe8cf;}
 .demo-section{background:#fff;padding:25px;border-radius:var(--radius);box-shadow:var(--shadow);}
+.demo-section-header{display:flex;justify-content:flex-start;margin-bottom:18px;}
+.tp-back-link{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid #d7e0ec;border-radius:999px;background:#f7fafd;color:var(--primary);font-weight:700;text-decoration:none;transition:background-color .2s ease,border-color .2s ease,color .2s ease;}
+.tp-back-link:hover{background:#eef3f9;border-color:#c2d0e1;color:var(--secondary);}
 .demo-layout{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px;}
 @media(max-width:1024px){.demo-layout{grid-template-columns:1fr;}}
 .order-entry{padding:20px;background:#f8f9fa;border-radius:var(--radius);border:1px solid #ddd;}
