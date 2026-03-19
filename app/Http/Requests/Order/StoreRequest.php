@@ -30,7 +30,7 @@ class StoreRequest extends FormRequest
         return [
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'ordered_at' => ['required', 'date'],
-            'delivery_due_at' => ['required', 'date', 'after_or_equal:ordered_at'],
+            'delivery_due_at' => ['nullable', 'date', 'after_or_equal:ordered_at'],
             'status' => ['required', 'string', Rule::in(Order::creatableStatuses())],
             'worker_id' => ['nullable', 'integer', 'exists:users,id'],
             'worker_deadline_at' => ['nullable', 'date', 'after_or_equal:ordered_at'],

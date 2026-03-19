@@ -82,7 +82,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
     <div id="itemsHiddenInputs"></div>
     <input type="hidden" id="print_bill" name="print_bill" value="{{ old('print_bill', '0') }}">
     <input type="hidden" id="ordered_at" name="ordered_at" value="{{ old('ordered_at', $editingOrder?->ordered_at?->format('Y-m-d H:i:s') ?: now()->format('Y-m-d H:i:s')) }}">
-    <input type="hidden" id="delivery_due_at" name="delivery_due_at" value="{{ old('delivery_due_at', $editingOrder?->delivery_due_at?->format('Y-m-d H:i:s') ?: now()->addDays(7)->format('Y-m-d H:i:s')) }}">
+    <input type="hidden" id="delivery_due_at" name="delivery_due_at" value="{{ old('delivery_due_at', $editingOrder?->delivery_due_at?->format('Y-m-d H:i:s')) }}">
     <input type="hidden" id="status" name="status" value="{{ old('status', $editingOrder?->status ?: \App\Models\Order::STATUS_CONFIRMED) }}">
     <input type="hidden" id="worker_id" name="worker_id" value="{{ old('worker_id', $editingOrder?->worker_id) }}">
     <input type="hidden" id="worker_deadline_at" name="worker_deadline_at" value="{{ old('worker_deadline_at', $editingOrder?->worker_deadline_at?->format('Y-m-d H:i:s')) }}">

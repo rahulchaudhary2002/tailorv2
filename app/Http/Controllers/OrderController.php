@@ -407,7 +407,7 @@ class OrderController extends Controller
 
         $order->delivery_due_at = $deliveryDueAt;
 
-        if ($order->worker_deadline_at && $order->worker_deadline_at->gt($order->delivery_due_at)) {
+        if ($order->delivery_due_at && $order->worker_deadline_at && $order->worker_deadline_at->gt($order->delivery_due_at)) {
             $order->worker_deadline_at = $order->delivery_due_at;
         }
 
@@ -659,7 +659,7 @@ class OrderController extends Controller
                         : null,
                     'worker_deadline_at' => $validated['worker_deadline_at'] ?? null,
                     'ordered_at' => $validated['ordered_at'],
-                    'delivery_due_at' => $validated['delivery_due_at'],
+                    'delivery_due_at' => $validated['delivery_due_at'] ?? null,
                     'status' => $status,
                     'fabric_issued_at' => $hasFabricIssuedOrLaterStatus
                         ? ($order->fabric_issued_at ?? now())
