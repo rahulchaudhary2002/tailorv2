@@ -22,19 +22,20 @@ class CustomerSeeder extends Seeder
                     'address' => '123 Main Street, Springfield',
                 ],
                 'measurements' => [
-                    'Shirt Stitching' => [
+                    'Shirt' => [
+                        ['type' => 'Length', 'measurement' => '74', 'unit' => 'cm'],
+                        ['type' => 'Sleeve', 'measurement' => '62', 'unit' => 'cm'],
                         ['type' => 'Chest', 'measurement' => '102', 'unit' => 'cm'],
                         ['type' => 'Waist', 'measurement' => '92', 'unit' => 'cm'],
+                        ['type' => 'Hip', 'measurement' => '100', 'unit' => 'cm'],
                         ['type' => 'Shoulder', 'measurement' => '46', 'unit' => 'cm'],
-                        ['type' => 'Sleeve Length', 'measurement' => '62', 'unit' => 'cm'],
-                        ['type' => 'Shirt Length', 'measurement' => '74', 'unit' => 'cm'],
+                        ['type' => 'Neck', 'measurement' => '40', 'unit' => 'cm'],
                     ],
-                    'Pant Stitching' => [
+                    'Pant' => [
+                        ['type' => 'Length', 'measurement' => '105', 'unit' => 'cm'],
                         ['type' => 'Waist', 'measurement' => '90', 'unit' => 'cm'],
                         ['type' => 'Hip', 'measurement' => '104', 'unit' => 'cm'],
-                        ['type' => 'Thigh', 'measurement' => '61', 'unit' => 'cm'],
-                        ['type' => 'Inseam', 'measurement' => '80', 'unit' => 'cm'],
-                        ['type' => 'Outseam', 'measurement' => '105', 'unit' => 'cm'],
+                        ['type' => 'Calf', 'measurement' => '41', 'unit' => 'cm'],
                         ['type' => 'Bottom', 'measurement' => '39', 'unit' => 'cm'],
                     ],
                 ],
@@ -47,20 +48,20 @@ class CustomerSeeder extends Seeder
                     'address' => '45 Lakeview Avenue, Austin',
                 ],
                 'measurements' => [
-                    'Blazer Stitching' => [
+                    'Long Coat' => [
+                        ['type' => 'Length', 'measurement' => '108', 'unit' => 'cm'],
+                        ['type' => 'Sleeve', 'measurement' => '63', 'unit' => 'cm'],
                         ['type' => 'Chest', 'measurement' => '106', 'unit' => 'cm'],
                         ['type' => 'Waist', 'measurement' => '94', 'unit' => 'cm'],
+                        ['type' => 'Hip', 'measurement' => '104', 'unit' => 'cm'],
                         ['type' => 'Shoulder', 'measurement' => '47', 'unit' => 'cm'],
-                        ['type' => 'Sleeve Length', 'measurement' => '63', 'unit' => 'cm'],
-                        ['type' => 'Blazer Length', 'measurement' => '76', 'unit' => 'cm'],
-                        ['type' => 'Bicep', 'measurement' => '34', 'unit' => 'cm'],
+                        ['type' => 'Back', 'measurement' => '44', 'unit' => 'cm'],
                     ],
-                    'Pant Stitching' => [
+                    'Pant' => [
+                        ['type' => 'Length', 'measurement' => '103', 'unit' => 'cm'],
                         ['type' => 'Waist', 'measurement' => '88', 'unit' => 'cm'],
                         ['type' => 'Hip', 'measurement' => '100', 'unit' => 'cm'],
-                        ['type' => 'Thigh', 'measurement' => '59', 'unit' => 'cm'],
-                        ['type' => 'Inseam', 'measurement' => '79', 'unit' => 'cm'],
-                        ['type' => 'Outseam', 'measurement' => '103', 'unit' => 'cm'],
+                        ['type' => 'Calf', 'measurement' => '39', 'unit' => 'cm'],
                         ['type' => 'Bottom', 'measurement' => '38', 'unit' => 'cm'],
                     ],
                 ],
@@ -73,20 +74,21 @@ class CustomerSeeder extends Seeder
                     'address' => '210 Maple Street, San Jose',
                 ],
                 'measurements' => [
-                    'Shirt Stitching' => [
+                    'Waistcoat' => [
+                        ['type' => 'Length', 'measurement' => '62', 'unit' => 'cm'],
                         ['type' => 'Chest', 'measurement' => '94', 'unit' => 'cm'],
                         ['type' => 'Waist', 'measurement' => '80', 'unit' => 'cm'],
+                        ['type' => 'Hip', 'measurement' => '96', 'unit' => 'cm'],
                         ['type' => 'Shoulder', 'measurement' => '41', 'unit' => 'cm'],
-                        ['type' => 'Sleeve Length', 'measurement' => '58', 'unit' => 'cm'],
-                        ['type' => 'Shirt Length', 'measurement' => '68', 'unit' => 'cm'],
                     ],
-                    'Blazer Stitching' => [
+                    'Shirt' => [
+                        ['type' => 'Length', 'measurement' => '68', 'unit' => 'cm'],
+                        ['type' => 'Sleeve', 'measurement' => '58', 'unit' => 'cm'],
                         ['type' => 'Chest', 'measurement' => '96', 'unit' => 'cm'],
                         ['type' => 'Waist', 'measurement' => '82', 'unit' => 'cm'],
+                        ['type' => 'Hip', 'measurement' => '98', 'unit' => 'cm'],
                         ['type' => 'Shoulder', 'measurement' => '42', 'unit' => 'cm'],
-                        ['type' => 'Sleeve Length', 'measurement' => '59', 'unit' => 'cm'],
-                        ['type' => 'Blazer Length', 'measurement' => '70', 'unit' => 'cm'],
-                        ['type' => 'Bicep', 'measurement' => '30', 'unit' => 'cm'],
+                        ['type' => 'Neck', 'measurement' => '36', 'unit' => 'cm'],
                     ],
                 ],
             ],

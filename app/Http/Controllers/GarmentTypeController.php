@@ -22,6 +22,12 @@ class GarmentTypeController extends Controller
         $q = trim((string) $request->query('q', ''));
 
         $garmentTypesQuery = GarmentType::query()
+            ->with([
+                'measurements.unit:id,name,symbol',
+                'tailoringPackages' => function ($query) {
+                    $query->orderBy('order')->orderBy('id');
+                },
+            ])
             ->withCount('measurements')
             ->withCount('tailoringPackages')
             ->latest();

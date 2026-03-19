@@ -7,7 +7,7 @@
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Garment Type Management</h1>
-        <p>Manage garment types with tailoring package and measurement count.</p>
+        <p>Manage garment types with full measurement format and multiple rates.</p>
     </div>
     @canany(['manage-garment-types', 'create-garment-types'])
         <div class="page-actions">
@@ -33,13 +33,51 @@
         <div class="table-title">Garment Types</div>
     </div>
 
+    <style>
+        .table th,
+        .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .garment-detail-stack {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+            min-width: 220px;
+            height: 100%;
+        }
+
+        .garment-detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 10px;
+            border: 1px solid #e1eaf4;
+            border-radius: 10px;
+            background: #f8fbff;
+        }
+
+        .garment-detail-row span:first-child {
+            color: #516274;
+        }
+
+        .garment-detail-row strong {
+            color: #1f2d3d;
+            text-align: center;
+        }
+    </style>
+
     <div class="table-container">
         <table class="table">
             <thead>
                 <tr>
-                    <th>Title</th>
-                    <th>Tailoring Packages</th>
-                    <th>Measurements</th>
+                    <th>SN</th>
+                    <th>Garment Type</th>
+                    <th>Measurement Format</th>
+                    <th>Rates</th>
                     <th>Created</th>
                     <th>Actions</th>
                 </tr>
@@ -47,10 +85,46 @@
             <tbody>
                 @forelse ($garmentTypes as $garmentType)
                     <tr>
-                        <td>{{ $garmentType->title }}</td>
-                        <td>{{ $garmentType->tailoring_packages_count }}</td>
-                        <td>{{ $garmentType->measurements_count }}</td>
-                        <td>{{ $garmentType->created_at->format('M d, Y') }}</td>
+                        <td>{{ ($garmentTypes->firstItem() ?? 1) + $loop->index }}</td>
+                        <td style="font-weight: 600;">
+                            {{ $garmentType->title }}
+                        </td>
+                        <td>
+                            @if ($garmentType->measurements->isNotEmpty())
+                                <div class="garment-detail-stack">
+                                    @foreach ($garmentType->measurements as $measurement)
+                                        <div class="garment-detail-row">
+                                            <span>{{ $measurement->order }}.</span>
+                                            <strong>
+                                                {{ $measurement->title }}
+                                                @if ($measurement->unit?->symbol)
+                                                    ({{ $measurement->unit->symbol }})
+                                                @endif
+                                            </strong>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
+                            @if ($garmentType->tailoringPackages->isNotEmpty())
+                                <div class="garment-detail-stack">
+                                    @foreach ($garmentType->tailoringPackages as $package)
+                                        <div class="garment-detail-row">
+                                            <span>{{ $package->name }}</span>
+                                            <strong>{{ number_format((float) $package->amount, 2) }}</strong>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
+                            {{ $garmentType->created_at->format('M d, Y') }}
+                        </td>
                         <td>
                             <div class="actions">
                                 @canany(['manage-garment-types', 'edit-garment-types'])
@@ -74,7 +148,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="empty">No garment types found.</td>
+                        <td colspan="6" class="empty">No garment types found.</td>
                     </tr>
                 @endforelse
             </tbody>
