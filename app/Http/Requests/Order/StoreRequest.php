@@ -41,7 +41,7 @@ class StoreRequest extends FormRequest
             'vat_enabled' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_category' => ['required', 'string', Rule::in(['custom', 'fabric', 'readymade'])],
+            'items.*.item_category' => ['required', 'string', Rule::in(['custom', 'fabric', 'readymade', 'accessories'])],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.size' => ['nullable', 'string', Rule::in(['S', 'M', 'L', 'XL', 'XXL'])],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
@@ -82,6 +82,10 @@ class StoreRequest extends FormRequest
 
             $fabricCategoryId = (int) (ProductCategory::query()
                 ->where('slug', 'fabrics')
+                ->value('id') ?? 0);
+
+            $accessoriesCategoryId = (int) (ProductCategory::query()
+                ->where('slug', 'accessories')
                 ->value('id') ?? 0);
 
             $productIds = $items
@@ -241,6 +245,10 @@ class StoreRequest extends FormRequest
 
                 if ($itemCategory === 'readymade' && !in_array((string) ($item['size'] ?? ''), ['S', 'M', 'L', 'XL', 'XXL'], true)) {
                     $validator->errors()->add("items.{$index}.size", 'Size is required for ready-made item.');
+                }
+
+                if ($itemCategory === 'accessories' && $accessoriesCategoryId > 0 && (int) $product->product_category_id !== $accessoriesCategoryId) {
+                    $validator->errors()->add("items.{$index}.product_id", 'Accessories category item requires an accessories product.');
                 }
 
             }

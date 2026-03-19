@@ -1443,14 +1443,16 @@ class OrderController extends Controller
                 ->values()
                 ->map(function ($item) use ($customProducts) {
                     if ((string) $item->item_category !== 'custom') {
+                        $itemCategory = (string) $item->item_category;
+
                         return [
                             'id' => 'existing-' . $item->id,
-                            'category' => (string) $item->item_category,
+                            'category' => $itemCategory,
                             'productId' => (int) $item->product_id,
                             'name' => $item->product
                                 ? trim($item->product->name . ' (' . $item->product->code . ')')
                                 : 'Product',
-                            'unitLabel' => (string) $item->item_category === 'fabric' ? 'm' : 'pcs',
+                            'unitLabel' => $itemCategory === 'fabric' ? 'm' : 'pcs',
                             'qty' => (float) $item->quantity,
                             'unitPrice' => (float) $item->unit_price,
                             'size' => data_get($item->custom_details, 'size'),
@@ -1507,7 +1509,7 @@ class OrderController extends Controller
     private function mapBillItemFromInput(array $item, int $index, Collection $productLookup, Collection $garmentLookup): ?array
     {
         $category = (string) ($item['item_category'] ?? '');
-        if (!in_array($category, ['custom', 'fabric', 'readymade'], true)) {
+        if (!in_array($category, ['custom', 'fabric', 'readymade', 'accessories'], true)) {
             return null;
         }
 

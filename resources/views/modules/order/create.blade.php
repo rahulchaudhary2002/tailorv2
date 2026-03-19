@@ -144,6 +144,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <select id="productCategory" class="tp-input">
                         <option value="fabric">Fabric</option>
                         <option value="readymade">Ready-Made</option>
+                        <option value="accessories">Accessories</option>
                         <option value="custom">Custom</option>
                     </select>
                 </div>
@@ -893,6 +894,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function getCategoryLabel(category) {
         if (category === 'fabric') return ['Fabric', 'product-category fabric-cat'];
         if (category === 'readymade') return ['Ready-Made', 'product-category ready-made-cat'];
+        if (category === 'accessories') return ['Accessories', 'product-category ready-made-cat'];
         return ['Custom', 'product-category custom-cat'];
     }
 
@@ -903,7 +905,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function filterProductsByCategory(category) {
         const matchesCategory = (product) => {
             if (category === 'fabric') return product.category === 'fabrics';
-            if (category === 'readymade') return product.category !== 'fabrics';
+            if (category === 'readymade') return product.category === 'ready-made';
+            if (category === 'accessories') return product.category === 'accessories';
             return product.category === 'fabrics';
         };
 
@@ -1313,7 +1316,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
         billItems.forEach((item) => {
             const lineTotal = Number(item.qty || 0) * Number(item.unitPrice || 0);
-            if (item.category === 'fabric' || item.category === 'readymade') {
+            if (item.category === 'fabric' || item.category === 'readymade' || item.category === 'accessories') {
                 subtotalFabric += lineTotal;
             }
             if (item.category === 'custom') {
