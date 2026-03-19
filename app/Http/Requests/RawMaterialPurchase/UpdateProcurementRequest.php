@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\RawMaterialPurchase;
 
-use App\Models\InventoryLocation;
+use App\Models\ProductCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,22 +24,22 @@ class UpdateProcurementRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'vendor_bill_number' => ['nullable', 'string', 'max:120'],
-            'vendor_bill_amount' => ['nullable', 'numeric', 'min:0'],
-            'bill_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
-            'update_inventory' => ['nullable', 'boolean'],
-            'inventory_location_id' => [
-                'nullable',
+            'vendor_id' => ['required', 'integer', 'exists:vendors,id'],
+            'purchased_at' => ['required', 'date'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'items' => ['required', 'array', 'size:1'],
+            'items.*.product_id' => [
+                'required',
                 'integer',
-                'required_with:update_inventory',
-                Rule::exists('inventory_locations', 'id')->where(function ($query) {
-                    $query
-                        ->where('is_active', true)
-                        ->where('type', InventoryLocation::TYPE_WAREHOUSE);
+                Rule::exists('products', 'id')->where(function ($query) {
+                    $query->whereIn(
+                        'product_category_id',
+                        ProductCategory::query()->where('slug', 'fabrics')->select('id')
+                    );
                 }),
             ],
-            'inventory_unit_cost' => ['nullable', 'numeric', 'min:0', 'required_if:update_inventory,1'],
-            'notes' => ['nullable', 'string', 'max:500'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ];
     }
 }

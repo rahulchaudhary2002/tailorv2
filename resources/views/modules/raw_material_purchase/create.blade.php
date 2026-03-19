@@ -6,7 +6,7 @@
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Create Raw Material Purchase</h1>
-        <p>Create purchase order. Later upload bill and update inventory from the process screen.</p>
+        <p>Create purchase and update warehouse inventory immediately.</p>
     </div>
 </div>
 
@@ -18,6 +18,8 @@
         'vendors' => $vendors,
         'products' => $products,
         'selectedVendorId' => $selectedVendorId ?? 0,
+        'selectedPurchaseDate' => now()->toDateString(),
+        'notesValue' => '',
     ])
 </form>
 @endsection

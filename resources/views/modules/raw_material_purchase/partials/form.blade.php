@@ -14,6 +14,12 @@
         </div>
     @endif
 
+    @php
+        $selectedVendorId = $selectedVendorId ?? 0;
+        $selectedPurchaseDate = $selectedPurchaseDate ?? now()->toDateString();
+        $notesValue = $notesValue ?? '';
+    @endphp
+
     <div class="outlet-form-grid">
         <div class="outlet-form-group">
             <label for="vendor_id">Vendor</label>
@@ -34,7 +40,7 @@
                 name="purchased_at"
                 type="date"
                 class="outlet-input"
-                value="{{ old('purchased_at', now()->toDateString()) }}"
+                value="{{ old('purchased_at', $selectedPurchaseDate) }}"
                 required
             >
         </div>
@@ -47,19 +53,22 @@
                 class="outlet-input"
                 rows="3"
                 placeholder="Optional supplier invoice/reference details"
-            >{{ old('notes') }}</textarea>
+            >{{ old('notes', $notesValue) }}</textarea>
         </div>
     </div>
 
     @php
-        $oldItems = old('items', [
+        $allowMultipleItems = $allowMultipleItems ?? true;
+        $oldItems = $oldItems ?? old('items', [
             ['product_id' => '', 'quantity' => 1, 'unit_price' => '0.00'],
         ]);
     @endphp
 
     <div class="table-header" style="margin-top: 1rem;">
         <div class="table-title">Purchase Items</div>
-        <button type="button" id="add-item-row" class="btn btn-secondary btn-sm">Add Item</button>
+        @if ($allowMultipleItems)
+            <button type="button" id="add-item-row" class="btn btn-secondary btn-sm">Add Item</button>
+        @endif
     </div>
 
     <div class="table-container">
@@ -109,7 +118,11 @@
                         </td>
                         <td class="item-total">0.00</td>
                         <td>
-                            <button type="button" class="btn btn-sm btn-secondary remove-item-row">Remove</button>
+                            @if ($allowMultipleItems)
+                                <button type="button" class="btn btn-sm btn-secondary remove-item-row">Remove</button>
+                            @else
+                                <span class="text-muted">-</span>
+                            @endif
                         </td>
                     </tr>
                 @endforeach
@@ -124,30 +137,32 @@
         </div>
     </div>
 
-    <template id="purchase-item-row-template">
-        <tr class="purchase-item-row">
-            <td>
-                <select class="outlet-input item-product" required>
-                    <option value="">Select Raw Material</option>
-                    @foreach ($products as $product)
-                        <option value="{{ $product->id }}">
-                            {{ $product->name }} ({{ $product->code }})
-                        </option>
-                    @endforeach
-                </select>
-            </td>
-            <td>
-                <input type="number" min="1" class="outlet-input item-quantity" value="1" required>
-            </td>
-            <td>
-                <input type="number" min="0" step="0.01" class="outlet-input item-unit-price" value="0.00" required>
-            </td>
-            <td class="item-total">0.00</td>
-            <td>
-                <button type="button" class="btn btn-sm btn-secondary remove-item-row">Remove</button>
-            </td>
-        </tr>
-    </template>
+    @if ($allowMultipleItems)
+        <template id="purchase-item-row-template">
+            <tr class="purchase-item-row">
+                <td>
+                    <select class="outlet-input item-product" required>
+                        <option value="">Select Raw Material</option>
+                        @foreach ($products as $product)
+                            <option value="{{ $product->id }}">
+                                {{ $product->name }} ({{ $product->code }})
+                            </option>
+                        @endforeach
+                    </select>
+                </td>
+                <td>
+                    <input type="number" min="1" class="outlet-input item-quantity" value="1" required>
+                </td>
+                <td>
+                    <input type="number" min="0" step="0.01" class="outlet-input item-unit-price" value="0.00" required>
+                </td>
+                <td class="item-total">0.00</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-secondary remove-item-row">Remove</button>
+                </td>
+            </tr>
+        </template>
+    @endif
 
     <div class="outlet-form-actions">
         <a href="{{ route('rawMaterialPurchase.index') }}" class="btn btn-secondary">Cancel</a>

@@ -6,7 +6,7 @@
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Raw Material Purchases</h1>
-        <p>Create purchase orders, upload bill with amount, and update inventory.</p>
+        <p>Create purchases and update inventory immediately.</p>
     </div>
     @canany(['manage-raw-material-purchases', 'create-raw-material-purchases'])
         <div class="page-actions">
@@ -42,7 +42,6 @@
                     <th>Unit</th>
                     <th>Unit Price</th>
                     <th>Total Amount</th>
-                    <th>Bill Amount</th>
                     <th>Inventory Location</th>
                     <th>Inventory</th>
                     <th>Actions</th>
@@ -58,12 +57,11 @@
                         <td>{{ $purchase->unit?->symbol ?: ($purchase->unit?->name ?: '-') }}</td>
                         <td>{{ number_format((float) $purchase->unit_price, 2) }}</td>
                         <td>{{ number_format((float) $purchase->total_amount, 2) }}</td>
-                        <td>{{ $purchase->vendor_bill_amount ? number_format((float) $purchase->vendor_bill_amount, 2) : '-' }}</td>
                         <td>{{ $purchase->inventoryLocation?->name ?: '-' }}</td>
                         <td>{{ $purchase->inventory_updated_at ? 'Updated' : 'Pending' }}</td>
                         <td>
                             @can('manage-raw-material-purchases')
-                                <a href="{{ route('rawMaterialPurchase.edit', $purchase) }}" class="btn btn-sm btn-secondary">Process</a>
+                                <a href="{{ route('rawMaterialPurchase.edit', $purchase) }}" class="btn btn-sm btn-secondary">Edit</a>
                             @else
                                 -
                             @endcan
@@ -71,7 +69,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="empty">No purchases found.</td>
+                        <td colspan="10" class="empty">No purchases found.</td>
                     </tr>
                 @endforelse
             </tbody>

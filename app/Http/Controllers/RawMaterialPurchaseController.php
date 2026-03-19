@@ -14,7 +14,6 @@ use App\Models\Vendor;
 use App\Models\VendorRawMaterialPurchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class RawMaterialPurchaseController extends Controller
 {
@@ -39,7 +38,7 @@ class RawMaterialPurchaseController extends Controller
                 })->orWhereHas('product', function ($productQuery) use ($q): void {
                     $productQuery->where('name', 'like', '%' . $q . '%')
                         ->orWhere('code', 'like', '%' . $q . '%');
-                })->orWhere('vendor_bill_number', 'like', '%' . $q . '%');
+                });
             });
         }
 
@@ -117,13 +116,15 @@ class RawMaterialPurchaseController extends Controller
         }
 
         DB::transaction(function () use ($validated, $items, $products, $warehouseLocationId): void {
+            $now = now();
+
             foreach ($items as $item) {
                 $productId = (int) $item['product_id'];
                 $quantity = (int) $item['quantity'];
                 $unitPrice = (float) $item['unit_price'];
                 $unitId = $this->resolveInventoryUnitIdForProduct($productId);
 
-                VendorRawMaterialPurchase::query()->create([
+                $purchase = VendorRawMaterialPurchase::query()->create([
                     'vendor_id' => (int) $validated['vendor_id'],
                     'product_id' => $productId,
                     'unit_id' => $unitId,
@@ -134,12 +135,20 @@ class RawMaterialPurchaseController extends Controller
                     'notes' => $validated['notes'] ?? null,
                     'inventory_location_id' => $warehouseLocationId,
                 ]);
+
+                $this->applyInventoryUpdate(
+                    $purchase,
+                    (int) $warehouseLocationId,
+                    $unitPrice,
+                    (string) ($validated['notes'] ?? 'Raw material purchase inventory update'),
+                    $now
+                );
             }
         });
 
         return redirect()
             ->route('rawMaterialPurchase.index')
-            ->with('success', 'Purchase order created successfully.');
+            ->with('success', 'Purchase created and inventory updated successfully.');
     }
 
     /**
@@ -151,114 +160,72 @@ class RawMaterialPurchaseController extends Controller
 
         $purchase->load(['vendor:id,name', 'product:id,name,code', 'unit:id,name,symbol', 'inventoryLocation:id,name,type']);
 
-        $inventoryLocations = InventoryLocation::query()
+        $vendors = Vendor::query()
             ->where('is_active', true)
-            ->where('type', InventoryLocation::TYPE_WAREHOUSE)
             ->orderBy('name')
-            ->get(['id', 'name', 'type', 'outlet_id']);
+            ->get(['id', 'name']);
 
-        return view('modules.raw_material_purchase.edit', compact('purchase', 'inventoryLocations'));
+        $products = Product::query()
+            ->whereHas('category', function ($query) {
+                $query->where('slug', 'fabrics');
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+
+        return view('modules.raw_material_purchase.edit', compact('purchase', 'vendors', 'products'));
     }
 
     /**
-     * Update procurement details:
-     * upload bill with amount and optionally update inventory.
+     * Update purchase notes/details.
      */
     public function updateProcurement(UpdateProcurementRequest $request, VendorRawMaterialPurchase $purchase)
     {
         $this->ensurePurchaseBelongsToWarehouse($purchase);
 
         $validated = $request->validated();
-        $this->validateWarehouseLocationInPayload($validated);
 
         try {
-            DB::transaction(function () use ($purchase, $request, $validated): void {
-                $now = now();
+            DB::transaction(function () use ($purchase, $validated): void {
+                $item = (array) collect($validated['items'] ?? [])->first();
+                $productId = (int) ($item['product_id'] ?? 0);
+                $quantity = (int) ($item['quantity'] ?? 0);
+                $unitPrice = (float) ($item['unit_price'] ?? 0);
+                $warehouseLocationId = $this->resolveWarehouseLocationIdForPurchase($purchase);
 
-                $purchase->unit_id = $this->resolveInventoryUnitIdForProduct((int) $purchase->product_id);
-
-                $purchase->notes = $validated['notes'] ?? $purchase->notes;
-                $purchase->vendor_bill_number = trim((string) ($validated['vendor_bill_number'] ?? $purchase->vendor_bill_number));
-
-                if (array_key_exists('vendor_bill_amount', $validated) && $validated['vendor_bill_amount'] !== null) {
-                    $purchase->vendor_bill_amount = (float) $validated['vendor_bill_amount'];
+                if (!$warehouseLocationId) {
+                    throw new \RuntimeException('No active warehouse location found.');
                 }
 
-                if ($request->hasFile('bill_file')) {
-                    if ($purchase->bill_file_path) {
-                        Storage::disk('public')->delete($purchase->bill_file_path);
-                    }
+                $previousState = [
+                    'location_id' => (int) ($purchase->inventory_location_id ?? 0),
+                    'vendor_id' => (int) $purchase->vendor_id,
+                    'product_id' => (int) $purchase->product_id,
+                    'unit_id' => (int) ($purchase->unit_id ?? 0),
+                    'quantity' => (float) $purchase->quantity,
+                    'unit_price' => (float) $purchase->unit_price,
+                    'total_amount' => (float) $purchase->total_amount,
+                ];
 
-                    $purchase->bill_file_path = $request->file('bill_file')->store('vendor-bills', 'public');
-                    $purchase->vendor_bill_recorded_at = $now;
-                }
-
-                if ($request->boolean('update_inventory') && $purchase->inventory_updated_at === null) {
-                    $locationId = (int) ($validated['inventory_location_id'] ?? 0);
-                    $purchaseQty = (float) $purchase->quantity;
-                    $unitPrice = (float) $purchase->unit_price;
-                    $inventoryUnitCost = (float) ($validated['inventory_unit_cost'] ?? $unitPrice);
-
-                    $stock = InventoryStock::query()->firstOrCreate(
-                        [
-                            'location_id' => $locationId,
-                            'product_id' => $purchase->product_id,
-                            'vendor_id' => $purchase->vendor_id,
-                        ],
-                        [
-                            'unit_id' => $purchase->unit_id,
-                            'on_hand_qty' => 0,
-                            'reserved_qty' => 0,
-                            'unit_cost' => $inventoryUnitCost,
-                        ]
-                    );
-
-                    $currentQty = (float) $stock->on_hand_qty;
-                    $currentValue = $currentQty * (float) $stock->unit_cost;
-                    $incomingValue = $purchaseQty * $inventoryUnitCost;
-                    $newQty = $currentQty + $purchaseQty;
-
-                    $stock->vendor_id = $purchase->vendor_id;
-                    $stock->unit_id = $purchase->unit_id;
-                    $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
-                    $stock->on_hand_qty = $newQty;
-                    $stock->save();
-
-                    $purchase->inventory_location_id = $locationId;
-                    $purchase->inventory_updated_at = $now;
-
-                    $inventoryTypeId = InventoryType::query()
-                        ->where('code', InventoryType::VENDOR_SUPPLIED)
-                        ->value('id');
-
-                    if (!$inventoryTypeId) {
-                        throw new \RuntimeException('Inventory type vendor_supplied is missing. Run inventory type seeder.');
-                    }
-
-                    $transaction = InventoryTransaction::query()->create([
-                        'inventory_type_id' => $inventoryTypeId,
-                        'trx_type' => InventoryTransaction::TYPE_IN,
-                        'reference_type' => 'purchase',
-                        'reference_id' => $purchase->id,
-                        'to_location_id' => $locationId,
-                        'vendor_id' => $purchase->vendor_id,
-                        'trx_date' => $now,
-                        'notes' => 'Raw material purchase inventory update',
-                        'created_by' => (int) auth()->id(),
-                    ]);
-
-                    $transaction->items()->create([
-                        'product_id' => $purchase->product_id,
-                        'qty' => $purchase->quantity,
-                        'unit_cost' => (float) $purchase->unit_price,
-                        'total_cost' => (float) $purchase->total_amount,
-                    ]);
-
-                    // Keep legacy manufacture unit stock in sync only if this flow ever targets factory.
-                    // Raw material purchase flow now accepts warehouse locations only.
-                }
-
+                $purchase->vendor_id = (int) $validated['vendor_id'];
+                $purchase->product_id = $productId;
+                $purchase->unit_id = $this->resolveInventoryUnitIdForProduct($productId);
+                $purchase->quantity = $quantity;
+                $purchase->unit_price = $unitPrice;
+                $purchase->total_amount = (float) $purchase->quantity * (float) $purchase->unit_price;
+                $purchase->purchased_at = $validated['purchased_at'];
+                $purchase->notes = $validated['notes'] ?? null;
+                $purchase->inventory_location_id = (int) $warehouseLocationId;
+                $purchase->inventory_updated_at = null;
                 $purchase->save();
+
+                $this->syncInventoryForUpdatedPurchase(
+                    $purchase,
+                    $previousState,
+                    (int) $warehouseLocationId,
+                    $unitPrice,
+                    (string) ($validated['notes'] ?? 'Raw material purchase inventory update'),
+                    now()
+                );
             });
         } catch (\RuntimeException $exception) {
             return back()
@@ -279,6 +246,24 @@ class RawMaterialPurchaseController extends Controller
             ->value('id');
     }
 
+    private function resolveWarehouseLocationIdForPurchase(VendorRawMaterialPurchase $purchase): ?int
+    {
+        $existingLocationId = (int) ($purchase->inventory_location_id ?? 0);
+        if ($existingLocationId > 0) {
+            $isWarehouse = InventoryLocation::query()
+                ->whereKey($existingLocationId)
+                ->where('is_active', true)
+                ->where('type', InventoryLocation::TYPE_WAREHOUSE)
+                ->exists();
+
+            if ($isWarehouse) {
+                return $existingLocationId;
+            }
+        }
+
+        return $this->currentWarehouseLocationId();
+    }
+
     private function ensurePurchaseBelongsToWarehouse(VendorRawMaterialPurchase $purchase): void
     {
         $locationId = (int) ($purchase->inventory_location_id ?? 0);
@@ -293,27 +278,6 @@ class RawMaterialPurchaseController extends Controller
             ->exists();
 
         if (!$belongsToWarehouse) {
-            abort(404);
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $validated
-     */
-    private function validateWarehouseLocationInPayload(array $validated): void
-    {
-        $locationId = (int) ($validated['inventory_location_id'] ?? 0);
-        if ($locationId < 1) {
-            return;
-        }
-
-        $isValid = InventoryLocation::query()
-            ->whereKey($locationId)
-            ->where('is_active', true)
-            ->where('type', InventoryLocation::TYPE_WAREHOUSE)
-            ->exists();
-
-        if (!$isValid) {
             abort(404);
         }
     }
@@ -335,5 +299,224 @@ class RawMaterialPurchaseController extends Controller
             ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
             ->orWhere('symbol', 'm')
             ->value('id');
+    }
+
+    private function applyInventoryUpdate(
+        VendorRawMaterialPurchase $purchase,
+        int $locationId,
+        float $inventoryUnitCost,
+        string $notes,
+        $now
+    ): void {
+        $stock = InventoryStock::query()->firstOrCreate(
+            [
+                'location_id' => $locationId,
+                'product_id' => $purchase->product_id,
+                'vendor_id' => $purchase->vendor_id,
+            ],
+            [
+                'unit_id' => $purchase->unit_id,
+                'on_hand_qty' => 0,
+                'reserved_qty' => 0,
+                'unit_cost' => $inventoryUnitCost,
+            ]
+        );
+
+        $purchaseQty = (float) $purchase->quantity;
+        $currentQty = (float) $stock->on_hand_qty;
+        $currentValue = $currentQty * (float) $stock->unit_cost;
+        $incomingValue = $purchaseQty * $inventoryUnitCost;
+        $newQty = $currentQty + $purchaseQty;
+
+        $stock->vendor_id = $purchase->vendor_id;
+        $stock->unit_id = $purchase->unit_id;
+        $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+        $stock->on_hand_qty = $newQty;
+        $stock->save();
+
+        $purchase->inventory_location_id = $locationId;
+        $purchase->inventory_updated_at = $now;
+        $purchase->save();
+
+        $inventoryTypeId = InventoryType::query()
+            ->where('code', InventoryType::VENDOR_SUPPLIED)
+            ->value('id');
+
+        if (!$inventoryTypeId) {
+            throw new \RuntimeException('Inventory type vendor_supplied is missing. Run inventory type seeder.');
+        }
+
+        $transaction = InventoryTransaction::query()->create([
+            'inventory_type_id' => $inventoryTypeId,
+            'trx_type' => InventoryTransaction::TYPE_IN,
+            'reference_type' => 'purchase',
+            'reference_id' => $purchase->id,
+            'to_location_id' => $locationId,
+            'vendor_id' => $purchase->vendor_id,
+            'trx_date' => $now,
+            'notes' => $notes,
+            'created_by' => (int) auth()->id(),
+        ]);
+
+        $transaction->items()->create([
+            'product_id' => $purchase->product_id,
+            'qty' => $purchase->quantity,
+            'unit_cost' => $inventoryUnitCost,
+            'total_cost' => (float) $purchase->total_amount,
+        ]);
+    }
+
+    private function revertInventoryUpdate(VendorRawMaterialPurchase $purchase): void
+    {
+        $transactions = InventoryTransaction::query()
+            ->with('items')
+            ->where('reference_type', 'purchase')
+            ->where('reference_id', $purchase->id)
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $locationId = (int) ($transaction->to_location_id ?? 0);
+            if ($locationId < 1) {
+                continue;
+            }
+
+            foreach ($transaction->items as $item) {
+                $stock = InventoryStock::query()
+                    ->where('location_id', $locationId)
+                    ->where('product_id', (int) $item->product_id)
+                    ->where('vendor_id', (int) $transaction->vendor_id)
+                    ->first();
+
+                if (!$stock) {
+                    continue;
+                }
+
+                $currentQty = (float) $stock->on_hand_qty;
+                $reverseQty = (float) $item->qty;
+                $newQty = max(0, $currentQty - $reverseQty);
+                $currentValue = $currentQty * (float) $stock->unit_cost;
+                $reverseValue = (float) $item->total_cost;
+
+                $stock->on_hand_qty = $newQty;
+                $stock->unit_cost = $newQty > 0
+                    ? max(0, ($currentValue - $reverseValue) / $newQty)
+                    : 0;
+                $stock->save();
+            }
+
+            $transaction->items()->delete();
+            $transaction->delete();
+        }
+    }
+
+    /**
+     * @param  array<string, int|float>  $previousState
+     */
+    private function syncInventoryForUpdatedPurchase(
+        VendorRawMaterialPurchase $purchase,
+        array $previousState,
+        int $locationId,
+        float $inventoryUnitCost,
+        string $notes,
+        $now
+    ): void {
+        $transaction = InventoryTransaction::query()
+            ->with('items')
+            ->where('reference_type', 'purchase')
+            ->where('reference_id', $purchase->id)
+            ->latest('id')
+            ->first();
+
+        if (!$transaction || $transaction->items->isEmpty()) {
+            $this->applyInventoryUpdate($purchase, $locationId, $inventoryUnitCost, $notes, $now);
+            return;
+        }
+
+        $transactionItem = $transaction->items->first();
+        $previousLocationId = (int) ($transaction->to_location_id ?: ($previousState['location_id'] ?? 0));
+        $previousVendorId = (int) ($transaction->vendor_id ?: ($previousState['vendor_id'] ?? 0));
+        $previousProductId = (int) ($transactionItem->product_id ?: ($previousState['product_id'] ?? 0));
+        $previousUnitId = (int) ($previousState['unit_id'] ?? 0);
+        $previousQty = (float) ($transactionItem->qty ?: ($previousState['quantity'] ?? 0));
+        $previousTotalCost = (float) ($transactionItem->total_cost ?: ($previousState['total_amount'] ?? 0));
+
+        $this->decreasePurchaseStock(
+            $previousLocationId,
+            $previousVendorId,
+            $previousProductId,
+            $previousQty,
+            $previousTotalCost
+        );
+
+        $targetStock = InventoryStock::query()->firstOrCreate(
+            [
+                'location_id' => $locationId,
+                'product_id' => $purchase->product_id,
+                'vendor_id' => $purchase->vendor_id,
+            ],
+            [
+                'unit_id' => $purchase->unit_id,
+                'on_hand_qty' => 0,
+                'reserved_qty' => 0,
+                'unit_cost' => $inventoryUnitCost,
+            ]
+        );
+
+        $currentQty = (float) $targetStock->on_hand_qty;
+        $incomingValue = (float) $purchase->total_amount;
+        $currentValue = $currentQty * (float) $targetStock->unit_cost;
+        $newQty = $currentQty + (float) $purchase->quantity;
+
+        $targetStock->vendor_id = $purchase->vendor_id;
+        $targetStock->unit_id = $purchase->unit_id ?: $previousUnitId;
+        $targetStock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+        $targetStock->on_hand_qty = $newQty;
+        $targetStock->save();
+
+        $purchase->inventory_location_id = $locationId;
+        $purchase->inventory_updated_at = $now;
+        $purchase->save();
+
+        $transaction->to_location_id = $locationId;
+        $transaction->vendor_id = $purchase->vendor_id;
+        $transaction->trx_date = $now;
+        $transaction->notes = $notes;
+        $transaction->save();
+
+        $transactionItem->product_id = $purchase->product_id;
+        $transactionItem->qty = $purchase->quantity;
+        $transactionItem->unit_cost = $inventoryUnitCost;
+        $transactionItem->total_cost = (float) $purchase->total_amount;
+        $transactionItem->save();
+    }
+
+    private function decreasePurchaseStock(
+        int $locationId,
+        int $vendorId,
+        int $productId,
+        float $quantity,
+        float $totalCost
+    ): void {
+        if ($locationId < 1 || $vendorId < 1 || $productId < 1 || $quantity <= 0) {
+            return;
+        }
+
+        $stock = InventoryStock::query()
+            ->where('location_id', $locationId)
+            ->where('product_id', $productId)
+            ->where('vendor_id', $vendorId)
+            ->first();
+
+        if (!$stock) {
+            return;
+        }
+
+        $currentQty = (float) $stock->on_hand_qty;
+        $newQty = max(0, $currentQty - $quantity);
+        $currentValue = $currentQty * (float) $stock->unit_cost;
+
+        $stock->on_hand_qty = $newQty;
+        $stock->unit_cost = $newQty > 0 ? max(0, ($currentValue - $totalCost) / $newQty) : 0;
+        $stock->save();
     }
 }

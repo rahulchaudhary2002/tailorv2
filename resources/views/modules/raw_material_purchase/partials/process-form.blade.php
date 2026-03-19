@@ -24,101 +24,71 @@
 
     <div class="outlet-form-grid">
         <div class="outlet-form-group">
-            <label>Vendor</label>
-            <input type="text" class="outlet-input" value="{{ $purchase->vendor?->name }}" readonly>
+            <label for="vendor_id">Vendor</label>
+            <select id="vendor_id" name="vendor_id" class="outlet-input" required>
+                <option value="">Select Vendor</option>
+                @foreach ($vendors as $vendor)
+                    <option value="{{ $vendor->id }}" @selected((string) old('vendor_id', $purchase->vendor_id) === (string) $vendor->id)>
+                        {{ $vendor->name }}
+                    </option>
+                @endforeach
+            </select>
         </div>
 
         <div class="outlet-form-group">
-            <label>Raw Material</label>
-            <input type="text" class="outlet-input" value="{{ $purchase->product?->name }} ({{ $purchase->product?->code }})" readonly>
+            <label for="product_id">Raw Material</label>
+            <select id="product_id" name="product_id" class="outlet-input" required>
+                <option value="">Select Raw Material</option>
+                @foreach ($products as $product)
+                    <option value="{{ $product->id }}" @selected((string) old('product_id', $purchase->product_id) === (string) $product->id)>
+                        {{ $product->name }} ({{ $product->code }})
+                    </option>
+                @endforeach
+            </select>
         </div>
 
         <div class="outlet-form-group">
-            <label>Quantity</label>
+            <label for="quantity">Quantity</label>
             <input
-                type="text"
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="1"
                 class="outlet-input"
-                value="{{ $purchase->quantity }} {{ $purchase->unit?->symbol ?: $purchase->unit?->name }}"
-                readonly
+                value="{{ old('quantity', $purchase->quantity) }}"
+                required
             >
         </div>
 
         <div class="outlet-form-group">
-            <label>Inventory Status</label>
+            <label for="purchased_at">Purchase Date</label>
             <input
-                type="text"
+                id="purchased_at"
+                name="purchased_at"
+                type="date"
                 class="outlet-input"
-                value="{{ $purchase->inventory_updated_at ? 'Updated on ' . $purchase->inventory_updated_at->format('M d, Y h:i A') : 'Not Updated' }}"
-                readonly
+                value="{{ old('purchased_at', optional($purchase->purchased_at)->toDateString()) }}"
+                required
             >
         </div>
 
         <div class="outlet-form-group">
-            <label for="vendor_bill_number">Bill Number</label>
+            <label for="unit_price">Unit Price</label>
             <input
-                id="vendor_bill_number"
-                name="vendor_bill_number"
-                type="text"
-                class="outlet-input"
-                value="{{ old('vendor_bill_number', $purchase->vendor_bill_number) }}"
-                placeholder="BILL-1001"
-            >
-        </div>
-
-        <div class="outlet-form-group">
-            <label for="vendor_bill_amount">Bill Amount</label>
-            <input
-                id="vendor_bill_amount"
-                name="vendor_bill_amount"
+                id="unit_price"
+                name="unit_price"
                 type="number"
                 min="0"
                 step="0.01"
                 class="outlet-input"
-                value="{{ old('vendor_bill_amount', $purchase->vendor_bill_amount ?: $purchase->total_amount) }}"
+                value="{{ old('unit_price', $purchase->unit_price) }}"
+                required
             >
-        </div>
-
-        <div class="outlet-form-group outlet-form-group-full">
-            <label for="bill_file">Upload Bill</label>
-            <input
-                id="bill_file"
-                name="bill_file"
-                type="file"
-                class="outlet-input"
-                accept=".pdf,.jpg,.jpeg,.png"
-            >
-            @if ($purchase->bill_file_path)
-                <small>
-                    Current bill:
-                    <a href="{{ asset('storage/' . $purchase->bill_file_path) }}" target="_blank" rel="noopener">View File</a>
-                </small>
-            @endif
-        </div>
-
-        <div class="outlet-form-group outlet-form-group-full">
-            <label class="product-active-toggle">
-                <input
-                    type="checkbox"
-                    name="update_inventory"
-                    value="1"
-                    @checked(old('update_inventory'))
-                    @disabled($purchase->inventory_updated_at !== null)
-                >
-                Update inventory with this purchase quantity
-            </label>
-            @if ($purchase->inventory_updated_at !== null)
-                <small>Inventory is already updated for this purchase.</small>
-            @endif
         </div>
 
         <div class="outlet-form-group">
-            <label for="inventory_location_id">Warehouse Location</label>
-            <select
-                id="inventory_location_id"
-                name="inventory_location_id"
-                class="outlet-input"
-                @disabled($purchase->inventory_updated_at !== null)
-            >
+            <label for="inventory_location_id">Inventory Location</label>
+            <select id="inventory_location_id" name="inventory_location_id" class="outlet-input" required>
                 <option value="">Select Location</option>
                 @foreach ($inventoryLocations as $location)
                     <option
@@ -129,22 +99,17 @@
                     </option>
                 @endforeach
             </select>
-            <small>Required only when updating inventory. Only warehouse locations are allowed.</small>
         </div>
 
         <div class="outlet-form-group">
-            <label for="inventory_unit_cost">Inventory Unit Cost</label>
+            <label>Total Amount</label>
             <input
-                id="inventory_unit_cost"
-                name="inventory_unit_cost"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                id="purchase-total-amount"
                 class="outlet-input"
-                value="{{ old('inventory_unit_cost', $purchase->unit_price) }}"
-                @disabled($purchase->inventory_updated_at !== null)
+                value="{{ number_format((float) $purchase->total_amount, 2) }}"
+                readonly
             >
-            <small>Required when updating inventory.</small>
         </div>
 
         <div class="outlet-form-group outlet-form-group-full">
