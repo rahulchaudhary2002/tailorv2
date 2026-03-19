@@ -275,8 +275,9 @@ class StoreRequest extends FormRequest
                     });
             });
             $netTotalWithoutVat = max(0.0, $subtotal - $discountAmount);
-            $vatAmount = $vatEnabled ? ($netTotalWithoutVat * 0.13) : 0.0;
-            $netTotal = $netTotalWithoutVat + $vatAmount + $tailoringTotal;
+            $taxableTotal = $netTotalWithoutVat + $tailoringTotal;
+            $vatAmount = $vatEnabled ? ($taxableTotal * 0.13) : 0.0;
+            $netTotal = $taxableTotal + $vatAmount;
 
             if ($discountAmount > $subtotal) {
                 $validator->errors()->add('discount_amount', 'Discount cannot be greater than order total.');

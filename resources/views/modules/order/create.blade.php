@@ -1432,8 +1432,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (discount.type === 'percent') discountAmount = (subtotalFabric + subtotalCustom) * (Number(discount.value || 0) / 100);
 
         const taxableSubtotal = Math.max((subtotalFabric + subtotalCustom) - discountAmount, 0);
-        const vatAmount = vatEnabled ? taxableSubtotal * 0.13 : 0;
-        const grandTotal = taxableSubtotal + vatAmount + totalTailoring;
+        const taxableTotal = taxableSubtotal + totalTailoring;
+        const vatAmount = vatEnabled ? taxableTotal * 0.13 : 0;
+        const grandTotal = taxableTotal + vatAmount;
 
         subtotalFabricEl.textContent = `NPR ${money(subtotalFabric)}`;
         subtotalCustomEl.textContent = `NPR ${money(subtotalCustom)}`;

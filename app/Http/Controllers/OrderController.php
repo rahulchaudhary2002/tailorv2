@@ -799,8 +799,9 @@ class OrderController extends Controller
 
                 $discountAmount = (float) ($validated['discount_amount'] ?? 0);
                 $taxableSubtotal = max(0.0, $subtotal - $discountAmount);
+                $taxableTotal = $taxableSubtotal + $tailoringTotal;
                 $vatAmount = $vatEnabled
-                    ? round($taxableSubtotal * 0.13, 2)
+                    ? round($taxableTotal * 0.13, 2)
                     : 0.0;
 
                 $order->subtotal_amount = $subtotal;
