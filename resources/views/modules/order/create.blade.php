@@ -854,10 +854,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     }
 
     async function resolveOrCreateCustomer(options = {}) {
-        const normalizedPhone = normalizePhone(customerPhoneInput.value);
+        const rawPhone = String(customerPhoneInput.value || '').trim();
+        const normalizedPhone = normalizePhone(rawPhone);
         const shouldCreate = Boolean(options.createIfMissing);
         const payload = {
-            phone: normalizedPhone,
+            phone: rawPhone,
             name: (customerNameInput.value || '').trim(),
             customer_type: customerTypeInput.value || 'retail',
         };
@@ -873,7 +874,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
             },
-            body: JSON.stringify(shouldCreate ? payload : { phone: payload.phone }),
+            body: JSON.stringify(shouldCreate ? payload : { phone: rawPhone }),
         });
 
         const data = await response.json();
