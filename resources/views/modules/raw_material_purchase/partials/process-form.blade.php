@@ -133,33 +133,18 @@
         </div>
 
         <div class="outlet-form-group">
-            <label for="inventory_base_price">Inventory Base Price</label>
+            <label for="inventory_unit_cost">Inventory Unit Cost</label>
             <input
-                id="inventory_base_price"
-                name="inventory_base_price"
+                id="inventory_unit_cost"
+                name="inventory_unit_cost"
                 type="number"
                 min="0"
                 step="0.01"
                 class="outlet-input"
-                value="{{ old('inventory_base_price', $purchase->unit_price) }}"
+                value="{{ old('inventory_unit_cost', $purchase->unit_price) }}"
                 @disabled($purchase->inventory_updated_at !== null)
             >
             <small>Required when updating inventory.</small>
-        </div>
-
-        <div class="outlet-form-group">
-            <label for="inventory_special_price">Inventory Special Price</label>
-            <input
-                id="inventory_special_price"
-                name="inventory_special_price"
-                type="number"
-                min="0"
-                step="0.01"
-                class="outlet-input"
-                value="{{ old('inventory_special_price') }}"
-                @disabled($purchase->inventory_updated_at !== null)
-            >
-            <small>Optional. Must be less than or equal to base price.</small>
         </div>
 
         <div class="outlet-form-group outlet-form-group-full">

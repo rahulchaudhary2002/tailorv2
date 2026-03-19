@@ -146,14 +146,8 @@ class InventoryController extends Controller
         $quantity = (float) $validated['quantity'];
         $trxType = (string) $validated['trx_type'];
 
-        $basePrice = (float) $validated['base_price'];
-        $specialPrice = array_key_exists('special_price', $validated) && $validated['special_price'] !== null
-            ? (float) $validated['special_price']
-            : null;
         $vendorId = isset($validated['vendor_id']) ? (int) $validated['vendor_id'] : null;
-        $unitCost = array_key_exists('unit_cost', $validated) && $validated['unit_cost'] !== null
-            ? (float) $validated['unit_cost']
-            : null;
+        $unitCost = (float) $validated['unit_cost'];
         $adjustmentType = (string) ($validated['adjustment_type'] ?? 'add');
         $setReorderLevel = $request->boolean('set_reorder_level');
         $reorderMinQty = array_key_exists('reorder_min_qty', $validated) && $validated['reorder_min_qty'] !== null
@@ -245,9 +239,7 @@ class InventoryController extends Controller
                         vendorId: $vendorId,
                         unitId: $unitId,
                         delta: -$quantity,
-                        unitCost: $unitCost,
-                        basePrice: $basePrice,
-                        specialPrice: $specialPrice
+                        unitCost: $unitCost
                     );
 
                     $toStock = $this->applyDeltaToStock(
@@ -256,9 +248,7 @@ class InventoryController extends Controller
                         vendorId: $vendorId,
                         unitId: $unitId,
                         delta: $quantity,
-                        unitCost: $unitCost,
-                        basePrice: $basePrice,
-                        specialPrice: $specialPrice
+                        unitCost: $unitCost
                     );
 
                     if ($setReorderLevel && $reorderMinQty !== null) {
@@ -288,9 +278,7 @@ class InventoryController extends Controller
                         vendorId: $vendorId,
                         unitId: $unitId,
                         delta: $delta,
-                        unitCost: $unitCost,
-                        basePrice: $basePrice,
-                        specialPrice: $specialPrice
+                        unitCost: $unitCost
                     );
 
                     if ($setReorderLevel && $reorderMinQty !== null) {
@@ -319,9 +307,7 @@ class InventoryController extends Controller
                     vendorId: $vendorId,
                     unitId: $unitId,
                     delta: $signedQty,
-                    unitCost: $unitCost,
-                    basePrice: $basePrice,
-                    specialPrice: $specialPrice
+                    unitCost: $unitCost
                 );
 
                 if ($setReorderLevel && $reorderMinQty !== null) {
@@ -427,9 +413,7 @@ class InventoryController extends Controller
                 'unit_id' => $unitId,
                 'on_hand_qty' => 0,
                 'reserved_qty' => 0,
-                'avg_cost' => 0,
-                'base_price' => 0,
-                'special_price' => null,
+                'unit_cost' => 0,
             ]
         );
 
@@ -444,9 +428,7 @@ class InventoryController extends Controller
         ?int $vendorId,
         ?int $unitId,
         float $delta,
-        ?float $unitCost,
-        float $basePrice,
-        ?float $specialPrice
+        float $unitCost
     ): InventoryStock {
         $stock = $this->getOrCreateStock($productId, $locationId, $vendorId, $unitId);
 
@@ -457,15 +439,13 @@ class InventoryController extends Controller
             throw new \RuntimeException('Insufficient stock for this transaction.');
         }
 
-        if ($unitCost !== null && $delta > 0) {
-            $currentValue = $currentQty * (float) $stock->avg_cost;
+        if ($delta > 0) {
+            $currentValue = $currentQty * (float) $stock->unit_cost;
             $incomingValue = $delta * $unitCost;
-            $stock->avg_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+            $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
         }
 
         $stock->on_hand_qty = $newQty;
-        $stock->base_price = $basePrice;
-        $stock->special_price = $specialPrice;
         $stock->save();
 
         return $stock;

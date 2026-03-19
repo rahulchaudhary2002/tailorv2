@@ -25,9 +25,7 @@ class StoreWorkflowRequest extends FormRequest
             'transfer_transaction_id' => ['required', 'integer', 'exists:inventory_transactions,id'],
             'quantity' => ['required', 'numeric', 'gt:0'],
             'material_wastage_qty' => ['nullable', 'numeric', 'min:0'],
-            'unit_cost' => ['nullable', 'numeric', 'min:0'],
-            'base_price' => ['required', 'numeric', 'min:0'],
-            'special_price' => ['nullable', 'numeric', 'min:0', 'lte:base_price'],
+            'unit_cost' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }

@@ -38,8 +38,7 @@ class UpdateProcurementRequest extends FormRequest
                         ->where('type', InventoryLocation::TYPE_WAREHOUSE);
                 }),
             ],
-            'inventory_base_price' => ['nullable', 'numeric', 'min:0', 'required_if:update_inventory,1'],
-            'inventory_special_price' => ['nullable', 'numeric', 'min:0', 'lte:inventory_base_price'],
+            'inventory_unit_cost' => ['nullable', 'numeric', 'min:0', 'required_if:update_inventory,1'],
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }

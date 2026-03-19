@@ -109,7 +109,7 @@ class DashboardController extends Controller
 
         $inventoryValueQuery = InventoryStock::query()
             ->join('inventory_locations', 'inventory_locations.id', '=', 'inventory_stocks.location_id')
-            ->selectRaw('COALESCE(SUM(COALESCE(inventory_stocks.on_hand_qty, 0) * COALESCE(inventory_stocks.avg_cost, 0)), 0) as stock_value');
+            ->selectRaw('COALESCE(SUM(COALESCE(inventory_stocks.on_hand_qty, 0) * COALESCE(inventory_stocks.unit_cost, 0)), 0) as stock_value');
 
         if ($scopeOutletIds->isNotEmpty()) {
             $inventoryValueQuery->whereIn('inventory_locations.outlet_id', $scopeOutletIds);
@@ -384,7 +384,7 @@ class DashboardController extends Controller
             $outletStockValue = (float) InventoryStock::query()
                 ->join('inventory_locations', 'inventory_locations.id', '=', 'inventory_stocks.location_id')
                 ->where('inventory_locations.outlet_id', $outletContextId)
-                ->selectRaw('COALESCE(SUM(COALESCE(inventory_stocks.on_hand_qty, 0) * COALESCE(inventory_stocks.avg_cost, 0)), 0) as stock_value')
+                ->selectRaw('COALESCE(SUM(COALESCE(inventory_stocks.on_hand_qty, 0) * COALESCE(inventory_stocks.unit_cost, 0)), 0) as stock_value')
                 ->value('stock_value');
 
             $todayDeliveries = (clone $outletBaseOrders)

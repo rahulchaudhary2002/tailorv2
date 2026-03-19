@@ -197,10 +197,7 @@ class RawMaterialPurchaseController extends Controller
                     $locationId = (int) ($validated['inventory_location_id'] ?? 0);
                     $purchaseQty = (float) $purchase->quantity;
                     $unitPrice = (float) $purchase->unit_price;
-                    $inventoryBasePrice = (float) ($validated['inventory_base_price'] ?? $unitPrice);
-                    $inventorySpecialPrice = array_key_exists('inventory_special_price', $validated) && $validated['inventory_special_price'] !== null
-                        ? (float) $validated['inventory_special_price']
-                        : null;
+                    $inventoryUnitCost = (float) ($validated['inventory_unit_cost'] ?? $unitPrice);
 
                     $stock = InventoryStock::query()->firstOrCreate(
                         [
@@ -212,23 +209,19 @@ class RawMaterialPurchaseController extends Controller
                             'unit_id' => $purchase->unit_id,
                             'on_hand_qty' => 0,
                             'reserved_qty' => 0,
-                            'avg_cost' => $unitPrice,
-                            'base_price' => $inventoryBasePrice,
-                            'special_price' => $inventorySpecialPrice,
+                            'unit_cost' => $inventoryUnitCost,
                         ]
                     );
 
                     $currentQty = (float) $stock->on_hand_qty;
-                    $currentValue = $currentQty * (float) $stock->avg_cost;
-                    $incomingValue = $purchaseQty * $unitPrice;
+                    $currentValue = $currentQty * (float) $stock->unit_cost;
+                    $incomingValue = $purchaseQty * $inventoryUnitCost;
                     $newQty = $currentQty + $purchaseQty;
 
                     $stock->vendor_id = $purchase->vendor_id;
                     $stock->unit_id = $purchase->unit_id;
-                    $stock->avg_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+                    $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
                     $stock->on_hand_qty = $newQty;
-                    $stock->base_price = $inventoryBasePrice;
-                    $stock->special_price = $inventorySpecialPrice;
                     $stock->save();
 
                     $purchase->inventory_location_id = $locationId;

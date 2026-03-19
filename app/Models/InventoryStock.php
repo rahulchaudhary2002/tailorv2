@@ -13,17 +13,13 @@ class InventoryStock extends Model
         'unit_id',
         'on_hand_qty',
         'reserved_qty',
-        'avg_cost',
-        'base_price',
-        'special_price',
+        'unit_cost',
     ];
 
     protected $casts = [
         'on_hand_qty' => 'decimal:2',
         'reserved_qty' => 'decimal:2',
-        'avg_cost' => 'decimal:2',
-        'base_price' => 'decimal:2',
-        'special_price' => 'decimal:2',
+        'unit_cost' => 'decimal:2',
     ];
 
     public function location()

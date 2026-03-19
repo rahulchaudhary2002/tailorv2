@@ -145,18 +145,8 @@
             </div>
 
             <div class="outlet-form-group">
-                <label for="unit_cost">Unit Cost (Optional)</label>
-                <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost') }}">
-            </div>
-
-            <div class="outlet-form-group">
-                <label for="base_price">Base Price</label>
-                <input id="base_price" name="base_price" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('base_price', '0.00') }}" required>
-            </div>
-
-            <div class="outlet-form-group">
-                <label for="special_price">Special Price</label>
-                <input id="special_price" name="special_price" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('special_price') }}" placeholder="Optional">
+                <label for="unit_cost">Unit Cost</label>
+                <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost', '0.00') }}" required>
             </div>
 
             <div class="outlet-form-group outlet-form-group-full">
@@ -275,9 +265,7 @@
                     <th>On Hand</th>
                     <th>Reserved</th>
                     <th>Unit</th>
-                    <th>Avg Cost</th>
-                    <th>Base Price</th>
-                    <th>Special Price</th>
+                    <th>Unit Cost</th>
                     <th>Updated</th>
                 </tr>
             </thead>
@@ -291,14 +279,12 @@
                         <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
                         <td>{{ number_format((float) $stock->reserved_qty, 2) }}</td>
                         <td>{{ $stock->unit?->symbol ?: ($stock->unit?->name ?: '-') }}</td>
-                        <td>{{ number_format((float) $stock->avg_cost, 2) }}</td>
-                        <td>{{ number_format((float) $stock->base_price, 2) }}</td>
-                        <td>{{ $stock->special_price !== null ? number_format((float) $stock->special_price, 2) : '-' }}</td>
+                        <td>{{ number_format((float) $stock->unit_cost, 2) }}</td>
                         <td>{{ $stock->updated_at->format('M d, Y h:i A') }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="empty">No inventory records found.</td>
+                        <td colspan="9" class="empty">No inventory records found.</td>
                     </tr>
                 @endforelse
             </tbody>

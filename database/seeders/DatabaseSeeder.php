@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             InventoryTypeSeeder::class,
             UnitSeeder::class,
             ProductSeeder::class,
+            ProductInventorySeeder::class,
             GarmentTypeSeeder::class,
             CustomerSeeder::class,
             VendorTypeSeeder::class,

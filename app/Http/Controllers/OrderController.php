@@ -1085,7 +1085,7 @@ class OrderController extends Controller
             $stock->on_hand_qty = (float) $stock->on_hand_qty - $deductQty;
             $stock->save();
 
-            $cost = (float) $stock->avg_cost;
+            $cost = (float) $stock->unit_cost;
             $totalCost += $deductQty * $cost;
             $consumedQty += $deductQty;
             $remainingQty -= $deductQty;
@@ -1263,18 +1263,16 @@ class OrderController extends Controller
                         'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
-                        'avg_cost' => $unitCost,
-                        'base_price' => 0,
-                        'special_price' => null,
+                        'unit_cost' => $unitCost,
                     ]);
                 }
 
                 $currentQty = (float) $stock->on_hand_qty;
-                $currentValue = $currentQty * (float) $stock->avg_cost;
+                $currentValue = $currentQty * (float) $stock->unit_cost;
                 $incomingValue = $qty * $unitCost;
                 $newQty = $currentQty + $qty;
 
-                $stock->avg_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+                $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
                 $stock->on_hand_qty = $newQty;
                 $stock->save();
             }

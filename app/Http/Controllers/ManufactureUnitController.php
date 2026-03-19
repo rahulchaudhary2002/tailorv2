@@ -221,7 +221,7 @@ class ManufactureUnitController extends Controller
                     'created_by' => (int) auth()->id(),
                 ]);
 
-                $unitCost = (float) $lockedStock->avg_cost;
+                $unitCost = (float) $lockedStock->unit_cost;
                 $transaction->items()->create([
                     'product_id' => $lockedStock->product_id,
                     'qty' => $quantity,
@@ -309,7 +309,7 @@ class ManufactureUnitController extends Controller
                 $sourceStock->on_hand_qty = $availableQty - $quantity;
                 $sourceStock->save();
 
-                $unitCost = (float) $sourceStock->avg_cost;
+                $unitCost = (float) $sourceStock->unit_cost;
                 $targetStock = InventoryStock::query()->firstOrCreate(
                     [
                         'location_id' => (int) $destinationLocation->id,
@@ -320,22 +320,18 @@ class ManufactureUnitController extends Controller
                         'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
-                        'avg_cost' => $unitCost,
-                        'base_price' => (float) $sourceStock->base_price,
-                        'special_price' => $sourceStock->special_price,
+                        'unit_cost' => $unitCost,
                     ]
                 );
 
                 $targetCurrentQty = (float) $targetStock->on_hand_qty;
                 $targetNewQty = $targetCurrentQty + $quantity;
-                $targetCurrentValue = $targetCurrentQty * (float) $targetStock->avg_cost;
+                $targetCurrentValue = $targetCurrentQty * (float) $targetStock->unit_cost;
                 $incomingValue = $quantity * $unitCost;
 
-                $targetStock->avg_cost = $targetNewQty > 0 ? (($targetCurrentValue + $incomingValue) / $targetNewQty) : 0;
+                $targetStock->unit_cost = $targetNewQty > 0 ? (($targetCurrentValue + $incomingValue) / $targetNewQty) : 0;
                 $targetStock->on_hand_qty = $targetNewQty;
                 $targetStock->unit_id = null;
-                $targetStock->base_price = (float) $sourceStock->base_price;
-                $targetStock->special_price = $sourceStock->special_price;
                 $targetStock->save();
 
                 $notes = 'Final goods transferred from factory stock.';
@@ -447,16 +443,10 @@ class ManufactureUnitController extends Controller
         $materialWastageQty = array_key_exists('material_wastage_qty', $validated) && $validated['material_wastage_qty'] !== null
             ? (float) $validated['material_wastage_qty']
             : null;
-        $unitCost = array_key_exists('unit_cost', $validated) && $validated['unit_cost'] !== null
-            ? (float) $validated['unit_cost']
-            : null;
-        $basePrice = (float) $validated['base_price'];
-        $specialPrice = array_key_exists('special_price', $validated) && $validated['special_price'] !== null
-            ? (float) $validated['special_price']
-            : null;
+        $unitCost = (float) $validated['unit_cost'];
 
         try {
-            DB::transaction(function () use ($inventoryTypeId, $location, $qty, $materialWastageQty, $unitCost, $basePrice, $specialPrice, $validated): void {
+            DB::transaction(function () use ($inventoryTypeId, $location, $qty, $materialWastageQty, $unitCost, $validated): void {
                 $transfer = InventoryTransaction::query()
                     ->with(['targetProduct.category:id,slug'])
                     ->lockForUpdate()
@@ -510,9 +500,7 @@ class ManufactureUnitController extends Controller
                         'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
-                        'avg_cost' => 0,
-                        'base_price' => $basePrice,
-                        'special_price' => $specialPrice,
+                        'unit_cost' => 0,
                     ]
                 );
 
@@ -520,15 +508,11 @@ class ManufactureUnitController extends Controller
                 $newQty = $currentQty + $qty;
                 $stock->unit_id = null;
 
-                if ($unitCost !== null) {
-                    $currentValue = $currentQty * (float) $stock->avg_cost;
-                    $incomingValue = $qty * $unitCost;
-                    $stock->avg_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
-                }
+                $currentValue = $currentQty * (float) $stock->unit_cost;
+                $incomingValue = $qty * $unitCost;
+                $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
 
                 $stock->on_hand_qty = $newQty;
-                $stock->base_price = $basePrice;
-                $stock->special_price = $specialPrice;
                 $stock->save();
 
                 if ($location->type === InventoryLocation::TYPE_FACTORY) {
@@ -629,7 +613,7 @@ class ManufactureUnitController extends Controller
                 $sourceStock->on_hand_qty = $sourceQty - $quantity;
                 $sourceStock->save();
 
-                $unitCost = (float) $sourceStock->avg_cost;
+                $unitCost = (float) $sourceStock->unit_cost;
                 $targetStock = InventoryStock::query()->firstOrCreate(
                     [
                         'location_id' => $outletLocation->id,
@@ -640,21 +624,17 @@ class ManufactureUnitController extends Controller
                         'unit_id' => null,
                         'on_hand_qty' => 0,
                         'reserved_qty' => 0,
-                        'avg_cost' => $unitCost,
-                        'base_price' => (float) $sourceStock->base_price,
-                        'special_price' => $sourceStock->special_price,
+                        'unit_cost' => $unitCost,
                     ]
                 );
 
                 $targetCurrentQty = (float) $targetStock->on_hand_qty;
                 $targetNewQty = $targetCurrentQty + $quantity;
-                $targetCurrentValue = $targetCurrentQty * (float) $targetStock->avg_cost;
+                $targetCurrentValue = $targetCurrentQty * (float) $targetStock->unit_cost;
                 $incomingValue = $quantity * $unitCost;
-                $targetStock->avg_cost = $targetNewQty > 0 ? (($targetCurrentValue + $incomingValue) / $targetNewQty) : 0;
+                $targetStock->unit_cost = $targetNewQty > 0 ? (($targetCurrentValue + $incomingValue) / $targetNewQty) : 0;
                 $targetStock->on_hand_qty = $targetNewQty;
                 $targetStock->unit_id = null;
-                $targetStock->base_price = (float) $sourceStock->base_price;
-                $targetStock->special_price = $sourceStock->special_price;
                 $targetStock->save();
 
                 $notes = 'Produced goods moved to current outlet inventory.';

@@ -12,10 +12,12 @@ class OutletSeeder extends Seeder
      */
     public function run(): void
     {
-        Outlet::create([
+        $outlet = Outlet::create([
             'name' => 'Branch Outlet',
             'code' => 'BRANCH001',
             'address' => '456 Branch Avenue, Townsville',
         ]);
+
+        $outlet->users()->sync([1]);
     }
 }

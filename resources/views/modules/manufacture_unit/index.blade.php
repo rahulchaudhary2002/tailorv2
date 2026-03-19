@@ -72,18 +72,8 @@
                 </div>
 
                 <div class="outlet-form-group">
-                    <label for="workflow_unit_cost">Unit Cost (Optional)</label>
-                    <input id="workflow_unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost') }}">
-                </div>
-
-                <div class="outlet-form-group">
-                    <label for="workflow_base_price">Base Price</label>
-                    <input id="workflow_base_price" name="base_price" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('base_price', '0.00') }}" required>
-                </div>
-
-                <div class="outlet-form-group">
-                    <label for="workflow_special_price">Special Price</label>
-                    <input id="workflow_special_price" name="special_price" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('special_price') }}">
+                    <label for="workflow_unit_cost">Unit Cost</label>
+                    <input id="workflow_unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost', '0.00') }}" required>
                 </div>
 
                 <div class="outlet-form-group outlet-form-group-full">
