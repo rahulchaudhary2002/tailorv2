@@ -39,14 +39,7 @@
 
 @include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product code/name or location...', 'reporting' => $reporting])
 
-<div class="app-tabs" role="tablist" aria-label="Inventory sections">
-    <button type="button" class="app-tab-button js-page-tab is-active" data-tab-target="transaction" aria-selected="true">Transaction</button>
-    <button type="button" class="app-tab-button js-page-tab" data-tab-target="alerts" aria-selected="false">Low Stock Alerts</button>
-    <button type="button" class="app-tab-button js-page-tab" data-tab-target="stock-summary" aria-selected="false">Stock Summary</button>
-</div>
-
-<div class="js-page-tab-panel" data-tab-panel="transaction">
-<div class="table-card" style="margin-bottom: 16px;">
+<div class="table-card inventory-actions-card" style="margin-bottom: 16px;">
     @if (session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
@@ -65,150 +58,165 @@
     @endif
 
     <div class="table-header">
-        <div class="table-title">Inventory Transaction</div>
+        <div class="table-title">Inventory Actions</div>
+        <button type="button" class="btn btn-primary js-open-transaction-modal">New Transaction</button>
     </div>
+</div>
 
-    <form action="{{ route('inventory.adjust') }}" method="POST" style="padding: 16px;">
-        @csrf
-        <input type="hidden" name="tab" value="transaction" class="js-active-tab-input">
-        <div class="outlet-form-grid">
-            <div class="outlet-form-group">
-                <label for="trx_type">Transaction Type</label>
-                <select id="trx_type" name="trx_type" class="outlet-input" required>
-                    <option value="in" @selected(old('trx_type') === 'in')>Stock In</option>
-                    <option value="out" @selected(old('trx_type') === 'out')>Stock Out</option>
-                    <option value="transfer" @selected(old('trx_type') === 'transfer')>Transfer</option>
-                    <option value="adjustment" @selected(old('trx_type', 'adjustment') === 'adjustment')>Adjustment</option>
-                </select>
-            </div>
+<div id="inventoryTransactionModal" class="app-modal" aria-hidden="true">
+    <div class="app-modal__backdrop js-transaction-modal-close"></div>
+    <div class="app-modal__panel inventory-transaction-modal__panel" role="dialog" aria-modal="true" aria-labelledby="inventoryTransactionModalTitle">
+        <div class="app-modal__header">
+            <h3 id="inventoryTransactionModalTitle">Inventory Transaction</h3>
+            <button type="button" class="inventory-modal-close js-transaction-modal-close" aria-label="Close transaction modal">&times;</button>
+        </div>
 
-            <div class="outlet-form-group" id="group-location-id">
-                <label for="location_id">Location (in/out/adjustment)</label>
-                <select id="location_id" name="location_id" class="outlet-input">
-                    <option value="">Select Location</option>
-                    @foreach ($locations as $location)
-                        <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('location_id') === (string) $location->id)>
-                            {{ $location->name }} ({{ $location->type }})
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+        <form action="{{ route('inventory.adjust') }}" method="POST" style="padding: 16px;">
+            @csrf
+            <input type="hidden" name="tab" value="{{ old('tab', 'stock-summary') }}" class="js-active-tab-input">
+            <div class="outlet-form-grid">
+                <div class="outlet-form-group">
+                    <label for="trx_type">Transaction Type</label>
+                    <select id="trx_type" name="trx_type" class="outlet-input" required>
+                        <option value="in" @selected(old('trx_type') === 'in')>Stock In</option>
+                        <option value="out" @selected(old('trx_type') === 'out')>Stock Out</option>
+                        <option value="transfer" @selected(old('trx_type') === 'transfer')>Transfer</option>
+                        <option value="adjustment" @selected(old('trx_type', 'adjustment') === 'adjustment')>Adjustment</option>
+                    </select>
+                </div>
 
-            <div class="outlet-form-group" id="group-from-location-id">
-                <label for="from_location_id">From Location (transfer)</label>
-                <select id="from_location_id" name="from_location_id" class="outlet-input">
-                    <option value="">Select Source</option>
-                    @foreach ($locations as $location)
-                        <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('from_location_id') === (string) $location->id)>
-                            {{ $location->name }} ({{ $location->type }})
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+                <div class="outlet-form-group" id="group-location-id">
+                    <label for="location_id">Location (in/out/adjustment)</label>
+                    <select id="location_id" name="location_id" class="outlet-input">
+                        <option value="">Select Location</option>
+                        @foreach ($locations as $location)
+                            <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('location_id') === (string) $location->id)>
+                                {{ $location->name }} ({{ $location->type }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-            <div class="outlet-form-group" id="group-to-location-id">
-                <label for="to_location_id">To Location (transfer)</label>
-                <select id="to_location_id" name="to_location_id" class="outlet-input">
-                    <option value="">Select Destination</option>
-                    @foreach ($locations as $location)
-                        <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('to_location_id') === (string) $location->id)>
-                            {{ $location->name }} ({{ $location->type }})
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+                <div class="outlet-form-group" id="group-from-location-id">
+                    <label for="from_location_id">From Location (transfer)</label>
+                    <select id="from_location_id" name="from_location_id" class="outlet-input">
+                        <option value="">Select Source</option>
+                        @foreach ($locations as $location)
+                            <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('from_location_id') === (string) $location->id)>
+                                {{ $location->name }} ({{ $location->type }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-            <div class="outlet-form-group">
-                <label for="product_id">Product</label>
-                <select id="product_id" name="product_id" class="outlet-input js-inventory-product-select" required>
-                    <option value="">Select Product</option>
-                    @foreach ($products as $product)
-                        <option value="{{ $product->id }}" @selected((string) old('product_id') === (string) $product->id)>
-                            {{ $product->name }} ({{ $product->code }})
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+                <div class="outlet-form-group" id="group-to-location-id">
+                    <label for="to_location_id">To Location (transfer)</label>
+                    <select id="to_location_id" name="to_location_id" class="outlet-input">
+                        <option value="">Select Destination</option>
+                        @foreach ($locations as $location)
+                            <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('to_location_id') === (string) $location->id)>
+                                {{ $location->name }} ({{ $location->type }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-            <div class="outlet-form-group" id="group-adjustment-type">
-                <label for="adjustment_type">Adjustment Mode</label>
-                <select id="adjustment_type" name="adjustment_type" class="outlet-input">
-                    <option value="add" @selected(old('adjustment_type') === 'add')>Add</option>
-                    <option value="remove" @selected(old('adjustment_type') === 'remove')>Remove</option>
-                    <option value="set" @selected(old('adjustment_type', 'set') === 'set')>Set Final Qty</option>
-                </select>
-            </div>
+                <div class="outlet-form-group">
+                    <label for="product_id">Product</label>
+                    <select id="product_id" name="product_id" class="outlet-input js-inventory-product-select" required>
+                        <option value="">Select Product</option>
+                        @foreach ($products as $product)
+                            <option value="{{ $product->id }}" @selected((string) old('product_id') === (string) $product->id)>
+                                {{ $product->name }} ({{ $product->code }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
-            <div class="outlet-form-group">
-                <label for="quantity">Quantity</label>
-                <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" class="outlet-input" value="{{ old('quantity', '1.00') }}" required>
-            </div>
+                <div class="outlet-form-group" id="group-adjustment-type">
+                    <label for="adjustment_type">Adjustment Mode</label>
+                    <select id="adjustment_type" name="adjustment_type" class="outlet-input">
+                        <option value="add" @selected(old('adjustment_type') === 'add')>Add</option>
+                        <option value="remove" @selected(old('adjustment_type') === 'remove')>Remove</option>
+                        <option value="set" @selected(old('adjustment_type', 'set') === 'set')>Set Final Qty</option>
+                    </select>
+                </div>
 
-            <div class="outlet-form-group">
-                <label for="unit_cost">Unit Cost</label>
-                <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost', '0.00') }}" required>
-            </div>
+                <div class="outlet-form-group">
+                    <label for="quantity">Quantity</label>
+                    <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" class="outlet-input" value="{{ old('quantity', '1.00') }}" required>
+                </div>
 
-            <div class="outlet-form-group outlet-form-group-full">
-                <div class="inventory-reorder-toggle">
-                    <label for="set_reorder_level" class="user-switch">
-                        <input
-                            id="set_reorder_level"
-                            name="set_reorder_level"
-                            type="checkbox"
-                            value="1"
-                            @checked((bool) old('set_reorder_level'))
-                        >
-                        <span class="user-switch-slider"></span>
-                    </label>
-                    <label for="set_reorder_level" class="inventory-reorder-label">
-                        Set/Update Reorder Level for this product at selected location
+                <div class="outlet-form-group">
+                    <label for="unit_cost">Unit Cost</label>
+                    <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost', '0.00') }}" required>
+                </div>
+
+                <div class="outlet-form-group outlet-form-group-full">
+                    <div class="inventory-reorder-toggle">
+                        <label for="set_reorder_level" class="user-switch">
+                            <input
+                                id="set_reorder_level"
+                                name="set_reorder_level"
+                                type="checkbox"
+                                value="1"
+                                @checked((bool) old('set_reorder_level'))
+                            >
+                            <span class="user-switch-slider"></span>
+                        </label>
+                        <label for="set_reorder_level" class="inventory-reorder-label">
+                            Set/Update Reorder Level for this product at selected location
+                        </label>
+                    </div>
+                    <label id="reorder-location-hint" for="set_reorder_level" class="inventory-reorder-hint">
+                        Applies to selected location (or destination location for transfer).
                     </label>
                 </div>
-                <label id="reorder-location-hint" for="set_reorder_level" class="inventory-reorder-hint">
-                    Applies to selected location (or destination location for transfer).
-                </label>
+
+                <div class="outlet-form-group" id="group-reorder-min-qty">
+                    <label for="reorder_min_qty">Reorder Min Qty</label>
+                    <input
+                        id="reorder_min_qty"
+                        name="reorder_min_qty"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        class="outlet-input"
+                        value="{{ old('reorder_min_qty') }}"
+                        placeholder="e.g. 10.00"
+                    >
+                </div>
+
+                <div class="outlet-form-group" id="group-reorder-qty">
+                    <label for="reorder_qty">Reorder Qty (Optional)</label>
+                    <input
+                        id="reorder_qty"
+                        name="reorder_qty"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        class="outlet-input"
+                        value="{{ old('reorder_qty') }}"
+                        placeholder="e.g. 25.00"
+                    >
+                </div>
+
+                <div class="outlet-form-group outlet-form-group-full">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" name="notes" class="outlet-input" rows="2" placeholder="Optional transaction note">{{ old('notes') }}</textarea>
+                </div>
             </div>
 
-            <div class="outlet-form-group" id="group-reorder-min-qty">
-                <label for="reorder_min_qty">Reorder Min Qty</label>
-                <input
-                    id="reorder_min_qty"
-                    name="reorder_min_qty"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    class="outlet-input"
-                    value="{{ old('reorder_min_qty') }}"
-                    placeholder="e.g. 10.00"
-                >
+            <div class="outlet-form-actions">
+                <button type="submit" class="btn btn-primary">Save Transaction</button>
             </div>
-
-            <div class="outlet-form-group" id="group-reorder-qty">
-                <label for="reorder_qty">Reorder Qty (Optional)</label>
-                <input
-                    id="reorder_qty"
-                    name="reorder_qty"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    class="outlet-input"
-                    value="{{ old('reorder_qty') }}"
-                    placeholder="e.g. 25.00"
-                >
-            </div>
-
-            <div class="outlet-form-group outlet-form-group-full">
-                <label for="notes">Notes</label>
-                <textarea id="notes" name="notes" class="outlet-input" rows="2" placeholder="Optional transaction note">{{ old('notes') }}</textarea>
-            </div>
-        </div>
-
-        <div class="outlet-form-actions">
-            <button type="submit" class="btn btn-primary">Save Transaction</button>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
+
+<div class="app-tabs" role="tablist" aria-label="Inventory sections">
+    <button type="button" class="app-tab-button js-page-tab is-active" data-tab-target="stock-summary" aria-selected="true">Stock Summary</button>
+    <button type="button" class="app-tab-button js-page-tab" data-tab-target="alerts" aria-selected="false">Low Stock Alerts</button>
 </div>
 
 <div class="js-page-tab-panel" data-tab-panel="alerts" hidden>
@@ -304,8 +312,12 @@
 @section('page-specific-script')
 <script>
     (function () {
+        const body = document.body;
         const tabButtons = Array.from(document.querySelectorAll('.js-page-tab'));
         const tabPanels = Array.from(document.querySelectorAll('.js-page-tab-panel'));
+        const transactionModal = document.getElementById('inventoryTransactionModal');
+        const transactionModalPanel = transactionModal?.querySelector('.app-modal__panel') || null;
+        const openTransactionModalButtons = Array.from(document.querySelectorAll('.js-open-transaction-modal'));
         const trxType = document.getElementById('trx_type');
         const location = document.getElementById('location_id');
         const fromLocation = document.getElementById('from_location_id');
@@ -323,6 +335,26 @@
         const groupAdjustment = document.getElementById('group-adjustment-type');
         const groupReorderMinQty = document.getElementById('group-reorder-min-qty');
         const groupReorderQty = document.getElementById('group-reorder-qty');
+
+        const closeTransactionModal = () => {
+            if (!transactionModal) {
+                return;
+            }
+
+            transactionModal.classList.remove('is-open');
+            transactionModal.setAttribute('aria-hidden', 'true');
+            body.classList.remove('app-modal-open');
+        };
+
+        const openTransactionModal = () => {
+            if (!transactionModal) {
+                return;
+            }
+
+            transactionModal.classList.add('is-open');
+            transactionModal.setAttribute('aria-hidden', 'false');
+            body.classList.add('app-modal-open');
+        };
 
         const setActiveTab = (tab) => {
             tabButtons.forEach((button) => {
@@ -344,7 +376,7 @@
             const hashTab = String(window.location.hash || '').replace('#', '');
             const initialTab = tabPanels.some((panel) => panel.dataset.tabPanel === hashTab)
                 ? hashTab
-                : String(tabButtons[0].dataset.tabTarget || 'transaction');
+                : String(tabButtons[0].dataset.tabTarget || 'stock-summary');
 
             setActiveTab(initialTab);
 
@@ -360,6 +392,20 @@
                 });
             });
         }
+
+        openTransactionModalButtons.forEach((button) => {
+            button.addEventListener('click', openTransactionModal);
+        });
+
+        transactionModal?.querySelectorAll('.js-transaction-modal-close').forEach((button) => {
+            button.addEventListener('click', closeTransactionModal);
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && transactionModal?.classList.contains('is-open')) {
+                closeTransactionModal();
+            }
+        });
 
         if (!trxType) {
             return;
@@ -386,6 +432,7 @@
                 width: '100%',
                 placeholder: product.options[0]?.textContent?.trim() || 'Select Product',
                 allowClear: !product.required,
+                dropdownParent: window.jQuery(transactionModalPanel || transactionModal || document.body),
             });
 
             product.dataset.select2Ready = '1';
@@ -452,6 +499,10 @@
         bindProductChange(product, applyDependentData);
         initInventoryProductSelect2();
         applyVisibility();
+
+        if (@json($errors->any())) {
+            openTransactionModal();
+        }
     })();
 </script>
 @endsection
@@ -502,6 +553,92 @@
         color: #64748b;
         display: block;
         margin-top: 4px;
+    }
+
+    .inventory-actions-card .table-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .app-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1200;
+    }
+
+    .app-modal.is-open {
+        display: flex;
+    }
+
+    .app-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+    }
+
+    .app-modal__panel {
+        position: relative;
+        width: min(960px, calc(100vw - 32px));
+        max-height: calc(100vh - 32px);
+        overflow-x: hidden;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+        box-sizing: border-box;
+    }
+
+    .inventory-transaction-modal__panel {
+        width: min(1080px, calc(100vw - 32px));
+    }
+
+    .inventory-transaction-modal__panel .outlet-form-grid {
+        min-width: 0;
+    }
+
+    .inventory-transaction-modal__panel .outlet-form-group,
+    .inventory-transaction-modal__panel .outlet-input {
+        min-width: 0;
+    }
+
+    .app-modal__header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 20px;
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .app-modal__header h3 {
+        margin: 0;
+    }
+
+    .inventory-modal-close {
+        border: 0;
+        background: transparent;
+        color: #334155;
+        font-size: 28px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .select2-container--open {
+        z-index: 1300;
+    }
+
+    body.app-modal-open {
+        overflow: hidden;
     }
 </style>
 @endsection
