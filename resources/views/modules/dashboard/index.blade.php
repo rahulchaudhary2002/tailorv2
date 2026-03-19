@@ -321,7 +321,7 @@
 
 @if ($roleScope === 'worker')
     <div class="dashboard-grid dashboard-kpi-grid dashboard-kpi-grid-worker">
-        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Assigned Orders</div><div class="dashboard-kpi__value">{{ number_format($workerKpis['assignedCount']) }}</div></div>
+        <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Assigned Tasks</div><div class="dashboard-kpi__value">{{ number_format($workerKpis['assignedCount']) }}</div></div>
         <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Due Today</div><div class="dashboard-kpi__value">{{ number_format($workerKpis['dueToday']) }}</div></div>
         <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Overdue</div><div class="dashboard-kpi__value">{{ number_format($workerKpis['overdue']) }}</div></div>
         <div class="table-card dashboard-kpi"><div class="dashboard-kpi__label">Completed This Week</div><div class="dashboard-kpi__value">{{ number_format($workerKpis['completedThisWeek']) }}</div></div>
@@ -332,17 +332,18 @@
             <div class="table-header"><div class="table-title">My Current Work Queue</div></div>
             <div class="table-container">
                 <table class="table">
-                    <thead><tr><th>Order</th><th>Customer</th><th>Due Date</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Task</th><th>Order</th><th>Customer</th><th>Due Date</th><th>Status</th></tr></thead>
                     <tbody>
                     @forelse ($workerQueue as $row)
                         <tr>
-                            <td>{{ $row->order_number }}</td>
-                            <td>{{ $row->customer?->name ?: '-' }}</td>
+                            <td>{{ $row->task_title ?: ($row->task_number ?: '-') }}</td>
+                            <td>{{ $row->order?->order_number ?: '-' }}</td>
+                            <td>{{ $row->order?->customer?->name ?: '-' }}</td>
                             <td>{{ $row->worker_deadline_at?->format('M d, h:i A') ?: '-' }}</td>
-                            <td>{{ \App\Models\Order::statusLabel((string) $row->status) }}</td>
+                            <td>{{ \App\Models\OrderTask::statusLabels()[(string) $row->status] ?? ucfirst((string) $row->status) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="empty">No active assignments.</td></tr>
+                        <tr><td colspan="5" class="empty">No active assignments.</td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -353,17 +354,18 @@
             <div class="table-header"><div class="table-title">Recently Completed</div></div>
             <div class="table-container">
                 <table class="table">
-                    <thead><tr><th>Order</th><th>Customer</th><th>Completed/Delivered</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Task</th><th>Order</th><th>Customer</th><th>Completed</th><th>Status</th></tr></thead>
                     <tbody>
                     @forelse ($workerRecentlyCompleted as $row)
                         <tr>
-                            <td>{{ $row->order_number }}</td>
-                            <td>{{ $row->customer?->name ?: '-' }}</td>
-                            <td>{{ ($row->delivered_at ?: $row->completed_at)?->format('M d, h:i A') ?: '-' }}</td>
-                            <td>{{ \App\Models\Order::statusLabel((string) $row->status) }}</td>
+                            <td>{{ $row->task_title ?: ($row->task_number ?: '-') }}</td>
+                            <td>{{ $row->order?->order_number ?: '-' }}</td>
+                            <td>{{ $row->order?->customer?->name ?: '-' }}</td>
+                            <td>{{ $row->completed_at?->format('M d, h:i A') ?: '-' }}</td>
+                            <td>{{ \App\Models\OrderTask::statusLabels()[(string) $row->status] ?? ucfirst((string) $row->status) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="empty">No recently completed orders.</td></tr>
+                        <tr><td colspan="5" class="empty">No recently completed tasks.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

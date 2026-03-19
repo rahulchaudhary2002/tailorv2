@@ -134,11 +134,27 @@
                     </a>
                 </li>
             @endcanany
+            @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                <li class="nav-item">
+                    <a href="{{ route('taskManagement.index') }}" class="nav-link {{ request()->routeIs('taskManagement.*') ? 'active' : '' }}">
+                        <i class="fas fa-list-check nav-icon"></i>
+                        <span class="nav-text">Task Management</span>
+                    </a>
+                </li>
+            @endcanany
             @canany(['view-assigned-jobs', 'manage-orders'])
                 <li class="nav-item">
                     <a href="{{ route('order.assignedJobs') }}" class="nav-link {{ request()->routeIs('order.assignedJobs') ? 'active' : '' }}">
                         <i class="fas fa-user-check nav-icon"></i>
                         <span class="nav-text">Assigned Jobs</span>
+                    </a>
+                </li>
+            @endcanany
+            @canany(['view-payment-management', 'manage-payment-management', 'manage-orders'])
+                <li class="nav-item">
+                    <a href="{{ route('paymentManagement.index') }}" class="nav-link {{ request()->routeIs('paymentManagement.*') ? 'active' : '' }}">
+                        <i class="fas fa-money-check-dollar nav-icon"></i>
+                        <span class="nav-text">Payment Management</span>
                     </a>
                 </li>
             @endcanany

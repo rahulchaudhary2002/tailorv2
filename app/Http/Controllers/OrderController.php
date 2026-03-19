@@ -13,8 +13,8 @@ use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\Order;
+use App\Models\OrderTask;
 use App\Models\Product;
-use App\Models\User;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -38,7 +38,8 @@ class OrderController extends Controller
                 'outlet:id,name',
                 'customer:id,name,phone',
                 'creator:id,name',
-                'worker:id,name',
+                'tasks:id,order_id,worker_id,worker_deadline_at,status',
+                'tasks.worker:id,name',
             ]);
 
         if ($outletId > 0) {
@@ -72,8 +73,6 @@ class OrderController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $workers = $this->assignableWorkers($outletId);
-
         $statusLabels = Order::statusLabels();
         $nextStatusesByOrderId = $orders->getCollection()
             ->mapWithKeys(function (Order $order) {
@@ -82,7 +81,6 @@ class OrderController extends Controller
 
         return view('modules.order.index', compact(
             'orders',
-            'workers',
             'statusLabels',
             'nextStatusesByOrderId',
             'reporting'
@@ -95,70 +93,68 @@ class OrderController extends Controller
     public function assignedJobs(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $user = auth()->user();
         $userId = (int) auth()->id();
-        $outletId = $this->currentOutletId();
+        $accessibleOutletIds = $user?->outlets()
+            ->pluck('outlets.id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->values() ?? collect();
 
-        $ordersQuery = Order::query()
+        $tasksQuery = OrderTask::query()
             ->with([
-                'outlet:id,name',
-                'customer:id,name,phone',
-                'creator:id,name',
-                'worker:id,name',
+                'order:id,order_number,customer_id,delivery_due_at,outlet_id,status',
+                'order.outlet:id,name',
+                'order.customer:id,name,phone',
             ])
             ->where('worker_id', $userId)
             ->whereIn('status', [
-                Order::STATUS_ASSIGNED,
-                Order::STATUS_IN_PROGRESS,
-                Order::STATUS_NEAR_COMPLETION,
-                Order::STATUS_COMPLETED,
-                Order::STATUS_DELIVERED,
+                OrderTask::STATUS_ASSIGNED,
+                OrderTask::STATUS_IN_PROGRESS,
+                OrderTask::STATUS_COMPLETED,
             ]);
 
-        if ($outletId > 0) {
-            $ordersQuery->where('outlet_id', $outletId);
+        if ($accessibleOutletIds->isNotEmpty()) {
+            $tasksQuery->whereHas('order', function ($query) use ($accessibleOutletIds): void {
+                $query->whereIn('outlet_id', $accessibleOutletIds);
+            });
         } else {
-            $ordersQuery->whereRaw('1 = 0');
+            $tasksQuery->whereRaw('1 = 0');
         }
 
         if ($q !== '') {
-            $ordersQuery->where(function ($query) use ($q): void {
-                $query->where('order_number', 'like', '%' . $q . '%')
-                    ->orWhere('status', 'like', '%' . $q . '%')
-                    ->orWhereHas('customer', function ($customerQuery) use ($q): void {
-                        $customerQuery->where('name', 'like', '%' . $q . '%')
-                            ->orWhere('phone', 'like', '%' . $q . '%');
-                });
+            $tasksQuery->where(function ($query) use ($q): void {
+                $query->where('task_number', 'like', '%' . $q . '%')
+                    ->orWhere('task_title', 'like', '%' . $q . '%')
+                    ->orWhereHas('order', function ($orderQuery) use ($q): void {
+                        $orderQuery->where('order_number', 'like', '%' . $q . '%')
+                            ->orWhere('status', 'like', '%' . $q . '%')
+                            ->orWhereHas('customer', function ($customerQuery) use ($q): void {
+                                $customerQuery->where('name', 'like', '%' . $q . '%')
+                                    ->orWhere('phone', 'like', '%' . $q . '%');
+                            });
+                    });
             });
         }
 
         $reporting = [
-            'total' => (clone $ordersQuery)->count(),
-            'added_this_week' => (clone $ordersQuery)->where('ordered_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $ordersQuery)->whereBetween('ordered_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $ordersQuery)->where('ordered_at', '>=', now()->subDays(30))->count(),
+            'total' => (clone $tasksQuery)->count(),
+            'assigned' => (clone $tasksQuery)->where('status', OrderTask::STATUS_ASSIGNED)->count(),
+            'in_progress' => (clone $tasksQuery)->where('status', OrderTask::STATUS_IN_PROGRESS)->count(),
+            'completed' => (clone $tasksQuery)->where('status', OrderTask::STATUS_COMPLETED)->count(),
         ];
 
-        $orders = $ordersQuery
-            ->latest('worker_deadline_at')
-            ->latest('ordered_at')
+        $tasks = $tasksQuery
+            ->latest('assigned_at')
+            ->latest('id')
             ->paginate(10)
             ->withQueryString();
 
-        $workers = $this->assignableWorkers($outletId);
-
-        $statusLabels = Order::statusLabels();
-        $nextStatusesByOrderId = $orders->getCollection()
-            ->mapWithKeys(function (Order $order) {
-                return [$order->id => Order::nextStatusesFor((string) $order->status)];
-            });
-
-        return view('modules.order.index', compact(
-            'orders',
-            'workers',
-            'statusLabels',
-            'nextStatusesByOrderId',
-            'reporting'
-        ));
+        return view('modules.order.assigned_jobs', [
+            'tasks' => $tasks,
+            'reporting' => $reporting,
+            'statusLabels' => OrderTask::statusLabels(),
+        ]);
     }
 
     /**
@@ -182,7 +178,9 @@ class OrderController extends Controller
 
         $user = auth()->user();
         $canManageOrders = (bool) $user?->hasPermission('manage-orders');
-        $isOwnAssignedOrder = (int) ($order->worker_id ?? 0) === (int) ($user?->id ?? 0);
+        $isOwnAssignedOrder = $order->tasks()
+            ->where('worker_id', (int) ($user?->id ?? 0))
+            ->exists();
 
         if (!$canManageOrders && !$isOwnAssignedOrder) {
             abort(403);
@@ -216,7 +214,8 @@ class OrderController extends Controller
             'outlet:id,name',
             'customer:id,name,phone,email,address',
             'creator:id,name',
-            'worker:id,name',
+            'tasks:id,order_id,worker_id,worker_deadline_at,status',
+            'tasks.worker:id,name',
             'items.product:id,name,code',
             'items.unit:id,name,symbol',
         ]);
@@ -307,7 +306,6 @@ class OrderController extends Controller
             ->get(['id', 'title']);
 
         $selectedCustomerId = $request->query('customer_id');
-        $workers = $this->assignableWorkers($outletId);
 
         $initialOrderState = $this->buildInitialOrderState($request, $products, $garmentTypes, $editingOrder);
 
@@ -316,7 +314,6 @@ class OrderController extends Controller
             'customers',
             'garmentTypes',
             'selectedCustomerId',
-            'workers',
             'productAvailableQty',
             'editingOrder',
             'initialOrderState'
@@ -396,10 +393,6 @@ class OrderController extends Controller
         $deliveryDueAt = $validated['delivery_due_at'];
 
         $order->delivery_due_at = $deliveryDueAt;
-
-        if ($order->delivery_due_at && $order->worker_deadline_at && $order->worker_deadline_at->gt($order->delivery_due_at)) {
-            $order->worker_deadline_at = $order->delivery_due_at;
-        }
 
         $order->save();
 
@@ -613,13 +606,6 @@ class OrderController extends Controller
 
             DB::transaction(function () use ($request, $validated, $items, $products, $outletLocation, $inventoryTypeId, $outletId, $garmentTypes, $productFabricPriceMap, $vatEnabled, $existingOrder, &$savedOrder): void {
                 $status = (string) $validated['status'];
-                $workerId = (int) ($validated['worker_id'] ?? 0);
-                $hasAssignedOrLaterStatus = in_array($status, [
-                    Order::STATUS_ASSIGNED,
-                    Order::STATUS_IN_PROGRESS,
-                    Order::STATUS_NEAR_COMPLETION,
-                    Order::STATUS_COMPLETED,
-                ], true);
                 $hasFabricIssuedOrLaterStatus = in_array($status, [
                     Order::STATUS_FABRIC_ISSUED,
                     Order::STATUS_ASSIGNED,
@@ -643,11 +629,6 @@ class OrderController extends Controller
                     'order_number' => $order->exists ? $order->order_number : $this->generateOrderNumber(),
                     'outlet_id' => $outletId,
                     'customer_id' => (int) $validated['customer_id'],
-                    'worker_id' => $workerId > 0 ? $workerId : null,
-                    'worker_assigned_at' => $hasAssignedOrLaterStatus
-                        ? ($order->worker_assigned_at ?? now())
-                        : null,
-                    'worker_deadline_at' => $validated['worker_deadline_at'] ?? null,
                     'ordered_at' => $validated['ordered_at'],
                     'delivery_due_at' => $validated['delivery_due_at'] ?? null,
                     'status' => $status,
@@ -851,7 +832,9 @@ class OrderController extends Controller
         $user = auth()->user();
         $canManageOrders = (bool) $user?->hasPermission('manage-orders');
         $canViewAssignedJobs = (bool) $user?->hasPermission(self::WORKER_PERMISSION_KEY);
-        $isOwnAssignedOrder = (int) ($order->worker_id ?? 0) === (int) ($user?->id ?? 0);
+        $isOwnAssignedOrder = $order->tasks()
+            ->where('worker_id', (int) ($user?->id ?? 0))
+            ->exists();
         $redirectRoute = $canManageOrders ? 'order.index' : 'order.assignedJobs';
 
         if (!$canManageOrders) {
@@ -871,6 +854,18 @@ class OrderController extends Controller
 
         $validated = $request->validated();
         $targetStatus = (string) ($validated['status'] ?? '');
+
+        if ($targetStatus === Order::STATUS_COMPLETED) {
+            $hasIncompleteTasks = $order->tasks()
+                ->whereNotIn('status', [OrderTask::STATUS_COMPLETED, OrderTask::STATUS_CANCELLED])
+                ->exists();
+
+            if ($hasIncompleteTasks) {
+                return redirect()
+                    ->route($redirectRoute)
+                    ->with('error', 'Complete all tasks before marking the order as completed.');
+            }
+        }
 
         if (!$canManageOrders) {
             $allowedWorkerStatuses = [
@@ -994,7 +989,8 @@ class OrderController extends Controller
         $order->loadMissing([
             'outlet:id,name',
             'customer:id,name,email,phone,address',
-            'worker:id,name,email',
+            'tasks:id,order_id,worker_id,worker_deadline_at,payable_amount,status',
+            'tasks.worker:id,name,email',
             'items.product:id,name,code',
             'items.unit:id,name,symbol',
         ]);
@@ -1566,22 +1562,6 @@ class OrderController extends Controller
                 ->values()
                 ->all(),
         ];
-    }
-
-    /**
-     * @return \Illuminate\Support\Collection<int, User>
-     */
-    private function assignableWorkers(?int $outletId = null): \Illuminate\Support\Collection
-    {
-        $scopeOutletId = $outletId && $outletId > 0
-            ? $outletId
-            : null;
-
-        return User::query()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->filter(fn (User $user) => $user->hasPermission(self::WORKER_PERMISSION_KEY, $scopeOutletId))
-            ->values();
     }
 
     private function syncCustomerMeasurementsFromOrderItems(int $customerId, Collection $items): void

@@ -85,7 +85,7 @@ class CustomerController extends Controller
         ]);
 
         $ordersQuery = $customer->orders()
-            ->with(['outlet:id,name', 'worker:id,name'])
+            ->with(['outlet:id,name'])
             ->when($currentOutletId > 0, function ($query) use ($currentOutletId): void {
                 $query->where('outlet_id', $currentOutletId);
             });
@@ -97,7 +97,6 @@ class CustomerController extends Controller
                 'id',
                 'order_number',
                 'outlet_id',
-                'worker_id',
                 'ordered_at',
                 'delivery_due_at',
                 'status',

@@ -60,6 +60,16 @@ class User extends Authenticatable
         return $this->belongsTo(Outlet::class, 'current_outlet_id');
     }
 
+    public function assignedTasks()
+    {
+        return $this->hasMany(OrderTask::class, 'worker_id');
+    }
+
+    public function createdTasks()
+    {
+        return $this->hasMany(OrderTask::class, 'created_by');
+    }
+
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'user_role')

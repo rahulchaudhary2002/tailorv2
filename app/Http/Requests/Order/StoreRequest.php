@@ -32,8 +32,6 @@ class StoreRequest extends FormRequest
             'ordered_at' => ['required', 'date'],
             'delivery_due_at' => ['nullable', 'date', 'after_or_equal:ordered_at'],
             'status' => ['required', 'string', Rule::in(Order::creatableStatuses())],
-            'worker_id' => ['nullable', 'integer', 'exists:users,id'],
-            'worker_deadline_at' => ['nullable', 'date', 'after_or_equal:ordered_at'],
             'payment_status' => ['required', 'string', Rule::in(Order::availablePaymentStatuses())],
             'payment_method' => ['nullable', 'string', 'max:100'],
             'advance_payment_amount' => ['nullable', 'numeric', 'min:0'],
@@ -285,21 +283,6 @@ class StoreRequest extends FormRequest
 
             if ($advanceAmount > $netTotal) {
                 $validator->errors()->add('advance_payment_amount', 'Advance payment amount cannot be greater than payable amount after discount.');
-            }
-
-            if (in_array($status, [
-                Order::STATUS_ASSIGNED,
-                Order::STATUS_IN_PROGRESS,
-                Order::STATUS_NEAR_COMPLETION,
-                Order::STATUS_COMPLETED,
-            ], true)) {
-                if ((int) $this->input('worker_id', 0) < 1) {
-                    $validator->errors()->add('worker_id', 'Worker is required for assigned/in-progress/completed order status.');
-                }
-
-                if (empty($this->input('worker_deadline_at'))) {
-                    $validator->errors()->add('worker_deadline_at', 'Worker deadline is required for assigned/in-progress/completed order status.');
-                }
             }
 
             if (in_array($status, [Order::STATUS_DELIVERED, Order::STATUS_CANCELLED], true)) {

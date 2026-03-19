@@ -26,9 +26,6 @@ class Order extends Model
         'ordered_at',
         'delivery_due_at',
         'status',
-        'worker_id',
-        'worker_assigned_at',
-        'worker_deadline_at',
         'fabric_issued_at',
         'completed_at',
         'delivered_at',
@@ -48,8 +45,6 @@ class Order extends Model
     protected $casts = [
         'ordered_at' => 'datetime',
         'delivery_due_at' => 'datetime',
-        'worker_assigned_at' => 'datetime',
-        'worker_deadline_at' => 'datetime',
         'fabric_issued_at' => 'datetime',
         'completed_at' => 'datetime',
         'delivered_at' => 'datetime',
@@ -77,14 +72,14 @@ class Order extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function worker()
-    {
-        return $this->belongsTo(User::class, 'worker_id');
-    }
-
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(OrderTask::class);
     }
 
     public function payableAmount(): float

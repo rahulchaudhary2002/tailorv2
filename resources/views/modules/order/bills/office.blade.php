@@ -11,6 +11,9 @@
 </div>
 
 <div class="table-card bill-wrap">
+    @php
+        $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
+    @endphp
     <div class="bill-actions">
         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
     </div>
@@ -24,7 +27,7 @@
             <div class="bill-muted">
                 <div>Order Date: {{ $order->ordered_at?->format('M d, Y h:i A') ?: '-' }}</div>
                 <div>Customer: {{ $order->customer?->name ?: 'Walk-in' }}</div>
-                <div>Worker: {{ $order->worker?->name ?: 'Unassigned' }}</div>
+                <div>Task Workers: {{ $taskWorkers->isNotEmpty() ? $taskWorkers->implode(', ') : 'Unassigned' }}</div>
             </div>
         </div>
 

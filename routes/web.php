@@ -11,6 +11,8 @@ use App\Http\Controllers\GarmentTypeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManufactureUnitController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PaymentManagementController;
+use App\Http\Controllers\TaskManagementController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VendorController;
@@ -145,7 +147,19 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{order}/bill/worker', [OrderController::class, 'workerBill'])->name('bill.worker')->middleware('can:view-assigned-jobs,manage-orders');
         Route::get('/{order}/bill/office', [OrderController::class, 'officeBill'])->name('bill.office')->middleware('can:manage-orders');
         Route::put('/payment/{order}', [OrderController::class, 'updatePayment'])->name('payment.update')->middleware('can:manage-orders');
-        Route::put('/status/{order}', [OrderController::class, 'updateStatus'])->name('status.update')->middleware('can:manage-orders,view-assigned-jobs');
+        Route::put('/status/{order}', [OrderController::class, 'updateStatus'])->name('status.update')->middleware('can:manage-orders');
+    });
+
+    Route::group(['prefix' => 'task-management', 'as' => 'taskManagement.'], function () {
+        Route::get('/', [TaskManagementController::class, 'index'])->name('index')->middleware('can:view-task-management,manage-task-management,manage-orders');
+        Route::put('/update/{task}', [TaskManagementController::class, 'update'])->name('update')->middleware('can:manage-task-management,manage-orders');
+        Route::put('/worker-update/{task}', [TaskManagementController::class, 'workerUpdate'])->name('workerUpdate')->middleware('can:view-assigned-jobs,manage-orders');
+        Route::get('/slip/{task}', [TaskManagementController::class, 'slip'])->name('slip')->middleware('can:view-task-management,manage-task-management,view-assigned-jobs,manage-orders');
+    });
+
+    Route::group(['prefix' => 'payment-management', 'as' => 'paymentManagement.'], function () {
+        Route::get('/', [PaymentManagementController::class, 'index'])->name('index')->middleware('can:view-payment-management,manage-payment-management,manage-orders');
+        Route::put('/task/{task}/pay', [PaymentManagementController::class, 'payWorkerTask'])->name('task.pay')->middleware('can:manage-payment-management,manage-orders');
     });
 
     Route::group(['prefix' => 'garment-type', 'as' => 'garmentType.'], function () {

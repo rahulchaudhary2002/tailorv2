@@ -39,7 +39,7 @@
                     <th>Date</th>
                     <th>Customer</th>
                     <th>Delivery</th>
-                    <th>Worker</th>
+                    <th>Task Worker</th>
                     <th>Status</th>
                     <th>Payment</th>
                     <th>Total Amount</th>
@@ -53,7 +53,18 @@
                         $canManageOrders = (bool) $authUser?->hasPermission('manage-orders');
                         $canViewOrders = (bool) $authUser?->hasPermission('view-orders');
                         $canViewAssignedJobs = (bool) $authUser?->hasPermission('view-assigned-jobs');
-                        $isOwnAssignedOrder = (int) ($order->worker_id ?? 0) === (int) ($authUser?->id ?? 0);
+                        $taskWorkers = $order->tasks
+                            ->pluck('worker.name')
+                            ->filter()
+                            ->unique()
+                            ->values();
+                        $taskDeadline = $order->tasks
+                            ->pluck('worker_deadline_at')
+                            ->filter()
+                            ->sort()
+                            ->first();
+                        $isOwnAssignedOrder = $order->tasks
+                            ->contains(fn ($task) => (int) ($task->worker_id ?? 0) === (int) ($authUser?->id ?? 0));
                         $netPayable = $order->payableAmount();
                         $paidAmount = $order->paidAmount();
                         $remainingDue = $order->dueAmount();
@@ -84,7 +95,6 @@
                             \App\Models\Order::STATUS_DELIVERED,
                             \App\Models\Order::STATUS_CANCELLED,
                         ], true);
-                        $workerName = $order->worker?->name ?: '-';
                     @endphp
                     <tr>
                         <td>
@@ -138,8 +148,8 @@
                             <small>Delivered: {{ $order->delivered_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
                         <td>
-                            <div>{{ $workerName }}</div>
-                            <small>Deadline: {{ $order->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</small>
+                            <div>{{ $taskWorkers->isNotEmpty() ? $taskWorkers->implode(', ') : '-' }}</div>
+                            <small>Deadline: {{ $taskDeadline?->format('M d, Y h:i A') ?: '-' }}</small>
                             <small style="display:block;">Fabric Issued: {{ $order->fabric_issued_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
                         <td>{{ $statusLabels[$order->status] ?? ucfirst($order->status ?: '-') }}</td>
@@ -216,21 +226,6 @@
 
                                             <input type="hidden" class="remaining-due-value" value="{{ number_format($remainingDue, 2, '.', '') }}">
 
-                                            <div class="worker-assign-wrap order-actions-hidden-row">
-                                                <select name="worker_id" class="outlet-input">
-                                                    <option value="">Select Worker</option>
-                                                    @foreach ($workers as $worker)
-                                                        <option value="{{ $worker->id }}" @selected((int) $order->worker_id === (int) $worker->id)>{{ $worker->name }}</option>
-                                                    @endforeach
-                                                </select>
-                                                <input
-                                                    name="worker_deadline_at"
-                                                    type="datetime-local"
-                                                    class="outlet-input"
-                                                    value="{{ old('worker_deadline_at', $order->worker_deadline_at?->format('Y-m-d\TH:i') ?: $order->delivery_due_at?->format('Y-m-d\TH:i')) }}"
-                                                >
-                                            </div>
-
                                             <div class="remaining-payment-wrap order-actions-hidden-row">
                                                 <input
                                                     name="remaining_payment_amount"
@@ -265,9 +260,6 @@
                                         @if ($canManageOrders || $canViewOrders)
                                             <a href="{{ route('order.bill.customer', $order) }}" target="_blank" class="order-actions-link">Customer Bill</a>
                                         @endif
-                                        @if ($canManageOrders || ($canViewAssignedJobs && $isOwnAssignedOrder))
-                                            <a href="{{ route('order.bill.worker', $order) }}" target="_blank" class="order-actions-link">Worker Slip</a>
-                                        @endif
                                         @if ($canManageOrders)
                                             <a href="{{ route('order.bill.office', $order) }}" target="_blank" class="order-actions-link">Office Bill</a>
                                         @endif
@@ -278,7 +270,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="empty">No orders found.</td>
+                        <td colspan="9" class="empty">No orders found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -596,9 +588,6 @@
             const remainingWrap = form.querySelector('.remaining-payment-wrap');
             const remainingInput = form.querySelector('.remaining-payment-input');
             const dueInput = form.querySelector('.remaining-due-value');
-            const workerWrap = form.querySelector('.worker-assign-wrap');
-            const workerSelect = workerWrap?.querySelector('select[name="worker_id"]');
-            const workerDeadline = workerWrap?.querySelector('input[name="worker_deadline_at"]');
 
             if (!statusSelect) {
                 return;
@@ -606,18 +595,7 @@
 
             const toggleFields = () => {
                 const selected = statusSelect.value;
-                const isAssigned = selected === '{{ \App\Models\Order::STATUS_ASSIGNED }}';
                 const isDelivered = selected === '{{ \App\Models\Order::STATUS_DELIVERED }}';
-
-                if (workerWrap) {
-                    workerWrap.style.display = isAssigned ? 'flex' : 'none';
-                }
-                if (workerSelect) {
-                    workerSelect.required = isAssigned;
-                }
-                if (workerDeadline) {
-                    workerDeadline.required = isAssigned;
-                }
 
                 if (remainingWrap && remainingInput && dueInput) {
                     remainingWrap.style.display = isDelivered ? 'flex' : 'none';

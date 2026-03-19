@@ -23,17 +23,6 @@ class OrderWorkflowService
             $order->fabric_issued_at = $now;
         }
 
-        if ($toStatus === Order::STATUS_ASSIGNED) {
-            $workerId = (int) ($payload['worker_id'] ?? 0);
-            if ($workerId < 1) {
-                throw new \RuntimeException('Worker is required when assigning the order.');
-            }
-
-            $order->worker_id = $workerId;
-            $order->worker_assigned_at = $payload['worker_assigned_at'] ?? $now;
-            $order->worker_deadline_at = $payload['worker_deadline_at'] ?? $order->delivery_due_at;
-        }
-
         if ($toStatus === Order::STATUS_COMPLETED && !$order->completed_at) {
             $order->completed_at = $now;
         }

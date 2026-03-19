@@ -38,8 +38,6 @@ class UpdateStatusRequest extends FormRequest
             ],
             'remaining_payment_amount' => ['nullable', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:100'],
-            'worker_id' => ['nullable', 'integer', 'exists:users,id'],
-            'worker_deadline_at' => ['nullable', 'date'],
         ];
     }
 
@@ -47,16 +45,6 @@ class UpdateStatusRequest extends FormRequest
     {
         $validator->after(function (\Illuminate\Validation\Validator $validator): void {
             $status = (string) $this->input('status', '');
-
-            if ($status === Order::STATUS_ASSIGNED) {
-                if ((int) $this->input('worker_id', 0) < 1) {
-                    $validator->errors()->add('worker_id', 'Worker is required when assigning the order.');
-                }
-
-                if (empty($this->input('worker_deadline_at'))) {
-                    $validator->errors()->add('worker_deadline_at', 'Worker deadline is required when assigning the order.');
-                }
-            }
 
             if ($status === Order::STATUS_DELIVERED && empty($this->input('payment_method'))) {
                 $validator->errors()->add('payment_method', 'Payment method is required when delivering the order.');

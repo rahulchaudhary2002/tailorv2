@@ -22,13 +22,15 @@ class UpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $targetUser = $this->route('user') ?? $this->route('worker');
+
         return [
             'name' => ['required', 'string', 'max:100'],
             'email' => [
                 'required',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore($this->route('user')),
+                Rule::unique('users', 'email')->ignore($targetUser),
             ],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],

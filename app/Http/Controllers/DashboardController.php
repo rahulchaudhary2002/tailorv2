@@ -9,6 +9,7 @@ use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderTask;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\VendorRawMaterialPurchase;
@@ -419,20 +420,20 @@ class DashboardController extends Controller
         $workerRecentlyCompleted = collect();
 
         if ($isWorker) {
-            $workerBase = Order::query()
+            $workerBase = OrderTask::query()
+                ->with(['order:id,order_number,customer_id,outlet_id', 'order.customer:id,name'])
                 ->where('worker_id', (int) $user->id);
 
             if ($outletContextId > 0) {
-                $workerBase->where('outlet_id', $outletContextId);
+                $workerBase->whereHas('order', function (Builder $query) use ($outletContextId): void {
+                    $query->where('outlet_id', $outletContextId);
+                });
             }
 
             $activeStatuses = [
-                Order::STATUS_PENDING,
-                Order::STATUS_CONFIRMED,
-                Order::STATUS_FABRIC_ISSUED,
-                Order::STATUS_ASSIGNED,
-                Order::STATUS_IN_PROGRESS,
-                Order::STATUS_NEAR_COMPLETION,
+                OrderTask::STATUS_PENDING,
+                OrderTask::STATUS_ASSIGNED,
+                OrderTask::STATUS_IN_PROGRESS,
             ];
 
             $workerAssignedCount = (int) (clone $workerBase)
@@ -453,26 +454,21 @@ class DashboardController extends Controller
             $weekStart = $now->copy()->startOfWeek();
             $weekEnd = $now->copy()->endOfWeek();
             $workerCompletedThisWeek = (int) (clone $workerBase)
-                ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_DELIVERED])
-                ->where(function (Builder $query) use ($weekStart, $weekEnd): void {
-                    $query->whereBetween('completed_at', [$weekStart, $weekEnd])
-                        ->orWhereBetween('delivered_at', [$weekStart, $weekEnd]);
-                })
+                ->where('status', OrderTask::STATUS_COMPLETED)
+                ->whereBetween('completed_at', [$weekStart, $weekEnd])
                 ->count();
 
             $workerQueue = (clone $workerBase)
-                ->with(['customer:id,name'])
                 ->whereIn('status', $activeStatuses)
                 ->orderBy('worker_deadline_at')
                 ->limit(15)
-                ->get(['id', 'order_number', 'customer_id', 'worker_deadline_at', 'status']);
+                ->get(['id', 'order_id', 'task_number', 'task_title', 'worker_deadline_at', 'status']);
 
             $workerRecentlyCompleted = (clone $workerBase)
-                ->with(['customer:id,name'])
-                ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_DELIVERED])
-                ->orderByRaw('COALESCE(delivered_at, completed_at, updated_at) DESC')
+                ->where('status', OrderTask::STATUS_COMPLETED)
+                ->orderByRaw('COALESCE(completed_at, updated_at) DESC')
                 ->limit(10)
-                ->get(['id', 'order_number', 'customer_id', 'completed_at', 'delivered_at', 'status']);
+                ->get(['id', 'order_id', 'task_number', 'task_title', 'completed_at', 'status']);
         }
 
         $monthStart = $now->copy()->startOfMonth();

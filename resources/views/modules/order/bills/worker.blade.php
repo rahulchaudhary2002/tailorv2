@@ -11,6 +11,10 @@
 </div>
 
 <div class="table-card bill-wrap">
+    @php
+        $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
+        $taskDeadline = $order->tasks->pluck('worker_deadline_at')->filter()->sort()->first();
+    @endphp
     <div class="bill-actions">
         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
     </div>
@@ -46,8 +50,8 @@
         @endphp
 
         <div class="bill-grid">
-            <div class="bill-grid-item"><span class="bill-grid-label">Worker Name:</span> {{ $order->worker?->name ?: 'Unassigned' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Deadline:</span> {{ $order->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</div>
+            <div class="bill-grid-item"><span class="bill-grid-label">Worker Name:</span> {{ $taskWorkers->isNotEmpty() ? $taskWorkers->implode(', ') : 'Unassigned' }}</div>
+            <div class="bill-grid-item"><span class="bill-grid-label">Deadline:</span> {{ $taskDeadline?->format('M d, Y h:i A') ?: '-' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Fabric Issued:</span> {{ $order->fabric_issued_at?->format('M d, Y h:i A') ?: '-' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Work Type:</span> {{ $workTypes->isNotEmpty() ? $workTypes->implode(', ') : 'General Tailoring' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Payment Amount:</span> {{ number_format($workerPayment, 2) }}</div>

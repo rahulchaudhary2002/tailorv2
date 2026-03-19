@@ -83,8 +83,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
     <input type="hidden" id="ordered_at" name="ordered_at" value="{{ old('ordered_at', $editingOrder?->ordered_at?->format('Y-m-d H:i:s') ?: now()->format('Y-m-d H:i:s')) }}">
     <input type="hidden" id="delivery_due_at" name="delivery_due_at" value="{{ old('delivery_due_at', $editingOrder?->delivery_due_at?->format('Y-m-d H:i:s')) }}">
     <input type="hidden" id="status" name="status" value="{{ old('status', $editingOrder?->status ?: \App\Models\Order::STATUS_CONFIRMED) }}">
-    <input type="hidden" id="worker_id" name="worker_id" value="{{ old('worker_id', $editingOrder?->worker_id) }}">
-    <input type="hidden" id="worker_deadline_at" name="worker_deadline_at" value="{{ old('worker_deadline_at', $editingOrder?->worker_deadline_at?->format('Y-m-d H:i:s')) }}">
     <input type="hidden" id="notes" name="notes" value="{{ old('notes', $editingOrder?->notes) }}">
     <input type="hidden" id="payment_status" name="payment_status" value="{{ old('payment_status', $editingOrder?->payment_status ?: \App\Models\Order::PAYMENT_STATUS_UNPAID) }}">
     <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method', $editingOrder?->payment_method) }}">

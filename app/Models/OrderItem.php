@@ -38,4 +38,9 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Unit::class);
     }
+
+    public function tasks()
+    {
+        return $this->hasMany(OrderTask::class);
+    }
 }

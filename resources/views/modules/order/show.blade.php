@@ -3,6 +3,10 @@
 @section('title', 'View Order')
 
 @section('content')
+@php
+    $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
+    $taskDeadline = $order->tasks->pluck('worker_deadline_at')->filter()->sort()->first();
+@endphp
 <div class="page-header">
     <div class="page-title">
         <h1 class="text-dark">Order {{ $order->order_number }}</h1>
@@ -40,8 +44,12 @@
             <div>{{ $order->delivery_due_at?->format('M d, Y h:i A') ?? '-' }}</div>
         </div>
         <div class="outlet-form-group">
-            <label>Worker</label>
-            <div>{{ $order->worker?->name ?? 'Unassigned' }}</div>
+            <label>Task Workers</label>
+            <div>{{ $taskWorkers->isNotEmpty() ? $taskWorkers->implode(', ') : 'Unassigned' }}</div>
+        </div>
+        <div class="outlet-form-group">
+            <label>Task Deadline</label>
+            <div>{{ $taskDeadline?->format('M d, Y h:i A') ?? '-' }}</div>
         </div>
         <div class="outlet-form-group">
             <label>Created By</label>
