@@ -310,14 +310,8 @@ $customerLookupPayload = $customers->map(function ($customer) {
             <div class="tp-modal-body">
                 <div class="tp-modal-info">
                     <div><strong>Product:</strong> <span id="modalProductName">-</span></div>
-                    <div><strong>Unit Price:</strong> <span id="modalProductPrice">0.00</span></div>
-                    <div><strong>Qty:</strong> <span id="modalProductQuantity">0.00</span></div>
-                    <div><strong>Queue:</strong> <span id="modalQueueLabel">-</span></div>
-                </div>
-
-                <div class="tp-modal-section" style="margin-top:14px;">
-                    <h4><i class="fas fa-layer-group"></i> Selected Fabrics</h4>
-                    <div id="selectedFabricQueue" class="tp-selected-fabric-queue"></div>
+                    <div><strong>Fabric Price:</strong> <span id="modalProductPrice">NPR 0.00 per meter</span></div>
+                    <div><strong>Fabric Quantity (meters):</strong> <span id="modalProductQuantity">0.00</span></div>
                 </div>
 
                 <div class="tp-form-group" style="margin-top: 14px;">
@@ -608,10 +602,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-product-quantity-item strong{color:var(--primary);}
 .tp-product-quantity-input{display:flex;align-items:center;gap:8px;}
 .tp-product-quantity-input input{width:110px;}
-.tp-selected-fabric-queue{display:grid;gap:8px;}
-.tp-selected-fabric-chip{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d7e0ec;border-radius:10px;background:#f7fafd;color:var(--primary);}
-.tp-selected-fabric-chip.active{border-color:#7b1fa2;background:#f9f0ff;box-shadow:0 0 0 2px rgba(123,31,162,.12);}
-.tp-selected-fabric-chip strong{color:inherit;}
 .tp-stitching{background:#f9f0ff;border-color:#eadcf6;}
 .tp-tailoring-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
 .tp-tailoring-option{background:#fff;border:1px solid #d1c4e9;border-radius:10px;padding:12px;cursor:pointer;transition:.2s;}
@@ -708,8 +698,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const modalProductPrice = document.getElementById('modalProductPrice');
     const modalProductQuantity = document.getElementById('modalProductQuantity');
     const modalProductCounter = document.getElementById('modalProductCounter');
-    const modalQueueLabel = document.getElementById('modalQueueLabel');
-    const selectedFabricQueue = document.getElementById('selectedFabricQueue');
     const garmentTypeCheckboxes = document.getElementById('garmentTypeCheckboxes');
     const measurementFieldsEl = document.getElementById('measurementFields');
     const customFabricOwnRadio = document.getElementById('customFabricOwn');
@@ -733,6 +721,19 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     function money(value) {
         return Number(value || 0).toFixed(2);
+    }
+
+    function normalizeUnitLabel(unitLabel) {
+        const normalizedUnit = String(unitLabel || '').trim().toLowerCase();
+        if (!normalizedUnit) return 'meter';
+        if (normalizedUnit === 'm') return 'meter';
+        if (normalizedUnit === 'pcs') return 'pieces';
+        if (normalizedUnit === 'pc') return 'piece';
+        return normalizedUnit;
+    }
+
+    function formatFabricPrice(value, unitLabel = 'meter') {
+        return `NPR ${money(value)} per ${normalizeUnitLabel(unitLabel)}`;
     }
 
     function normalizePhone(value) {
@@ -906,10 +907,12 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         return product.defaultPrice != null ? Number(product.defaultPrice) : 0;
     }
 
-    function rebuildProductSelect(category) {
+    function rebuildProductSelect(category, preserveSelection = true) {
         const isCustom = category === 'custom';
         const list = filterProductsByCategory(category);
-        const selectedValues = isCustom ? getSelectedProductIds() : (productSelect.value ? [String(productSelect.value)] : []);
+        const selectedValues = preserveSelection
+            ? (isCustom ? getSelectedProductIds() : (productSelect.value ? [String(productSelect.value)] : []))
+            : [];
 
         productSelect.innerHTML = '';
         productSelect.removeAttribute('size');
@@ -1017,6 +1020,18 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             : '-';
     }
 
+    function resetOrderEntryFields() {
+        categorySelect.value = 'fabric';
+        selectedCustomProductIds = [];
+        qtyInput.value = '1';
+        customQuantityContainer.innerHTML = '';
+        sizeRadios.forEach((radio) => {
+            radio.checked = false;
+        });
+        rebuildProductSelect(categorySelect.value, false);
+        unitHint.textContent = '-';
+    }
+
     function syncCustomProductQuantities() {
         if (categorySelect.value !== 'custom') {
             return;
@@ -1099,7 +1114,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             const draft = existingDrafts.get(String(garmentTypeId));
             const savedMeasurements = getCustomerMeasurementForGarment(customerId, garmentTypeId);
             const baseMeasurements = garment.measurements || [];
-            const selectedPackageId = draft?.tailoringPackageId || existingGarment?.tailoring?.packageId || '';
+            const defaultPackageId = garment.tailoringPackages?.[0]?.id || '';
+            const selectedPackageId = draft?.tailoringPackageId || existingGarment?.tailoring?.packageId || defaultPackageId;
 
             const section = document.createElement('div');
             section.className = 'tp-garment-section';
@@ -1124,7 +1140,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             });
             measurementHtml += '</div>';
 
-            let tailoringOptions = '<option value="">Select tailoring package</option>';
+            let tailoringOptions = '';
             (garment.tailoringPackages || []).forEach((pkg) => {
                 tailoringOptions += `
                     <option
@@ -1172,37 +1188,20 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         const stockUnitPrice = Number(pending.unitPrice || resolveDefaultPrice(pending.productId) || 0);
+        const unitLabel = pending.unitLabel || 'meter';
 
         if (source === 'stock') {
-            modalProductPrice.textContent = money(stockUnitPrice);
+            modalProductPrice.textContent = formatFabricPrice(stockUnitPrice, unitLabel);
             modalProductQuantity.textContent = money(Number(customStockFabricQty.value || 0));
             const product = productMap.get(String(pending.productId || ''));
             customStockFabricHint.textContent = product
                 ? `Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim()
                 : 'Selected stock fabric is unavailable.';
         } else {
-            modalProductPrice.textContent = money(0);
+            modalProductPrice.textContent = formatFabricPrice(stockUnitPrice, unitLabel);
             modalProductQuantity.textContent = money(Number(pending.qty || 0));
             customStockFabricHint.textContent = '';
         }
-    }
-
-    function renderSelectedFabricQueue() {
-        if (!selectedFabricQueue) return;
-        if (!pendingCustomQueue.length) {
-            selectedFabricQueue.innerHTML = '<div class="tp-hint">No custom fabrics selected yet.</div>';
-            return;
-        }
-
-        selectedFabricQueue.innerHTML = pendingCustomQueue.map((item, index) => `
-            <div class="tp-selected-fabric-chip ${index === pendingCustomIndex ? 'active' : ''}">
-                <div>
-                    <strong>${item.name}</strong>
-                    <div class="tp-garment-summary">Qty: ${money(item.qty)} ${item.unitLabel || ''}</div>
-                </div>
-                <div>${index === pendingCustomIndex ? 'Current' : `Next ${index + 1}`}</div>
-            </div>
-        `).join('');
     }
 
     function openModal() {
@@ -1223,9 +1222,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             input.checked = false;
         });
         measurementFieldsEl.innerHTML = '<div class="tp-hint">Select at least one garment type.</div>';
-        if (selectedFabricQueue) {
-            selectedFabricQueue.innerHTML = '';
-        }
     }
 
     function closeModal() {
@@ -1251,16 +1247,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         modalProductName.textContent = pending.name;
-        modalProductPrice.textContent = money(pending.unitPrice);
+        modalProductPrice.textContent = formatFabricPrice(pending.unitPrice, pending.unitLabel || 'meter');
         modalProductQuantity.textContent = money(pending.qty);
         if (modalProductCounter) {
             modalProductCounter.textContent = `${pendingCustomIndex + 1}/${pendingCustomQueue.length}`;
         }
-        if (modalQueueLabel) {
-            modalQueueLabel.textContent = `${pending.name} (${pendingCustomIndex + 1} of ${pendingCustomQueue.length})`;
-        }
-        renderSelectedFabricQueue();
-
         const itemState = {
             garments: existingItem?.garments || [],
         };
@@ -1595,9 +1586,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             unitPrice: resolveDefaultPrice(productId),
             size: category === 'readymade' ? selectedReadymadeSize() : null,
         });
-        productSelect.value = '';
-        qtyInput.value = '1';
-        updateProductSelectionUI();
+        resetOrderEntryFields();
         renderBill();
     });
 
@@ -1716,6 +1705,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         pendingCustomIndex += 1;
         if (pendingCustomIndex >= pendingCustomQueue.length) {
             closeModal();
+            resetOrderEntryFields();
             renderBill();
             return;
         }
