@@ -15,29 +15,23 @@ class UnitController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
 
         $unitsQuery = Unit::query();
 
         if ($q !== '') {
-            $unitsQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('symbol', 'like', '%' . $q . '%');
+            $unitsQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(symbol) LIKE ?', ['%' . $qLower . '%']);
             });
         }
-
-        $reporting = [
-            'total' => (clone $unitsQuery)->count(),
-            'added_this_week' => (clone $unitsQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $unitsQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $unitsQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
 
         $units = $unitsQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.unit.index', compact('units', 'reporting'));
+        return view('modules.unit.index', compact('units'));
     }
 
     /**

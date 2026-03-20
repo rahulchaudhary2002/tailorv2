@@ -14,12 +14,19 @@ class TaskManagementController extends Controller
     {
     }
 
+    private function workerRoleId(): int
+    {
+        return (int) (\App\Models\Role::query()->where('name', 'Worker')->value('id') ?? 0);
+    }
+
     public function index(Request $request)
     {
         $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+        $workerRoleId = $this->workerRoleId();
         $this->taskService->syncForOutlet($outletId);
 
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
         $status = trim((string) $request->query('status', ''));
 
         $tasksQuery = OrderTask::query()
@@ -34,14 +41,14 @@ class TaskManagementController extends Controller
             ->latest('id');
 
         if ($q !== '') {
-            $tasksQuery->where(function ($query) use ($q): void {
-                $query->where('task_number', 'like', '%' . $q . '%')
-                    ->orWhere('task_title', 'like', '%' . $q . '%')
-                    ->orWhereHas('order', function ($orderQuery) use ($q): void {
-                        $orderQuery->where('order_number', 'like', '%' . $q . '%')
-                            ->orWhereHas('customer', function ($customerQuery) use ($q): void {
-                                $customerQuery->where('name', 'like', '%' . $q . '%')
-                                    ->orWhere('phone', 'like', '%' . $q . '%');
+            $tasksQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
+                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
                             });
                     });
             });
@@ -51,23 +58,17 @@ class TaskManagementController extends Controller
             $tasksQuery->where('status', $status);
         }
 
-        $reporting = [
-            'total' => (clone $tasksQuery)->count(),
-            'pending' => (clone $tasksQuery)->where('status', OrderTask::STATUS_PENDING)->count(),
-            'assigned' => (clone $tasksQuery)->where('status', OrderTask::STATUS_ASSIGNED)->count(),
-            'completed' => (clone $tasksQuery)->where('status', OrderTask::STATUS_COMPLETED)->count(),
-        ];
-
         $tasks = $tasksQuery->paginate(15)->withQueryString();
 
         $workers = User::query()
-            ->whereExists(function ($query) use ($outletId): void {
-                $query->selectRaw('1')
-                    ->from('user_role')
-                    ->join('roles', 'roles.id', '=', 'user_role.role_id')
-                    ->whereColumn('user_role.user_id', 'users.id')
-                    ->where('roles.name', 'Worker')
-                    ->where('user_role.outlet_id', $outletId);
+            ->where('is_super_admin', false)
+            ->when($workerRoleId > 0, function ($query) use ($workerRoleId, $outletId): void {
+                $query->whereHas('roles', function ($roleQuery) use ($workerRoleId, $outletId): void {
+                    $roleQuery->where('roles.id', $workerRoleId);
+                    if ($outletId > 0) {
+                        $roleQuery->where('user_role.outlet_id', $outletId);
+                    }
+                });
             })
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -75,7 +76,6 @@ class TaskManagementController extends Controller
         return view('modules.task_management.index', [
             'tasks' => $tasks,
             'workers' => $workers,
-            'reporting' => $reporting,
             'statusLabels' => OrderTask::statusLabels(),
             'selectedStatus' => $status,
         ]);
@@ -85,20 +85,29 @@ class TaskManagementController extends Controller
     {
         $this->ensureTaskBelongsToCurrentOutlet($task);
         $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+        $workerRoleId = $this->workerRoleId();
 
         $validated = $request->validate([
             'worker_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where(function ($query) use ($outletId) {
-                    $query->whereExists(function ($subQuery) use ($outletId): void {
-                        $subQuery->selectRaw('1')
-                            ->from('user_role')
-                            ->join('roles', 'roles.id', '=', 'user_role.role_id')
-                            ->whereColumn('user_role.user_id', 'users.id')
-                            ->where('roles.name', 'Worker')
-                            ->where('user_role.outlet_id', $outletId);
-                    });
+                Rule::exists('users', 'id')->where(function ($query) use ($outletId, $workerRoleId) {
+                    $query->where('is_super_admin', false)
+                        ->whereExists(function ($subQuery) use ($workerRoleId): void {
+                            $subQuery->selectRaw('1')
+                                ->from('user_role')
+                                ->whereColumn('user_role.user_id', 'users.id')
+                                ->where('user_role.role_id', $workerRoleId);
+                        });
+
+                    if ($outletId > 0) {
+                        $query->whereExists(function ($subQuery) use ($outletId): void {
+                            $subQuery->selectRaw('1')
+                                ->from('user_role')
+                                ->whereColumn('user_role.user_id', 'users.id')
+                                ->where('user_role.outlet_id', $outletId);
+                        });
+                    }
                 }),
             ],
             'worker_deadline_at' => ['nullable', 'date'],

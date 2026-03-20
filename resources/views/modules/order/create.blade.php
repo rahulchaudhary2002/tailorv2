@@ -286,7 +286,21 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
             <div class="tp-modal-body">
                 <div class="tp-modal-info">
-                    <div><strong>Product:</strong> <span id="modalProductName">-</span></div>
+                    <div class="tp-modal-product-row">
+                        <div>
+                            <strong>Product:</strong>
+                            <span id="modalProductName">-</span>
+                        </div>
+                        <button type="button" id="changeModalProductBtn" class="tp-modal-edit-btn" style="display:none;" aria-label="Change selected product" title="Change selected product">
+                            <i class="fas fa-rotate"></i>
+                        </button>
+                    </div>
+                    <div id="modalProductSelectWrap" class="tp-form-group" style="display:none; margin-top:14px;">
+                        <label for="modalProductSelect">Change Product</label>
+                        <select id="modalProductSelect" class="tp-input">
+                            <option value="">Select Product</option>
+                        </select>
+                    </div>
                     <div><strong>Fabric Price:</strong> <span id="modalProductPrice">NPR 0.00 per meter</span></div>
                     <div><strong>Fabric Quantity (meters):</strong> <span id="modalProductQuantity">0.00</span></div>
                 </div>
@@ -369,7 +383,8 @@ h2 i,h3 i,h4 i{margin-right:10px;color:var(--accent);}
 .form-group{margin-bottom:15px;}
 label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
 .tp-input{width:100%;padding:10px 15px;border:1px solid #ccc;border-radius:var(--radius);font-size:1rem;}
-.demo-section .select2-container--default .select2-selection--single{
+.demo-section .select2-container--default .select2-selection--single,
+.tp-modal .select2-container--default .select2-selection--single{
     min-height:auto;
     height:43px;
     border:1px solid #c9d5e6;
@@ -381,21 +396,25 @@ label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
     box-shadow:none;
     display:block;
 }
-.demo-section .select2-container--default .select2-selection--single .select2-selection__rendered{
+.demo-section .select2-container--default .select2-selection--single .select2-selection__rendered,
+.tp-modal .select2-container--default .select2-selection--single .select2-selection__rendered{
     color:inherit;
     line-height:43px;
     padding-left:14px;
     padding-right:30px;
     margin-left:0;
 }
-.demo-section .select2-container--default .select2-selection--single .select2-selection__placeholder{
+.demo-section .select2-container--default .select2-selection--single .select2-selection__placeholder,
+.tp-modal .select2-container--default .select2-selection--single .select2-selection__placeholder{
     color:#6a7785;
 }
-.demo-section .select2-container--default .select2-selection--single .select2-selection__arrow{
+.demo-section .select2-container--default .select2-selection--single .select2-selection__arrow,
+.tp-modal .select2-container--default .select2-selection--single .select2-selection__arrow{
     height:100%;
     right:10px;
 }
-.demo-section .select2-container--default .select2-selection--single .select2-selection__clear{
+.demo-section .select2-container--default .select2-selection--single .select2-selection__clear,
+.tp-modal .select2-container--default .select2-selection--single .select2-selection__clear{
     position:absolute;
     right:32px;
     top:50%;
@@ -407,11 +426,14 @@ label{display:block;margin-bottom:5px;font-weight:600;color:var(--secondary);}
     padding:0;
     float:none;
 }
-.demo-section .select2-container--default .select2-selection--single .select2-selection__clear:hover{
+.demo-section .select2-container--default .select2-selection--single .select2-selection__clear:hover,
+.tp-modal .select2-container--default .select2-selection--single .select2-selection__clear:hover{
     color:#dc3545;
 }
 .demo-section .select2-container--default.select2-container--focus .select2-selection--single,
-.demo-section .select2-container--default.select2-container--open .select2-selection--single{
+.demo-section .select2-container--default.select2-container--open .select2-selection--single,
+.tp-modal .select2-container--default.select2-container--focus .select2-selection--single,
+.tp-modal .select2-container--default.select2-container--open .select2-selection--single{
     border-color:var(--accent);
     background:#fff;
     box-shadow:0 0 0 3px rgba(201,169,110,.16);
@@ -560,13 +582,16 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .total-row span:last-child{font-size:1.4rem;color:#0f2942;}
 .bill-actions{margin-top:22px;display:flex;gap:12px;}
 .bill-actions>*{flex:1;}
-.tp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;}
-.tp-modal{width:100%;max-width:860px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.30);overflow:hidden;}
+.tp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:stretch;justify-content:center;padding:0 20px;}
+.tp-modal{width:100%;max-width:1400px;height:100vh;background:#fff;border-radius:0;box-shadow:none;overflow:hidden;display:flex;flex-direction:column;}
 .tp-modal-header{background:var(--primary);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;}
 .tp-modal-header h3{margin:0;color:#fff;border:0;padding:0;}
 .tp-modal-close{background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
-.tp-modal-body{padding:16px;max-height:70vh;overflow:auto;}
+.tp-modal-body{padding:16px;flex:1 1 auto;overflow:auto;}
 .tp-modal-info{background:#f8f9fa;border:1px solid #eef1f5;border-radius:10px;padding:10px;display:grid;gap:6px;}
+.tp-modal-product-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.tp-modal-edit-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid #d7e0ec;background:#fff;color:var(--primary);text-decoration:none;transition:.2s;}
+.tp-modal-edit-btn:hover{background:#eef3f9;border-color:#c7d4e3;}
 .tp-modal-section{margin-top:14px;border:1px solid #eef1f5;border-radius:10px;padding:12px;}
 .tp-modal-section h4{margin:0 0 10px;color:var(--primary);}
 .tp-measurement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
@@ -590,7 +615,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-tailoring-option.selected{border-color:#7b1fa2;background:#e1bee7;box-shadow:0 0 0 2px rgba(123,31,162,.18);}
 .tp-tailoring-option h5{margin:0 0 4px;color:#7b1fa2;}
 .tp-selected-package{margin-top:10px;background:#e1bee7;border-radius:10px;padding:10px;}
-.tp-modal-footer{padding:14px 16px;background:#f8f9fa;border-top:1px solid #eef1f5;display:flex;justify-content:flex-end;gap:10px;}
+.tp-modal-footer{padding:14px 16px;background:#f8f9fa;border-top:1px solid #eef1f5;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;}
 @media print{body *{visibility:hidden !important;}#billPrintArea,#billPrintArea *{visibility:visible !important;}#billPrintArea{position:absolute !important;top:0;left:0;width:100% !important;max-width:100% !important;margin:0 !important;padding:0 !important;border:0 !important;box-shadow:none !important;background:#fff !important;}#billPrintArea .bill-actions,#billPrintArea .toggle-switch,#billPrintArea .discount-section button,#billPrintArea #clearBill,#billPrintArea #printBill{display:none !important;}}
 </style>
 @endsection
@@ -671,6 +696,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const cancelMeasurementBtn = document.getElementById('cancelMeasurement');
     const saveMeasurementBtn = document.getElementById('saveMeasurement');
     const modalProductName = document.getElementById('modalProductName');
+    const changeModalProductBtn = document.getElementById('changeModalProductBtn');
+    const modalProductSelectWrap = document.getElementById('modalProductSelectWrap');
+    const modalProductSelect = document.getElementById('modalProductSelect');
     const modalProductPrice = document.getElementById('modalProductPrice');
     const modalProductQuantity = document.getElementById('modalProductQuantity');
     const modalProductCounter = document.getElementById('modalProductCounter');
@@ -711,6 +739,42 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     function formatFabricPrice(value, unitLabel = 'meter') {
         return `NPR ${money(value)} per ${normalizeUnitLabel(unitLabel)}`;
+    }
+
+    function buildModalProductSelect() {
+        if (!modalProductSelect) return;
+
+        modalProductSelect.innerHTML = '<option value="">Select Product</option>';
+        filterProductsByCategory('custom').forEach((product) => {
+            const option = document.createElement('option');
+            option.value = String(product.id);
+            option.textContent = `${product.name} (${product.code}) | Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim();
+            modalProductSelect.appendChild(option);
+        });
+
+        setupOrderSelect2(modalProductSelect, 'Change custom fabric');
+    }
+
+    function applyPendingProductChange(productId) {
+        const pending = getCurrentPendingCustom();
+        const selectedProduct = productMap.get(String(productId || ''));
+
+        if (!pending || !selectedProduct) {
+            return;
+        }
+
+        pending.productId = selectedProduct.id;
+        pending.name = `${selectedProduct.name} (${selectedProduct.code})`;
+        pending.unitLabel = selectedProduct.unitLabel || '';
+        pending.unitPrice = resolveDefaultPrice(selectedProduct.id);
+
+        modalProductName.textContent = pending.name;
+        modalProductPrice.textContent = formatFabricPrice(pending.unitPrice, pending.unitLabel || 'meter');
+        updateCustomFabricSourceUI();
+
+        if (modalProductSelectWrap) {
+            modalProductSelectWrap.style.display = 'none';
+        }
     }
 
     function normalizePhone(value) {
@@ -1264,6 +1328,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             input.checked = false;
         });
         measurementFieldsEl.innerHTML = '<div class="tp-hint">Select at least one garment type.</div>';
+        if (modalProductSelectWrap) {
+            modalProductSelectWrap.style.display = 'none';
+        }
     }
 
     function closeModal() {
@@ -1289,6 +1356,18 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         modalProductName.textContent = pending.name;
+        if (changeModalProductBtn && pending.productId) {
+            changeModalProductBtn.style.display = 'inline-flex';
+        } else if (changeModalProductBtn) {
+            changeModalProductBtn.style.display = 'none';
+        }
+        if (modalProductSelect) {
+            buildModalProductSelect();
+            modalProductSelect.value = String(pending.productId || '');
+            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.select2) {
+                window.jQuery(modalProductSelect).val(String(pending.productId || '')).trigger('change.select2');
+            }
+        }
         modalProductPrice.textContent = formatFabricPrice(pending.unitPrice, pending.unitLabel || 'meter');
         modalProductQuantity.textContent = money(pending.qty);
         if (modalProductCounter) {
@@ -1647,6 +1726,10 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const pending = getCurrentPendingCustom();
         if (!pending) return;
 
+        if (modalProductSelect?.value && String(modalProductSelect.value) !== String(pending.productId || '')) {
+            applyPendingProductChange(modalProductSelect.value);
+        }
+
         const selectedGarmentIds = getSelectedGarmentIds();
         if (!selectedGarmentIds.length) {
             alert('Select at least one garment type.');
@@ -1760,6 +1843,30 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     closeModalBtn.addEventListener('click', closeModal);
     cancelMeasurementBtn.addEventListener('click', closeModal);
+    changeModalProductBtn?.addEventListener('click', () => {
+        if (!modalProductSelectWrap || !modalProductSelect) {
+            return;
+        }
+
+        const shouldShow = modalProductSelectWrap.style.display === 'none';
+        modalProductSelectWrap.style.display = shouldShow ? '' : 'none';
+
+        if (!shouldShow) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            if (window.jQuery && window.jQuery.fn && window.jQuery(modalProductSelect).hasClass('select2-hidden-accessible')) {
+                window.jQuery(modalProductSelect).select2('open');
+                return;
+            }
+
+            modalProductSelect.focus();
+        });
+    });
+    bindSelect2Change(modalProductSelect, () => {
+        applyPendingProductChange(modalProductSelect?.value || '');
+    });
 
     discountTypeEl.addEventListener('change', () => {
         discountValueEl.disabled = discountTypeEl.value === 'none';

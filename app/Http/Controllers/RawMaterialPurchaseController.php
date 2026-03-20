@@ -25,6 +25,10 @@ class RawMaterialPurchaseController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $productFilterId = (int) $request->query('product_id', 0);
+        $vendorFilterId = (int) $request->query('vendor_id', 0);
+        $locationFilterId = (int) $request->query('location_id', 0);
 
         $purchasesQuery = VendorRawMaterialPurchase::query()
             ->with(['vendor:id,name', 'product:id,name,code', 'unit:id,name,symbol', 'inventoryLocation:id,name,type'])
@@ -34,29 +38,53 @@ class RawMaterialPurchaseController extends Controller
             ->latest('purchased_at');
 
         if ($q !== '') {
-            $purchasesQuery->where(function ($query) use ($q): void {
-                $query->whereHas('vendor', function ($vendorQuery) use ($q): void {
-                    $vendorQuery->where('name', 'like', '%' . $q . '%');
-                })->orWhereHas('product', function ($productQuery) use ($q): void {
-                    $productQuery->where('name', 'like', '%' . $q . '%')
-                        ->orWhere('code', 'like', '%' . $q . '%');
+            $purchasesQuery->where(function ($query) use ($qLower): void {
+                $query->whereHas('vendor', function ($vendorQuery) use ($qLower): void {
+                    $vendorQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
+                })->orWhereHas('product', function ($productQuery) use ($qLower): void {
+                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
                 });
             });
         }
 
-        $reporting = [
-            'total' => (clone $purchasesQuery)->count(),
-            'added_this_week' => (clone $purchasesQuery)->where('purchased_at', '>=', now()->startOfWeek()->toDateString())->count(),
-            'added_this_month' => (clone $purchasesQuery)->whereBetween('purchased_at', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])->count(),
-            'added_last_30_days' => (clone $purchasesQuery)->where('purchased_at', '>=', now()->subDays(30)->toDateString())->count(),
-        ];
+        if ($productFilterId > 0) {
+            $purchasesQuery->where('product_id', $productFilterId);
+        }
+
+        if ($vendorFilterId > 0) {
+            $purchasesQuery->where('vendor_id', $vendorFilterId);
+        }
+
+        if ($locationFilterId > 0) {
+            $purchasesQuery->where('inventory_location_id', $locationFilterId);
+        }
 
         $purchases = $purchasesQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.raw_material_purchase.index', compact('purchases', 'reporting'));
+        $products = Product::query()
+            ->with('category:id,slug')
+            ->whereHas('category', function ($query) {
+                $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'product_category_id']);
+
+        $vendors = Vendor::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $locations = InventoryLocation::query()
+            ->where('type', InventoryLocation::TYPE_WAREHOUSE)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'type']);
+
+        return view('modules.raw_material_purchase.index', compact('purchases', 'products', 'vendors', 'locations'));
     }
 
     /**

@@ -74,6 +74,8 @@ class WorkerController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $outletId = (int) $request->query('outlet_id', 0);
         $workerRoleId = (int) optional($this->workerRole())->id;
 
         $workersQuery = User::query()
@@ -88,25 +90,28 @@ class WorkerController extends Controller
             ->withCount('outlets');
 
         if ($q !== '') {
-            $workersQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('email', 'like', '%' . $q . '%');
+            $workersQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(email) LIKE ?', ['%' . $qLower . '%']);
             });
         }
 
-        $reporting = [
-            'total' => (clone $workersQuery)->count(),
-            'added_this_week' => (clone $workersQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $workersQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $workersQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
+        if ($outletId > 0) {
+            $workersQuery->whereHas('outlets', function ($query) use ($outletId): void {
+                $query->where('outlets.id', $outletId);
+            });
+        }
 
         $workers = $workersQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.worker.index', compact('workers', 'reporting'));
+        $outlets = Outlet::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'address']);
+
+        return view('modules.worker.index', compact('workers', 'outlets'));
     }
 
     public function create()

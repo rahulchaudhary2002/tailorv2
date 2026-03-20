@@ -20,6 +20,7 @@ class GarmentTypeController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
 
         $garmentTypesQuery = GarmentType::query()
             ->with([
@@ -33,23 +34,16 @@ class GarmentTypeController extends Controller
             ->latest();
 
         if ($q !== '') {
-            $garmentTypesQuery->where(function ($query) use ($q): void {
-                $query->where('title', 'like', '%' . $q . '%');
+            $garmentTypesQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(title) LIKE ?', ['%' . $qLower . '%']);
             });
         }
-
-        $reporting = [
-            'total' => (clone $garmentTypesQuery)->count(),
-            'added_this_week' => (clone $garmentTypesQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $garmentTypesQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $garmentTypesQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
 
         $garmentTypes = $garmentTypesQuery
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.garment_type.index', compact('garmentTypes', 'reporting'));
+        return view('modules.garment_type.index', compact('garmentTypes'));
     }
 
     /**

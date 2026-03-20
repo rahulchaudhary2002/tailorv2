@@ -25,7 +25,60 @@
     </div>
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product code or location...', 'reporting' => $reporting])
+@php
+    $query = trim((string) request('q', ''));
+    $selectedProductId = (int) request('product_id', 0);
+    $selectedLocationId = (int) request('location_id', 0);
+@endphp
+
+<div class="directory-reporting" style="margin-bottom: 16px;">
+    <div class="directory-reporting__filter-bar">
+        <div class="directory-reporting__filter-head">
+            <h3 class="directory-reporting__filter-title">Filter Records</h3>
+            @if ($query !== '' || $selectedProductId > 0 || $selectedLocationId > 0)
+                <a href="{{ url()->current() }}" class="btn btn-light btn-sm">Clear Filters</a>
+            @endif
+        </div>
+
+        <form method="GET" class="listing-filter-form">
+            <div class="listing-filter-form__fields listing-filter-form__fields--triple">
+                <div class="outlet-form-group listing-filter-form__field listing-filter-form__field--search">
+                    <label for="q_filter">Search</label>
+                    <input id="q_filter" type="text" name="q" class="outlet-input" value="{{ $query }}" placeholder="Search by product code, product name, or location...">
+                </div>
+
+                <div class="outlet-form-group listing-filter-form__field">
+                    <label for="product_filter">Product</label>
+                    <select id="product_filter" name="product_id" class="outlet-input">
+                        <option value="">All Products</option>
+                        @foreach ($productionProducts as $product)
+                            <option value="{{ $product->id }}" @selected($selectedProductId === (int) $product->id)>
+                                {{ $product->name }}@if($product->code) ({{ $product->code }})@endif
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="outlet-form-group listing-filter-form__field">
+                    <label for="location_filter">Location</label>
+                    <select id="location_filter" name="location_id" class="outlet-input">
+                        <option value="">All Locations</option>
+                        @foreach ($stockFilterLocations as $location)
+                            <option value="{{ $location->id }}" @selected($selectedLocationId === (int) $location->id)>
+                                {{ $location->name }} ({{ $location->type }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="listing-filter-form__actions">
+                <button type="submit" class="btn btn-primary">Apply</button>
+                <a href="{{ url()->current() }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
 
 <div class="app-tabs" role="tablist" aria-label="Manufacture unit sections">
     <button type="button" class="app-tab-button js-page-tab is-active" data-tab-target="stock-records" aria-selected="true">Stock Records</button>
@@ -542,6 +595,58 @@
 
     body.app-modal-open {
         overflow: hidden;
+    }
+
+    .listing-filter-form {
+        display: grid;
+        gap: 14px;
+    }
+
+    .listing-filter-form__fields {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(200px, 1fr));
+        gap: 12px;
+        align-items: end;
+    }
+
+    .listing-filter-form__fields--triple {
+        grid-template-columns: minmax(320px, 1.6fr) repeat(2, minmax(220px, 1fr));
+    }
+
+    .listing-filter-form__field {
+        margin-bottom: 0;
+    }
+
+    .listing-filter-form__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    @media (max-width: 992px) {
+        .listing-filter-form__fields,
+        .listing-filter-form__fields--triple {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .listing-filter-form__field--search {
+            grid-column: 1 / -1;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .listing-filter-form__fields,
+        .listing-filter-form__fields--triple {
+            grid-template-columns: 1fr;
+        }
+
+        .listing-filter-form__actions {
+            flex-direction: column;
+        }
+
+        .listing-filter-form__actions .btn {
+            width: 100%;
+        }
     }
 </style>
 <script>

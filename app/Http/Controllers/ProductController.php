@@ -25,32 +25,36 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $categoryId = (int) $request->query('category_id', 0);
 
         $productsQuery = Product::query()
             ->with(['category:id,name,slug'])
             ->withSum('inventoryStocks as inventory_total_quantity', 'on_hand_qty');
 
         if ($q !== '') {
-            $productsQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('code', 'like', '%' . $q . '%')
-                    ->orWhere('amount', 'like', '%' . $q . '%');
+            $productsQuery->where(function ($query) use ($q, $qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%' . $q . '%']);
             });
         }
 
-        $reporting = [
-            'total' => (clone $productsQuery)->count(),
-            'added_this_week' => (clone $productsQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $productsQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $productsQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
+        if ($categoryId > 0) {
+            $productsQuery->where('product_category_id', $categoryId);
+        }
 
         $products = $productsQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.product.index', compact('products', 'reporting'));
+        $categories = ProductCategory::query()
+            ->creatableForProducts()
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug']);
+
+        return view('modules.product.index', compact('products', 'categories'));
     }
 
     /**
@@ -300,23 +304,18 @@ class ProductController extends Controller
                 ]);
 
                 if ($trxType === InventoryTransaction::TYPE_TRANSFER) {
-                    $this->applyDeltaToStock(
+                    $updatedTargetStocks = $this->transferStockBetweenLocations(
                         productId: (int) $product->id,
-                        locationId: (int) $fromLocationId,
+                        fromLocationId: (int) $fromLocationId,
+                        toLocationId: (int) $toLocationId,
                         unitId: $unitId,
-                        delta: -$quantity,
-                        unitCost: $unitCost
+                        quantity: $quantity,
+                        fallbackUnitCost: $unitCost
                     );
 
-                    $toStock = $this->applyDeltaToStock(
-                        productId: (int) $product->id,
-                        locationId: (int) $toLocationId,
-                        unitId: $unitId,
-                        delta: $quantity,
-                        unitCost: $unitCost
-                    );
-
-                    $this->syncLowStockAlert($toStock);
+                    foreach ($updatedTargetStocks as $targetStock) {
+                        $this->syncLowStockAlert($targetStock);
+                    }
                     return;
                 }
 
@@ -503,14 +502,18 @@ class ProductController extends Controller
         float $delta,
         float $unitCost
     ): InventoryStock {
+        if ($delta < 0) {
+            return $this->consumeStockFifo(
+                productId: $productId,
+                locationId: $locationId,
+                quantity: abs($delta)
+            );
+        }
+
         $stock = $this->getOrCreateStock($productId, $locationId, $unitId);
 
         $currentQty = (float) $stock->on_hand_qty;
         $newQty = $currentQty + $delta;
-
-        if ($newQty < 0) {
-            throw new \RuntimeException('Insufficient stock for this transaction.');
-        }
 
         if ($delta > 0) {
             $currentValue = $currentQty * (float) $stock->unit_cost;
@@ -522,6 +525,136 @@ class ProductController extends Controller
         $stock->save();
 
         return $stock;
+    }
+
+    private function consumeStockFifo(
+        int $productId,
+        int $locationId,
+        float $quantity
+    ): InventoryStock {
+        $sourceStocks = InventoryStock::query()
+            ->where('location_id', $locationId)
+            ->where('product_id', $productId)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $availableQty = (float) $sourceStocks->sum(function (InventoryStock $stock) {
+            return max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
+        });
+
+        if ($availableQty + 0.000001 < $quantity) {
+            throw new \RuntimeException('Insufficient stock for this transaction.');
+        }
+
+        $remainingQty = $quantity;
+        $lastTouchedStock = null;
+
+        foreach ($sourceStocks as $sourceStock) {
+            if ($remainingQty <= 0) {
+                break;
+            }
+
+            $movableQty = max(0, (float) $sourceStock->on_hand_qty - (float) $sourceStock->reserved_qty);
+            if ($movableQty <= 0) {
+                continue;
+            }
+
+            $deductQty = min($remainingQty, $movableQty);
+            $sourceStock->on_hand_qty = (float) $sourceStock->on_hand_qty - $deductQty;
+            $sourceStock->save();
+
+            $lastTouchedStock = $sourceStock;
+            $remainingQty -= $deductQty;
+        }
+
+        return $lastTouchedStock ?: $this->getOrCreateStock($productId, $locationId, null);
+    }
+
+    /**
+     * @return array<int, InventoryStock>
+     */
+    private function transferStockBetweenLocations(
+        int $productId,
+        int $fromLocationId,
+        int $toLocationId,
+        ?int $unitId,
+        float $quantity,
+        float $fallbackUnitCost
+    ): array {
+        if ($quantity <= 0) {
+            return [];
+        }
+
+        $sourceStocks = InventoryStock::query()
+            ->where('location_id', $fromLocationId)
+            ->where('product_id', $productId)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $availableQty = (float) $sourceStocks->sum(function (InventoryStock $stock) {
+            return max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
+        });
+
+        if ($availableQty + 0.000001 < $quantity) {
+            throw new \RuntimeException('Insufficient stock for this transfer.');
+        }
+
+        $remainingQty = $quantity;
+        $updatedTargets = [];
+
+        foreach ($sourceStocks as $sourceStock) {
+            if ($remainingQty <= 0) {
+                break;
+            }
+
+            $movableQty = max(0, (float) $sourceStock->on_hand_qty - (float) $sourceStock->reserved_qty);
+            if ($movableQty <= 0) {
+                continue;
+            }
+
+            $transferQty = min($remainingQty, $movableQty);
+            $sourceStock->on_hand_qty = (float) $sourceStock->on_hand_qty - $transferQty;
+            $sourceStock->save();
+
+            $transferUnitCost = (float) $sourceStock->unit_cost;
+            if ($transferUnitCost <= 0) {
+                $transferUnitCost = $fallbackUnitCost;
+            }
+
+            $targetVendorId = (int) ($sourceStock->vendor_id ?? 0);
+            $targetStock = InventoryStock::query()->firstOrCreate(
+                [
+                    'product_id' => $productId,
+                    'location_id' => $toLocationId,
+                    'vendor_id' => $targetVendorId > 0 ? $targetVendorId : null,
+                ],
+                [
+                    'unit_id' => $unitId,
+                    'on_hand_qty' => 0,
+                    'reserved_qty' => 0,
+                    'unit_cost' => 0,
+                ]
+            );
+
+            $targetStock->unit_id = $unitId;
+            $currentQty = (float) $targetStock->on_hand_qty;
+            $newQty = $currentQty + $transferQty;
+            $currentValue = $currentQty * (float) $targetStock->unit_cost;
+            $incomingValue = $transferQty * $transferUnitCost;
+
+            $targetStock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
+            $targetStock->on_hand_qty = $newQty;
+            $targetStock->save();
+
+            $updatedTargets[(string) $targetStock->id] = $targetStock;
+            $remainingQty -= $transferQty;
+        }
+
+        return array_values($updatedTargets);
     }
 
     private function syncLowStockAlert(InventoryStock $stock): void

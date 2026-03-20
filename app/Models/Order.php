@@ -207,4 +207,16 @@ class Order extends Model
             self::PAYMENT_STATUS_PAID,
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function paymentStatusLabels(): array
+    {
+        return [
+            self::PAYMENT_STATUS_UNPAID => 'Unpaid',
+            self::PAYMENT_STATUS_PARTIAL => 'Partial',
+            self::PAYMENT_STATUS_PAID => 'Paid',
+        ];
+    }
 }

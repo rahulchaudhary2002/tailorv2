@@ -31,6 +31,9 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $status = trim((string) $request->query('status', ''));
+        $paymentStatus = trim((string) $request->query('payment_status', ''));
         $outletId = $this->currentOutletId();
 
         $ordersQuery = Order::query()
@@ -49,23 +52,24 @@ class OrderController extends Controller
         }
 
         if ($q !== '') {
-            $ordersQuery->where(function ($query) use ($q): void {
-                $query->where('order_number', 'like', '%' . $q . '%')
-                    ->orWhere('status', 'like', '%' . $q . '%')
-                    ->orWhere('payment_status', 'like', '%' . $q . '%')
-                    ->orWhereHas('customer', function ($customerQuery) use ($q): void {
-                        $customerQuery->where('name', 'like', '%' . $q . '%')
-                            ->orWhere('phone', 'like', '%' . $q . '%');
+            $ordersQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(status) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(payment_status) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
+                        $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
                 });
             });
         }
 
-        $reporting = [
-            'total' => (clone $ordersQuery)->count(),
-            'added_this_week' => (clone $ordersQuery)->where('ordered_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $ordersQuery)->whereBetween('ordered_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $ordersQuery)->where('ordered_at', '>=', now()->subDays(30))->count(),
-        ];
+        if ($status !== '' && array_key_exists($status, Order::statusLabels())) {
+            $ordersQuery->where('status', $status);
+        }
+
+        if ($paymentStatus !== '' && array_key_exists($paymentStatus, Order::paymentStatusLabels())) {
+            $ordersQuery->where('payment_status', $paymentStatus);
+        }
 
         $orders = $ordersQuery
             ->latest('ordered_at')
@@ -74,6 +78,7 @@ class OrderController extends Controller
             ->withQueryString();
 
         $statusLabels = Order::statusLabels();
+        $paymentStatusLabels = Order::paymentStatusLabels();
         $nextStatusesByOrderId = $orders->getCollection()
             ->mapWithKeys(function (Order $order) {
                 return [$order->id => Order::nextStatusesFor((string) $order->status)];
@@ -82,8 +87,10 @@ class OrderController extends Controller
         return view('modules.order.index', compact(
             'orders',
             'statusLabels',
+            'paymentStatusLabels',
             'nextStatusesByOrderId',
-            'reporting'
+            'status',
+            'paymentStatus'
         ));
     }
 
@@ -93,6 +100,8 @@ class OrderController extends Controller
     public function assignedJobs(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $status = trim((string) $request->query('status', ''));
         $user = auth()->user();
         $userId = (int) auth()->id();
         $accessibleOutletIds = $user?->outlets()
@@ -123,26 +132,23 @@ class OrderController extends Controller
         }
 
         if ($q !== '') {
-            $tasksQuery->where(function ($query) use ($q): void {
-                $query->where('task_number', 'like', '%' . $q . '%')
-                    ->orWhere('task_title', 'like', '%' . $q . '%')
-                    ->orWhereHas('order', function ($orderQuery) use ($q): void {
-                        $orderQuery->where('order_number', 'like', '%' . $q . '%')
-                            ->orWhere('status', 'like', '%' . $q . '%')
-                            ->orWhereHas('customer', function ($customerQuery) use ($q): void {
-                                $customerQuery->where('name', 'like', '%' . $q . '%')
-                                    ->orWhere('phone', 'like', '%' . $q . '%');
+            $tasksQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
+                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(status) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
                             });
                     });
             });
         }
 
-        $reporting = [
-            'total' => (clone $tasksQuery)->count(),
-            'assigned' => (clone $tasksQuery)->where('status', OrderTask::STATUS_ASSIGNED)->count(),
-            'in_progress' => (clone $tasksQuery)->where('status', OrderTask::STATUS_IN_PROGRESS)->count(),
-            'completed' => (clone $tasksQuery)->where('status', OrderTask::STATUS_COMPLETED)->count(),
-        ];
+        if ($status !== '' && array_key_exists($status, OrderTask::statusLabels())) {
+            $tasksQuery->where('status', $status);
+        }
 
         $tasks = $tasksQuery
             ->latest('assigned_at')
@@ -152,8 +158,8 @@ class OrderController extends Controller
 
         return view('modules.order.assigned_jobs', [
             'tasks' => $tasks,
-            'reporting' => $reporting,
             'statusLabels' => OrderTask::statusLabels(),
+            'selectedStatus' => $status,
         ]);
     }
 
@@ -790,6 +796,10 @@ class OrderController extends Controller
                 $order->vat_amount = $vatAmount;
                 $order->save();
 
+                // The order instance may still carry previously loaded items from before edit.
+                // Clear and reload relations so reservation/issue uses the newly saved items.
+                $order->unsetRelation('items');
+
                 $this->syncCustomerMeasurementsFromOrderItems((int) $validated['customer_id'], $items);
 
                 if ($this->orderHasIssuedStock($order)) {
@@ -1063,6 +1073,7 @@ class OrderController extends Controller
         $stocks = InventoryStock::query()
             ->where('location_id', $locationId)
             ->where('product_id', $productId)
+            ->orderBy('created_at')
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
@@ -1167,6 +1178,7 @@ class OrderController extends Controller
         $stocks = InventoryStock::query()
             ->where('location_id', $locationId)
             ->where('product_id', $productId)
+            ->orderBy('created_at')
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
@@ -1259,6 +1271,7 @@ class OrderController extends Controller
                 $stock = InventoryStock::query()
                     ->where('location_id', $locationId)
                     ->where('product_id', $productId)
+                    ->orderBy('created_at')
                     ->orderBy('id')
                     ->lockForUpdate()
                     ->first();

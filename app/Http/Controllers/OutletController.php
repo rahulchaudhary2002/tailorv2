@@ -18,6 +18,7 @@ class OutletController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
 
         $outletsQuery = Outlet::query()
             ->withCount([
@@ -27,26 +28,19 @@ class OutletController extends Controller
             ]);
 
         if ($q !== '') {
-            $outletsQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('code', 'like', '%' . $q . '%')
-                    ->orWhere('address', 'like', '%' . $q . '%');
+            $outletsQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(address) LIKE ?', ['%' . $qLower . '%']);
             });
         }
-
-        $reporting = [
-            'total' => (clone $outletsQuery)->count(),
-            'added_this_week' => (clone $outletsQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $outletsQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $outletsQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
 
         $outlets = $outletsQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.outlet.index', compact('outlets', 'reporting'));
+        return view('modules.outlet.index', compact('outlets'));
     }
 
     /**

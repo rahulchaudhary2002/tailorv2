@@ -16,31 +16,34 @@ class VendorController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $vendorTypeId = (int) $request->query('vendor_type_id', 0);
 
         $vendorsQuery = Vendor::query()
             ->with('vendorType:id,name')
             ->latest();
 
         if ($q !== '') {
-            $vendorsQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('email', 'like', '%' . $q . '%')
-                    ->orWhere('phone', 'like', '%' . $q . '%');
+            $vendorsQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(email) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
             });
         }
 
-        $reporting = [
-            'total' => (clone $vendorsQuery)->count(),
-            'added_this_week' => (clone $vendorsQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $vendorsQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $vendorsQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
+        if ($vendorTypeId > 0) {
+            $vendorsQuery->where('vendor_type_id', $vendorTypeId);
+        }
 
         $vendors = $vendorsQuery
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.vendor.index', compact('vendors', 'reporting'));
+        $vendorTypes = VendorType::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return view('modules.vendor.index', compact('vendors', 'vendorTypes'));
     }
 
     /**

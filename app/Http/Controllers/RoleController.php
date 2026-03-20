@@ -29,6 +29,7 @@ class RoleController extends Controller
     {
         $currentOutletId = auth()->user()?->current_outlet_id;
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
 
         $rolesQuery = Role::query()
             ->with(['permissions:id,name'])
@@ -46,25 +47,18 @@ class RoleController extends Controller
             ]);
 
         if ($q !== '') {
-            $rolesQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('description', 'like', '%' . $q . '%');
+            $rolesQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(description) LIKE ?', ['%' . $qLower . '%']);
             });
         }
-
-        $reporting = [
-            'total' => (clone $rolesQuery)->count('roles.id'),
-            'added_this_week' => (clone $rolesQuery)->where('roles.created_at', '>=', now()->startOfWeek())->count('roles.id'),
-            'added_this_month' => (clone $rolesQuery)->whereBetween('roles.created_at', [now()->startOfMonth(), now()->endOfMonth()])->count('roles.id'),
-            'added_last_30_days' => (clone $rolesQuery)->where('roles.created_at', '>=', now()->subDays(30))->count('roles.id'),
-        ];
 
         $roles = $rolesQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.role.index', compact('roles', 'reporting'));
+        return view('modules.role.index', compact('roles'));
     }
 
     /**

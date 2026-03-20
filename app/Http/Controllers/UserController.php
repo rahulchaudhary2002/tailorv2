@@ -39,6 +39,8 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $outletId = (int) $request->query('outlet_id', 0);
         $workerRoleId = $this->workerRoleId();
 
         $usersQuery = User::query()
@@ -55,25 +57,28 @@ class UserController extends Controller
             ->withCount('outlets');
 
         if ($q !== '') {
-            $usersQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('email', 'like', '%' . $q . '%');
+            $usersQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(email) LIKE ?', ['%' . $qLower . '%']);
             });
         }
 
-        $reporting = [
-            'total' => (clone $usersQuery)->count(),
-            'added_this_week' => (clone $usersQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $usersQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $usersQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
+        if ($outletId > 0) {
+            $usersQuery->whereHas('outlets', function ($query) use ($outletId): void {
+                $query->where('outlets.id', $outletId);
+            });
+        }
 
         $users = $usersQuery
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('modules.user.index', compact('users', 'reporting'));
+        $outlets = Outlet::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'address']);
+
+        return view('modules.user.index', compact('users', 'outlets'));
     }
 
     /**

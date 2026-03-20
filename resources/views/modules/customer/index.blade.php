@@ -69,83 +69,22 @@
         letter-spacing: 0.4px;
     }
 
-    .customer-directory-page .filter-bar {
-        position: relative;
-        background: linear-gradient(160deg, #fff 0%, #f9f3ec 100%);
-        border-radius: var(--radius-card);
-        padding: 24px;
-        box-shadow: var(--shadow-md);
-        margin-bottom: 24px;
-        border: 1px solid #e8dccf;
-        overflow: hidden;
-    }
-
-    .customer-directory-page .filter-bar::before {
-        content: "";
-        position: absolute;
-        inset: 0 auto 0 0;
-        width: 5px;
-        background: linear-gradient(180deg, var(--primary), var(--secondary));
-    }
-
-    .customer-directory-page .filter-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-        margin-bottom: 16px;
-    }
-
-    .customer-directory-page .filter-head-meta {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
-
-    .customer-directory-page .filter-title {
-        margin: 0;
-        font-size: var(--text-lg);
-        font-weight: var(--font-bold);
-        color: var(--dark);
-    }
-
-    .customer-directory-page .filter-subtitle {
-        margin: 2px 0 0;
-        color: var(--gray-600);
-        font-size: var(--text-sm);
-    }
-
-    .customer-directory-page .clear-filters-btn {
-        border-color: #dbc7b2;
-        background: #fff;
-    }
-
-    .customer-directory-page .clear-filters-btn:hover {
-        border-color: var(--primary);
-        color: var(--primary);
-        background: #fff;
-    }
-
-    .customer-directory-page .filter-grid {
+    .customer-directory-page .listing-filter-form {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
-        margin-bottom: 0;
-        background: white;
-        border: 1px solid #eadfce;
-        border-radius: var(--radius-lg);
-        padding: 14px;
+    }
+
+    .customer-directory-page .listing-filter-form__fields {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.5fr) repeat(3, minmax(180px, 1fr));
+        gap: 12px;
+        align-items: end;
     }
 
     .customer-directory-page .filter-control {
         display: flex;
         flex-direction: column;
         gap: 6px;
-    }
-
-    .customer-directory-page .filter-control.search-field {
-        grid-column: 1 / -1;
     }
 
     .customer-directory-page .filter-label {
@@ -159,7 +98,6 @@
 
     .customer-directory-page .search-box-large {
         position: relative;
-        grid-column: 1 / -1;
     }
 
     .customer-directory-page .search-box-large i {
@@ -215,6 +153,12 @@
         border-color: var(--primary);
         box-shadow: 0 0 0 3px rgba(138, 90, 68, 0.1);
         outline: none;
+    }
+
+    .customer-directory-page .listing-filter-form__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
     }
 
     .customer-directory-page .view-toolbar {
@@ -439,14 +383,16 @@
     }
 
     @media (max-width: 768px) {
-        .customer-directory-page .filter-bar {
-            padding: 16px;
+        .customer-directory-page .listing-filter-form__fields {
+            grid-template-columns: 1fr;
         }
 
-        .customer-directory-page .filter-grid {
-            grid-template-columns: 1fr;
-            padding: 12px;
-            gap: 12px;
+        .customer-directory-page .listing-filter-form__actions {
+            flex-direction: column;
+        }
+
+        .customer-directory-page .listing-filter-form__actions .btn {
+            width: 100%;
         }
 
         .customer-directory-page .customer-cards {
@@ -499,58 +445,65 @@
         </div>
     </div>
 
-    <div class="filter-bar">
-        <div class="filter-head">
-            <div class="filter-head-meta">
-                <h3 class="filter-title">Find Customers Faster</h3>
-                <p class="filter-subtitle">Search, sort, and narrow results by time and customer type.</p>
+    <div class="directory-reporting" style="margin-bottom: 24px;">
+        <div class="directory-reporting__filter-bar">
+            <div class="directory-reporting__filter-head">
+                <h3 class="directory-reporting__filter-title">Filter Records</h3>
+                <button id="clearFiltersBtn" type="button" class="btn btn-light btn-sm">
+                    Clear Filters
+                </button>
             </div>
-            <button id="clearFiltersBtn" type="button" class="btn btn-light btn-sm clear-filters-btn">
-                <i class="fas fa-times"></i> Clear Filters
-            </button>
-        </div>
-        <div class="filter-grid">
-            <div class="filter-control search-field">
-                <label class="filter-label" for="customerSearchInput">Search</label>
-                <div class="search-box-large">
-                    <i class="fas fa-search"></i>
-                    <input id="customerSearchInput" type="text" placeholder="Search by name, email, phone, or address...">
+
+            <div class="listing-filter-form">
+                <div class="listing-filter-form__fields">
+                    <div class="filter-control">
+                        <label class="filter-label" for="customerSearchInput">Search</label>
+                        <div class="search-box-large">
+                            <i class="fas fa-search"></i>
+                            <input id="customerSearchInput" type="text" placeholder="Search by name, email, phone, or address...">
+                        </div>
+                    </div>
+                    <div class="filter-control">
+                        <label class="filter-label" for="createdFilter">Added</label>
+                        <div class="filter-select-wrap">
+                            <i class="fas fa-calendar-days"></i>
+                            <select id="createdFilter" class="form-control">
+                                <option value="all">All Time</option>
+                                <option value="7">Last 7 Days</option>
+                                <option value="30">Last 30 Days</option>
+                                <option value="90">Last 90 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-control">
+                        <label class="filter-label" for="sortFilter">Sort By</label>
+                        <div class="filter-select-wrap">
+                            <i class="fas fa-arrow-down-wide-short"></i>
+                            <select id="sortFilter" class="form-control">
+                                <option value="newest">Most Recent</option>
+                                <option value="oldest">Oldest</option>
+                                <option value="name_asc">Name (A-Z)</option>
+                                <option value="name_desc">Name (Z-A)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-control">
+                        <label class="filter-label" for="typeFilter">Customer Type</label>
+                        <div class="filter-select-wrap">
+                            <i class="fas fa-users-viewfinder"></i>
+                            <select id="typeFilter" class="form-control">
+                                <option value="all">All Types</option>
+                                <option value="retail">Retail</option>
+                                <option value="wholesale">Wholesale</option>
+                                <option value="custom">Custom / VIP</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="filter-control">
-                <label class="filter-label" for="createdFilter">Added</label>
-                <div class="filter-select-wrap">
-                    <i class="fas fa-calendar-days"></i>
-                    <select id="createdFilter" class="form-control">
-                        <option value="all">All Time</option>
-                        <option value="7">Last 7 Days</option>
-                        <option value="30">Last 30 Days</option>
-                        <option value="90">Last 90 Days</option>
-                    </select>
-                </div>
-            </div>
-            <div class="filter-control">
-                <label class="filter-label" for="sortFilter">Sort By</label>
-                <div class="filter-select-wrap">
-                    <i class="fas fa-arrow-down-wide-short"></i>
-                    <select id="sortFilter" class="form-control">
-                        <option value="newest">Most Recent</option>
-                        <option value="oldest">Oldest</option>
-                        <option value="name_asc">Name (A-Z)</option>
-                        <option value="name_desc">Name (Z-A)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="filter-control">
-                <label class="filter-label" for="typeFilter">Customer Type</label>
-                <div class="filter-select-wrap">
-                    <i class="fas fa-users-viewfinder"></i>
-                    <select id="typeFilter" class="form-control">
-                        <option value="all">All Types</option>
-                        <option value="retail">Retail</option>
-                        <option value="wholesale">Wholesale</option>
-                        <option value="custom">Custom / VIP</option>
-                    </select>
+
+                <div class="listing-filter-form__actions">
+                    <button type="button" id="applyCustomerFiltersBtn" class="btn btn-primary">Apply</button>
+                    <button id="resetCustomerFiltersBtn" type="button" class="btn btn-secondary">Reset</button>
                 </div>
             </div>
         </div>
@@ -740,7 +693,9 @@
         const createdFilter = document.getElementById('createdFilter');
         const sortFilter = document.getElementById('sortFilter');
         const typeFilter = document.getElementById('typeFilter');
+        const applyFiltersBtn = document.getElementById('applyCustomerFiltersBtn');
         const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        const resetFiltersBtn = document.getElementById('resetCustomerFiltersBtn');
         const cardsView = document.getElementById('customerCardsView');
         const tableView = document.getElementById('customerTableView');
         const emptyState = document.getElementById('customerEmptyState');
@@ -824,6 +779,7 @@
         searchInput.addEventListener('input', applyFilters);
         createdFilter.addEventListener('change', applyFilters);
         typeFilter.addEventListener('change', applyFilters);
+        applyFiltersBtn.addEventListener('click', applyFilters);
         sortFilter.addEventListener('change', () => {
             sortItems();
             applyFilters();
@@ -836,6 +792,10 @@
             sortFilter.value = 'newest';
             sortItems();
             applyFilters();
+        });
+
+        resetFiltersBtn.addEventListener('click', () => {
+            clearFiltersBtn.click();
         });
 
         viewButtons.forEach((button) => {

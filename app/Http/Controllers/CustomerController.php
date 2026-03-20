@@ -19,15 +19,16 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
 
         $customersQuery = Customer::query();
 
         if ($q !== '') {
-            $customersQuery->where(function ($query) use ($q): void {
-                $query->where('name', 'like', '%' . $q . '%')
-                    ->orWhere('email', 'like', '%' . $q . '%')
-                    ->orWhere('phone', 'like', '%' . $q . '%')
-                    ->orWhere('address', 'like', '%' . $q . '%');
+            $customersQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(email) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(address) LIKE ?', ['%' . $qLower . '%']);
             });
         }
 

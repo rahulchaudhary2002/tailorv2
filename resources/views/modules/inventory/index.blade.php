@@ -8,6 +8,9 @@
         <h1 class="text-dark">Inventory Management</h1>
         <p>Track stock-in, stock-out, transfer, and adjustments with location and vendor consistency.</p>
     </div>
+    <div class="page-actions">
+        <button type="button" class="btn btn-primary js-open-transaction-modal">New Transaction</button>
+    </div>
 </div>
 
 <div class="stats-grid" style="margin-bottom: 16px;">
@@ -37,19 +40,78 @@
     </div>
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $stocks, 'placeholder' => 'Search by product code/name or location...', 'reporting' => $reporting])
+@php
+    $query = trim((string) request('q', ''));
+    $selectedProductId = (int) request('product_id', 0);
+    $selectedLocationId = (int) request('location_id', 0);
+    $selectedVendorId = (int) request('vendor_id', 0);
+@endphp
 
-<div class="table-card inventory-actions-card" style="margin-bottom: 16px;">
-    @if (session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
-    @if (session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
-    @endif
+@if (session('success'))
+    <div class="alert alert-success" style="margin-bottom: 16px;">{{ session('success') }}</div>
+@endif
+@if (session('error'))
+    <div class="alert alert-danger" style="margin-bottom: 16px;">{{ session('error') }}</div>
+@endif
 
-    <div class="table-header">
-        <div class="table-title">Inventory Actions</div>
-        <button type="button" class="btn btn-primary js-open-transaction-modal">New Transaction</button>
+<div class="directory-reporting">
+    <div class="directory-reporting__filter-bar">
+        <div class="directory-reporting__filter-head">
+            <h3 class="directory-reporting__filter-title">Filter Records</h3>
+            @if ($query !== '' || $selectedProductId > 0 || $selectedLocationId > 0 || $selectedVendorId > 0)
+                <a href="{{ url()->current() }}" class="btn btn-light btn-sm">Clear Filters</a>
+            @endif
+        </div>
+
+        <form method="GET" class="inventory-filter-form">
+            <div class="inventory-filter-form__fields">
+                <div class="outlet-form-group inventory-filter-form__field inventory-filter-form__field--search">
+                    <label for="q_filter">Search</label>
+                    <input id="q_filter" type="text" name="q" class="outlet-input" value="{{ $query }}" placeholder="Search by product code, product name, or location...">
+                </div>
+
+                <div class="outlet-form-group inventory-filter-form__field">
+                    <label for="product_filter">Product</label>
+                    <select id="product_filter" name="product_id" class="outlet-input">
+                        <option value="">All Products</option>
+                        @foreach ($products as $product)
+                            <option value="{{ $product->id }}" @selected($selectedProductId === (int) $product->id)>
+                                {{ $product->name }}@if($product->code) ({{ $product->code }}) @endif
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="outlet-form-group inventory-filter-form__field">
+                    <label for="location_filter">Location</label>
+                    <select id="location_filter" name="location_id" class="outlet-input">
+                        <option value="">All Locations</option>
+                        @foreach ($locations as $location)
+                            <option value="{{ $location->id }}" @selected($selectedLocationId === (int) $location->id)>
+                                {{ $location->name }} ({{ $location->type }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="outlet-form-group inventory-filter-form__field">
+                    <label for="vendor_filter">Vendor</label>
+                    <select id="vendor_filter" name="vendor_id" class="outlet-input">
+                        <option value="">All Vendors</option>
+                        @foreach ($vendors as $vendor)
+                            <option value="{{ $vendor->id }}" @selected($selectedVendorId === (int) $vendor->id)>
+                                {{ $vendor->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="inventory-filter-form__actions">
+                <button type="submit" class="btn btn-primary">Apply</button>
+                <a href="{{ url()->current() }}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -691,6 +753,58 @@
 
     body.app-modal-open {
         overflow: hidden;
+    }
+
+    .inventory-filter-form {
+        display: grid;
+        gap: 14px;
+    }
+
+    .inventory-filter-form__fields {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(200px, 1fr));
+        gap: 12px;
+        align-items: end;
+    }
+
+    .inventory-filter-form__field {
+        margin-bottom: 0;
+    }
+
+    .inventory-filter-form__field--search .outlet-input {
+        min-height: 44px;
+    }
+
+    .inventory-filter-form__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 2px;
+    }
+
+    @media (max-width: 992px) {
+        .inventory-filter-form__fields {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .inventory-filter-form__field--search {
+            grid-column: 1 / -1;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .inventory-filter-form__fields {
+            grid-template-columns: 1fr;
+        }
+
+        .inventory-filter-form__actions {
+            justify-content: stretch;
+            flex-direction: column;
+        }
+
+        .inventory-filter-form__actions .btn {
+            width: 100%;
+        }
     }
 </style>
 @endsection

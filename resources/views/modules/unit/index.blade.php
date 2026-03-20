@@ -18,7 +18,7 @@
     @endcanany
 </div>
 
-@include('includes.reporting-filter', ['paginator' => $units, 'placeholder' => 'Search by unit name or symbol...', 'reporting' => $reporting])
+@include('includes.listing-filter', ['paginator' => $units, 'placeholder' => 'Search by unit name or symbol...'])
 
 <div class="table-card">
     @if (session('success'))

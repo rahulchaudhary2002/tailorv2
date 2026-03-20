@@ -24,6 +24,9 @@ class ManufactureUnitController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $productFilterId = (int) $request->query('product_id', 0);
+        $locationFilterId = (int) $request->query('location_id', 0);
 
         $stocksQuery = InventoryStock::query()
             ->whereHas('location', function ($query) {
@@ -32,22 +35,23 @@ class ManufactureUnitController extends Controller
             ->with(['product:id,name,code,product_category_id', 'product.category:id,slug', 'location:id,name,type', 'unit:id,name,symbol']);
 
         if ($q !== '') {
-            $stocksQuery->where(function ($query) use ($q): void {
-                $query->whereHas('product', function ($productQuery) use ($q): void {
-                    $productQuery->where('name', 'like', '%' . $q . '%')
-                        ->orWhere('code', 'like', '%' . $q . '%');
-                })->orWhereHas('location', function ($locationQuery) use ($q): void {
-                    $locationQuery->where('name', 'like', '%' . $q . '%');
+            $stocksQuery->where(function ($query) use ($qLower): void {
+                $query->whereHas('product', function ($productQuery) use ($qLower): void {
+                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
+                })->orWhereHas('location', function ($locationQuery) use ($qLower): void {
+                    $locationQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
                 });
             });
         }
 
-        $reporting = [
-            'total' => (clone $stocksQuery)->count(),
-            'added_this_week' => (clone $stocksQuery)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'added_this_month' => (clone $stocksQuery)->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'added_last_30_days' => (clone $stocksQuery)->where('created_at', '>=', now()->subDays(30))->count(),
-        ];
+        if ($productFilterId > 0) {
+            $stocksQuery->where('product_id', $productFilterId);
+        }
+
+        if ($locationFilterId > 0) {
+            $stocksQuery->where('location_id', $locationFilterId);
+        }
 
         $stocks = $stocksQuery
             ->latest()
@@ -57,6 +61,13 @@ class ManufactureUnitController extends Controller
         $finalGoodsTransferLocations = InventoryLocation::query()
             ->where('is_active', true)
             ->whereIn('type', [InventoryLocation::TYPE_WAREHOUSE, InventoryLocation::TYPE_OUTLET])
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get(['id', 'name', 'type']);
+
+        $stockFilterLocations = InventoryLocation::query()
+            ->where('is_active', true)
+            ->whereIn('type', [InventoryLocation::TYPE_WAREHOUSE, InventoryLocation::TYPE_FACTORY])
             ->orderBy('type')
             ->orderBy('name')
             ->get(['id', 'name', 'type']);
@@ -150,7 +161,7 @@ class ManufactureUnitController extends Controller
             ->limit(100)
             ->get(['id', 'trx_date', 'status', 'target_product_id']);
 
-        return view('modules.manufacture_unit.index', compact('stocks', 'stats', 'productionProducts', 'productionLogs', 'productionTransfers', 'availableProductionTransfers', 'finalGoodsTransferLocations', 'reporting'));
+        return view('modules.manufacture_unit.index', compact('stocks', 'stats', 'productionProducts', 'productionLogs', 'productionTransfers', 'availableProductionTransfers', 'finalGoodsTransferLocations', 'stockFilterLocations'));
     }
 
     /**
