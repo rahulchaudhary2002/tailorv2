@@ -99,6 +99,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [ProductController::class, 'store'])->name('store')->middleware('can:create-products,manage-products');
         Route::get('/edit/{product}', [ProductController::class, 'edit'])->name('edit')->middleware('can:edit-products,manage-products');
         Route::put('/update/{product}', [ProductController::class, 'update'])->name('update')->middleware('can:edit-products,manage-products');
+        Route::post('/{product}/inventory', [ProductController::class, 'adjustInventory'])->name('inventory.store')->middleware('can:manage-inventory');
         Route::delete('/delete/{product}', [ProductController::class, 'destroy'])->name('destroy')->middleware('can:delete-products,manage-products');
     });
 

@@ -34,6 +34,10 @@ class StoreRequest extends FormRequest
                 }),
             ],
             'amount' => ['required', 'numeric', 'min:0'],
+            'inventory_location_id' => ['nullable', 'integer', 'exists:inventory_locations,id'],
+            'opening_quantity' => ['nullable', 'numeric', 'gt:0'],
+            'opening_unit_cost' => ['nullable', 'numeric', 'min:0'],
+            'opening_notes' => ['nullable', 'string', 'max:500'],
         ];
     }
 }
