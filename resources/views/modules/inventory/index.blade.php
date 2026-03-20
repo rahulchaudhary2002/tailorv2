@@ -46,16 +46,6 @@
     @if (session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
-    @if ($errors->any())
-        <div class="alert alert-danger">
-            <strong>Please fix the following errors:</strong>
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
 
     <div class="table-header">
         <div class="table-title">Inventory Actions</div>
@@ -74,20 +64,33 @@
         <form action="{{ route('inventory.adjust') }}" method="POST" style="padding: 16px;">
             @csrf
             <input type="hidden" name="tab" value="{{ old('tab', 'stock-summary') }}" class="js-active-tab-input">
+            @if ($errors->any())
+                <div class="alert alert-danger inventory-modal-alert">
+                    <strong>Please fix the following errors:</strong>
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
             <div class="outlet-form-grid">
                 <div class="outlet-form-group">
                     <label for="trx_type">Transaction Type</label>
-                    <select id="trx_type" name="trx_type" class="outlet-input" required>
+                    <select id="trx_type" name="trx_type" class="outlet-input @error('trx_type') is-invalid @enderror" required>
                         <option value="in" @selected(old('trx_type') === 'in')>Stock In</option>
                         <option value="out" @selected(old('trx_type') === 'out')>Stock Out</option>
                         <option value="transfer" @selected(old('trx_type') === 'transfer')>Transfer</option>
                         <option value="adjustment" @selected(old('trx_type', 'adjustment') === 'adjustment')>Adjustment</option>
                     </select>
+                    @error('trx_type')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group" id="group-location-id">
                     <label for="location_id">Location (in/out/adjustment)</label>
-                    <select id="location_id" name="location_id" class="outlet-input">
+                    <select id="location_id" name="location_id" class="outlet-input @error('location_id') is-invalid @enderror">
                         <option value="">Select Location</option>
                         @foreach ($locations as $location)
                             <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('location_id') === (string) $location->id)>
@@ -95,11 +98,14 @@
                             </option>
                         @endforeach
                     </select>
+                    @error('location_id')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group" id="group-from-location-id">
                     <label for="from_location_id">From Location (transfer)</label>
-                    <select id="from_location_id" name="from_location_id" class="outlet-input">
+                    <select id="from_location_id" name="from_location_id" class="outlet-input @error('from_location_id') is-invalid @enderror">
                         <option value="">Select Source</option>
                         @foreach ($locations as $location)
                             <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('from_location_id') === (string) $location->id)>
@@ -107,11 +113,14 @@
                             </option>
                         @endforeach
                     </select>
+                    @error('from_location_id')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group" id="group-to-location-id">
                     <label for="to_location_id">To Location (transfer)</label>
-                    <select id="to_location_id" name="to_location_id" class="outlet-input">
+                    <select id="to_location_id" name="to_location_id" class="outlet-input @error('to_location_id') is-invalid @enderror">
                         <option value="">Select Destination</option>
                         @foreach ($locations as $location)
                             <option value="{{ $location->id }}" data-type="{{ $location->type }}" @selected((string) old('to_location_id') === (string) $location->id)>
@@ -119,11 +128,14 @@
                             </option>
                         @endforeach
                     </select>
+                    @error('to_location_id')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group">
                     <label for="product_id">Product</label>
-                    <select id="product_id" name="product_id" class="outlet-input js-inventory-product-select" required>
+                    <select id="product_id" name="product_id" class="outlet-input js-inventory-product-select @error('product_id') is-invalid @enderror" required>
                         <option value="">Select Product</option>
                         @foreach ($products as $product)
                             <option value="{{ $product->id }}" @selected((string) old('product_id') === (string) $product->id)>
@@ -131,25 +143,37 @@
                             </option>
                         @endforeach
                     </select>
+                    @error('product_id')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group" id="group-adjustment-type">
                     <label for="adjustment_type">Adjustment Mode</label>
-                    <select id="adjustment_type" name="adjustment_type" class="outlet-input">
+                    <select id="adjustment_type" name="adjustment_type" class="outlet-input @error('adjustment_type') is-invalid @enderror">
                         <option value="add" @selected(old('adjustment_type') === 'add')>Add</option>
                         <option value="remove" @selected(old('adjustment_type') === 'remove')>Remove</option>
                         <option value="set" @selected(old('adjustment_type', 'set') === 'set')>Set Final Qty</option>
                     </select>
+                    @error('adjustment_type')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group">
                     <label for="quantity">Quantity</label>
-                    <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" class="outlet-input" value="{{ old('quantity', '1.00') }}" required>
+                    <input id="quantity" name="quantity" type="number" min="0.01" step="0.01" class="outlet-input @error('quantity') is-invalid @enderror" value="{{ old('quantity', '1.00') }}" required>
+                    @error('quantity')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group">
                     <label for="unit_cost">Unit Cost</label>
-                    <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input" value="{{ old('unit_cost', '0.00') }}" required>
+                    <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input @error('unit_cost') is-invalid @enderror" value="{{ old('unit_cost', '0.00') }}" required>
+                    @error('unit_cost')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group outlet-form-group-full">
@@ -171,6 +195,9 @@
                     <label id="reorder-location-hint" for="set_reorder_level" class="inventory-reorder-hint">
                         Applies to selected location (or destination location for transfer).
                     </label>
+                    @error('set_reorder_level')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group" id="group-reorder-min-qty">
@@ -181,10 +208,13 @@
                         type="number"
                         min="0.01"
                         step="0.01"
-                        class="outlet-input"
+                        class="outlet-input @error('reorder_min_qty') is-invalid @enderror"
                         value="{{ old('reorder_min_qty') }}"
                         placeholder="e.g. 10.00"
                     >
+                    @error('reorder_min_qty')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group" id="group-reorder-qty">
@@ -195,15 +225,21 @@
                         type="number"
                         min="0.01"
                         step="0.01"
-                        class="outlet-input"
+                        class="outlet-input @error('reorder_qty') is-invalid @enderror"
                         value="{{ old('reorder_qty') }}"
                         placeholder="e.g. 25.00"
                     >
+                    @error('reorder_qty')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
 
                 <div class="outlet-form-group outlet-form-group-full">
                     <label for="notes">Notes</label>
-                    <textarea id="notes" name="notes" class="outlet-input" rows="2" placeholder="Optional transaction note">{{ old('notes') }}</textarea>
+                    <textarea id="notes" name="notes" class="outlet-input @error('notes') is-invalid @enderror" rows="2" placeholder="Optional transaction note">{{ old('notes') }}</textarea>
+                    @error('notes')
+                        <div class="inventory-field-error">{{ $message }}</div>
+                    @enderror
                 </div>
             </div>
 
@@ -560,6 +596,22 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
+    }
+
+    .inventory-modal-alert {
+        margin-bottom: 16px;
+    }
+
+    .inventory-field-error {
+        margin-top: 6px;
+        color: #b91c1c;
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+
+    .inventory-transaction-modal__panel .outlet-input.is-invalid {
+        border-color: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
     }
 
     .app-modal {

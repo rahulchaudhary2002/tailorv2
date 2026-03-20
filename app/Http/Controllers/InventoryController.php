@@ -201,8 +201,6 @@ class InventoryController extends Controller
                 $toLocationId,
                 $vendorId,
                 $unitId,
-                $basePrice,
-                $specialPrice,
                 $unitCost,
                 $adjustmentType,
                 $inventoryTypeId,
