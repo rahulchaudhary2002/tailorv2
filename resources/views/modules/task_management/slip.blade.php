@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="table-card bill-wrap">
+<div class="bill-wrap">
     <div class="bill-actions">
         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
     </div>
@@ -63,9 +63,51 @@
 
     <div class="bill-card">
         <h3 class="bill-title" style="font-size:18px;">Task Notes</h3>
+        @php
+            $garmentDesignNotes = collect((array) ($garment['design_note'] ?? []))
+                ->map(fn ($note) => trim((string) $note))
+                ->filter()
+                ->values();
+            $designNoteText = $garmentDesignNotes->isNotEmpty()
+                ? $garmentDesignNotes->implode(', ')
+                : (data_get($customDetails, 'design_note', '-') ?: '-');
+            $designImages = collect((array) ($garment['design_images'] ?? []))
+                ->push($garment['design_image'] ?? null)
+                ->when(function ($collection) {
+                    return $collection->filter(fn ($path) => filled($path))->isEmpty();
+                }, function ($collection) use ($customDetails) {
+                    return $collection
+                        ->concat((array) data_get($customDetails, 'design_images', []))
+                        ->push(data_get($customDetails, 'design_image'));
+                })
+                ->filter(fn ($path) => filled($path))
+                ->unique()
+                ->values();
+        @endphp
         <div class="bill-muted">Tailoring Package: {{ $garment['tailoring_package'] ?? '-' }}</div>
-        <div class="bill-muted">Design Note: {{ data_get($customDetails, 'design_note', '-') ?: '-' }}</div>
+        <div class="bill-muted">Design Note: {{ $designNoteText }}</div>
         <div class="bill-muted">Slip Required For Payment: Yes</div>
+    </div>
+
+    <div class="bill-card">
+        <h3 class="bill-title" style="font-size:18px;">Design Sample</h3>
+        @if ($designImages->isNotEmpty())
+            <div class="bill-design-grid" style="margin-top:6px;">
+                @foreach ($designImages as $imagePath)
+                    @php
+                        $imagePath = (string) $imagePath;
+                        $imageUrl = str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')
+                            ? $imagePath
+                            : \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($imagePath, '/'));
+                    @endphp
+                    <a href="{{ $imageUrl }}" target="_blank" rel="noopener">
+                        <img src="{{ $imageUrl }}" alt="Design Sample" class="bill-design-thumb">
+                    </a>
+                @endforeach
+            </div>
+        @else
+            <div class="bill-muted">No design sample attached.</div>
+        @endif
     </div>
 </div>
 @endsection

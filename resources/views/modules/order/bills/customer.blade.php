@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="table-card bill-wrap">
+<div class="bill-wrap">
     <div class="bill-actions">
         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
     </div>

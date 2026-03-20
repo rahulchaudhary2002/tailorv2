@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="table-card bill-wrap">
+<div class="bill-wrap">
     @php
         $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
     @endphp

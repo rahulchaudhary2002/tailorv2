@@ -26,6 +26,7 @@ $garmentPayload = $garmentTypes->map(function ($garmentType) {
     return [
         'id' => $garmentType->id,
         'title' => $garmentType->title,
+        'designNotes' => array_values((array) ($garmentType->design_note ?? [])),
         'tailoringPackages' => $garmentType->tailoringPackages->map(function ($package) {
             return [
                 'id' => $package->id,
@@ -335,20 +336,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 <div class="tp-modal-section">
                     <h4>Measurement Details</h4>
                     <div id="measurementFields" class="tp-garment-sections"></div>
-                    <small class="tp-hint">Each selected garment keeps its own quantity, measurements, and tailoring package.</small>
-                </div>
-
-                <div class="tp-modal-section tp-stitching">
-                    <div class="tp-form-group" style="margin-top: 12px;">
-                        <label>Design Note</label>
-                        <textarea id="customDesignNote" class="tp-input" rows="3" placeholder="Design details..."></textarea>
-                    </div>
-
-                    <div class="tp-form-group">
-                        <label>Upload design sample (optional)</label>
-                        <input id="customDesignImages" type="file" class="tp-input" accept="image/*" multiple>
-                        <small class="tp-hint">Images will be submitted with the form.</small>
-                    </div>
+                    <small class="tp-hint">Each selected garment keeps its own quantity, measurements, tailoring package, optional design notes, and optional design samples.</small>
                 </div>
             </div>
 
@@ -615,6 +603,17 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-tailoring-option.selected{border-color:#7b1fa2;background:#e1bee7;box-shadow:0 0 0 2px rgba(123,31,162,.18);}
 .tp-tailoring-option h5{margin:0 0 4px;color:#7b1fa2;}
 .tp-selected-package{margin-top:10px;background:#e1bee7;border-radius:10px;padding:10px;}
+.tp-design-note-panel{margin-top:12px;padding:14px 18px 18px;border-radius:12px;background:#eef4fa;border:1px solid #dbe6f2;}
+.tp-design-note-heading{margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #d7b5eb;color:#a100c4;font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:8px;}
+.tp-design-note-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 22px;}
+.tp-design-note-item{display:flex;align-items:center;gap:8px;color:#334a92;font-size:1rem;font-weight:500;}
+.tp-design-note-item input{margin:0;}
+.tp-design-upload-panel{margin-top:18px;padding:16px 18px;border:1px dashed #e2bd71;border-radius:12px;background:#fffdfa;}
+.tp-design-upload-heading{margin:0 0 12px;color:#3e4a92;font-size:1.1rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;}
+.tp-design-upload-input{padding:12px 14px;background:#fff;border:1px solid #cfd9e5;border-radius:10px;}
+.tp-existing-image-note{margin-top:8px;color:#5d6b7a;font-size:.9rem;text-align:center;}
+@media(max-width:900px){.tp-design-note-list{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:560px){.tp-design-note-list{grid-template-columns:1fr;}}
 .tp-modal-footer{padding:14px 16px;background:#f8f9fa;border-top:1px solid #eef1f5;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;}
 @media print{body *{visibility:hidden !important;}#billPrintArea,#billPrintArea *{visibility:visible !important;}#billPrintArea{position:absolute !important;top:0;left:0;width:100% !important;max-width:100% !important;margin:0 !important;padding:0 !important;border:0 !important;box-shadow:none !important;background:#fff !important;}#billPrintArea .bill-actions,#billPrintArea .toggle-switch,#billPrintArea .discount-section button,#billPrintArea #clearBill,#billPrintArea #printBill{display:none !important;}}
 </style>
@@ -709,8 +708,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const customStockFabricFields = document.getElementById('customStockFabricFields');
     const customStockFabricQty = document.getElementById('customStockFabricQty');
     const customStockFabricHint = document.getElementById('customStockFabricHint');
-    const customDesignNote = document.getElementById('customDesignNote');
-    const customDesignImages = document.getElementById('customDesignImages');
 
     let billItems = Array.isArray(initialOrderState?.items) ? initialOrderState.items : [];
     let discount = initialOrderState?.discount || { type: 'none', value: 0 };
@@ -1191,6 +1188,15 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             drafts.set(garmentTypeId, {
                 quantity: Number(section.querySelector('input[data-garment-qty]')?.value || 1),
                 measurements,
+                designNotes: Array.from(section.querySelectorAll('input[data-design-note]:checked')).map((input) => String(input.value || '')),
+                designFiles: Array.from(section.querySelector('input[data-design-images]')?.files || []),
+                existingDesignImages: (() => {
+                    try {
+                        return JSON.parse(section.dataset.existingDesignImages || '[]');
+                    } catch (error) {
+                        return [];
+                    }
+                })(),
                 tailoringPackageId: Number(tailoringSelect?.value || 0) || null,
                 tailoringPackage: tailoringSelect?.selectedOptions?.[0]?.dataset.packageName || '',
             });
@@ -1222,10 +1228,18 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             const baseMeasurements = garment.measurements || [];
             const defaultPackageId = garment.tailoringPackages?.[0]?.id || '';
             const selectedPackageId = draft?.tailoringPackageId || existingGarment?.tailoring?.packageId || defaultPackageId;
+            const selectedDesignNotes = draft?.designNotes
+                || existingGarment?.designNotes
+                || existingGarment?.designNote
+                || [];
+            const existingDesignImages = draft?.existingDesignImages || existingGarment?.existingDesignImages || [];
+            const draftDesignFiles = draft?.designFiles || existingGarment?.designFiles || [];
 
             const section = document.createElement('div');
             section.className = 'tp-garment-section';
             section.dataset.garmentTypeId = String(garmentTypeId);
+            section.dataset.existingDesignImages = JSON.stringify(existingDesignImages);
+            section._designFiles = draftDesignFiles;
 
             let measurementHtml = '<div class="tp-measurement-grid">';
             baseMeasurements.forEach((measurement) => {
@@ -1245,6 +1259,40 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 `;
             });
             measurementHtml += '</div>';
+
+            let designNoteHtml = '<div class="tp-design-note-panel"><div class="tp-design-note-heading"><i class="fas fa-pencil-alt"></i> Design notes (optional)</div>';
+            if ((garment.designNotes || []).length) {
+                designNoteHtml += '<div class="tp-design-note-list">';
+                (garment.designNotes || []).forEach((note, noteIndex) => {
+                    const checkboxId = `garment-${garmentTypeId}-design-note-${noteIndex}`;
+                    designNoteHtml += `
+                        <label for="${checkboxId}" class="tp-design-note-item">
+                            <input
+                                id="${checkboxId}"
+                                type="checkbox"
+                                value="${String(note)}"
+                                data-design-note="1"
+                                ${selectedDesignNotes.includes(String(note)) ? 'checked' : ''}>
+                            <span>${String(note)}</span>
+                        </label>
+                    `;
+                });
+                designNoteHtml += '</div>';
+            } else {
+                designNoteHtml += '<div class="tp-hint">No preset design notes for this garment type.</div>';
+            }
+            designNoteHtml += '</div>';
+
+            const existingImageCount = Array.isArray(existingDesignImages) ? existingDesignImages.length : 0;
+            const selectedFileCount = Array.isArray(draftDesignFiles) ? draftDesignFiles.length : 0;
+            const designImageHtml = `
+                <div class="tp-design-upload-panel">
+                    <div class="tp-design-upload-heading"><i class="fas fa-cloud-upload-alt"></i> Upload design sample (optional)</div>
+                    <input type="file" class="tp-input tp-design-upload-input" data-design-images accept="image/*" multiple>
+                    ${existingImageCount ? `<div class="tp-existing-image-note">${existingImageCount} existing design sample${existingImageCount > 1 ? 's' : ''} will be kept.</div>` : ''}
+                    ${selectedFileCount ? `<div class="tp-existing-image-note">${selectedFileCount} newly selected file${selectedFileCount > 1 ? 's are' : ' is'} queued.</div>` : ''}
+                </div>
+            `;
 
             let tailoringOptions = '';
             (garment.tailoringPackages || []).forEach((pkg) => {
@@ -1277,6 +1325,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                         ${tailoringOptions}
                     </select>
                 </div>
+                ${designNoteHtml}
+                ${designImageHtml}
             `;
 
             measurementFieldsEl.appendChild(section);
@@ -1317,13 +1367,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     function resetCustomModalState() {
         modal.dataset.itemState = JSON.stringify({ garments: [] });
-        customDesignNote.value = '';
         customFabricOwnRadio.checked = true;
         customFabricStockRadio.checked = false;
         customStockFabricQty.value = '1.00';
-        try {
-            customDesignImages.value = '';
-        } catch (error) {}
         Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
             input.checked = false;
         });
@@ -1385,7 +1431,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             input.checked = selectedIds.includes(String(input.value || ''));
         });
 
-        customDesignNote.value = String(existingItem?.designNote || '');
         const fabricSource = String(existingItem?.fabricSource || 'own');
         customFabricOwnRadio.checked = fabricSource !== 'stock';
         customFabricStockRadio.checked = fabricSource === 'stock';
@@ -1458,6 +1503,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                                 <strong>${garment.title}</strong> x ${money(garment.quantity)}
                                 <div class="item-sub">${garment.tailoring?.package || 'Tailoring'} - NPR ${money(garment.tailoring?.amount || 0)} each</div>
                                 ${measurements ? `<div class="item-sub"><i class="fas fa-ruler"></i> ${measurements}${garment.measurements.length > 3 ? ' ...' : ''}</div>` : ''}
+                                ${garment.designNotes?.length ? `<div class="item-sub"><i class="fas fa-note-sticky"></i> ${garment.designNotes.join(', ')}</div>` : ''}
                             </div>
                             <div><strong>NPR ${money(Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0))}</strong></div>
                         </div>
@@ -1477,7 +1523,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                             <span class="${chipClass}">${label}</span>
                             <div class="item-sub">${money(item.qty)} ${item.unitLabel || ''} × NPR ${money(item.unitPrice)}</div>
                             ${sizeSummary}
-                            ${item.designNote ? `<div class="item-sub"><i class="fas fa-note-sticky"></i> ${item.designNote}</div>` : ''}
                         </div>
                         <div class="product-actions">
                             <button type="button" class="btn-secondary" data-action="edit" data-id="${item.id}">Edit</button>
@@ -1569,10 +1614,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_source]`, String(item.fabricSource || 'own')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || item.qty || 0)));
-            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][design_note]`, String(item.designNote || '')));
-            (item.existingDesignImages || []).forEach((path, pathIndex) => {
-                hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][existing_design_images][${pathIndex}]`, String(path || '')));
-            });
 
             (item.garments || []).forEach((garment, garmentIndex) => {
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][garment_type_id]`, String(garment.garmentTypeId || '')));
@@ -1581,15 +1622,21 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][tailoring_package_id]`, String(garment.tailoring?.packageId || '')));
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][tailoring_package]`, String(garment.tailoring?.package || '')));
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][tailoring_amount]`, String(garment.tailoring?.amount || 0)));
+                (garment.designNotes || []).forEach((note, noteIndex) => {
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][design_note][${noteIndex}]`, String(note || '')));
+                });
+                (garment.existingDesignImages || []).forEach((path, pathIndex) => {
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][existing_design_images][${pathIndex}]`, String(path || '')));
+                });
 
                 (garment.measurements || []).forEach((measurement, measurementIndex) => {
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][measurements][${measurementIndex}][type]`, String(measurement.type || '')));
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][measurements][${measurementIndex}][measurement]`, String(measurement.measurement || '')));
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][measurements][${measurementIndex}][unit]`, String(measurement.unit || '')));
                 });
-            });
 
-            appendFileInput(`items[${idx}][custom][design_images][]`, item.designFiles || []);
+                appendFileInput(`items[${idx}][custom][garments][${garmentIndex}][design_images][]`, garment.designFiles || []);
+            });
         });
     }
 
@@ -1785,6 +1832,18 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 title: garmentType?.title || tailoringOption.dataset.packageName || 'Garment',
                 quantity: garmentQuantity,
                 measurements,
+                designNotes: Array.from(section.querySelectorAll('input[data-design-note]:checked')).map((input) => String(input.value || '')),
+                designFiles: (() => {
+                    const selectedFiles = Array.from(section.querySelector('input[data-design-images]')?.files || []);
+                    return selectedFiles.length ? selectedFiles : (section._designFiles || []);
+                })(),
+                existingDesignImages: (() => {
+                    try {
+                        return JSON.parse(section.dataset.existingDesignImages || '[]');
+                    } catch (error) {
+                        return [];
+                    }
+                })(),
                 tailoring: {
                     packageId: Number(tailoringOption.value || 0),
                     package: tailoringOption.dataset.packageName || 'Tailoring',
@@ -1798,7 +1857,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             return;
         }
 
-        const designFiles = Array.from(customDesignImages.files || []);
         const stockUnitPrice = Number(pending.unitPrice || resolveDefaultPrice(pending.productId) || 0);
         const payload = {
             id: editingCustomIndex > -1 ? billItems[editingCustomIndex]?.id : `${Date.now()}-${Math.random()}`,
@@ -1812,16 +1870,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             fabricSource,
             fabricQuantity,
             garments,
-            designNote: customDesignNote.value || '',
-            designFiles,
-            existingDesignImages: [],
         };
 
         if (editingCustomIndex > -1 && billItems[editingCustomIndex]) {
-            if (!designFiles.length) {
-                payload.designFiles = billItems[editingCustomIndex].designFiles || [];
-            }
-            payload.existingDesignImages = billItems[editingCustomIndex].existingDesignImages || [];
             billItems[editingCustomIndex] = payload;
             closeModal();
             renderBill();

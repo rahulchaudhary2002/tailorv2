@@ -270,7 +270,7 @@
         .table-card {
             border: 0;
             box-shadow: none;
-            padding: 0;
+            padding: 16px;
             margin: 0;
         }
 

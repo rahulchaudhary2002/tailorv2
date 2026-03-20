@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="table-card bill-wrap">
+<div class="bill-wrap">
     @php
         $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
         $taskDeadline = $order->tasks->pluck('worker_deadline_at')->filter()->sort()->first();
@@ -182,7 +182,8 @@
         <h3 class="bill-title" style="font-size:18px;">Design References</h3>
         @forelse ($customItems as $customItem)
             @php
-                $designImages = collect((array) data_get($customItem->custom_details, 'design_images', []))
+                $garments = collect((array) data_get($customItem->custom_details, 'garments', []));
+                $itemLevelDesignImages = collect((array) data_get($customItem->custom_details, 'design_images', []))
                     ->push(data_get($customItem->custom_details, 'design_image'))
                     ->filter(fn ($path) => filled($path))
                     ->unique()
@@ -190,11 +191,39 @@
             @endphp
             <div class="bill-muted" style="margin-top:10px;">
                 {{ data_get($customItem->custom_details, 'garment_title')
-                    ?: (collect((array) data_get($customItem->custom_details, 'garments', []))->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment') }}
+                    ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment') }}
             </div>
-            @if ($designImages->isNotEmpty())
+            @if ($garments->isNotEmpty())
+                @foreach ($garments as $garment)
+                    @php
+                        $garmentDesignImages = collect((array) ($garment['design_images'] ?? []))
+                            ->push($garment['design_image'] ?? null)
+                            ->filter(fn ($path) => filled($path))
+                            ->unique()
+                            ->values();
+                    @endphp
+                    <div class="bill-muted" style="margin-top:8px;">
+                        {{ $garment['garment_title'] ?? 'Garment' }}
+                    </div>
+                    @if ($garmentDesignImages->isNotEmpty())
+                        <div class="bill-design-grid" style="margin-top:6px;">
+                            @foreach ($garmentDesignImages as $imagePath)
+                                @php
+                                    $imagePath = (string) $imagePath;
+                                    $imageUrl = str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')
+                                        ? $imagePath
+                                        : \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($imagePath, '/'));
+                                @endphp
+                                <a href="{{ $imageUrl }}" target="_blank" rel="noopener">
+                                    <img src="{{ $imageUrl }}" alt="Design Image" class="bill-design-thumb">
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                @endforeach
+            @elseif ($itemLevelDesignImages->isNotEmpty())
                 <div class="bill-design-grid" style="margin-top:6px;">
-                    @foreach ($designImages as $imagePath)
+                    @foreach ($itemLevelDesignImages as $imagePath)
                         @php
                             $imagePath = (string) $imagePath;
                             $imageUrl = str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')

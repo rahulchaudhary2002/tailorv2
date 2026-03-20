@@ -309,7 +309,7 @@ class OrderController extends Controller
                 },
             ])
             ->orderBy('title')
-            ->get(['id', 'title']);
+            ->get(['id', 'title', 'design_note']);
 
         $selectedCustomerId = $request->query('customer_id');
 
@@ -686,19 +686,43 @@ class OrderController extends Controller
                         $fabricQuantityUnit = 'm';
                         $garments = collect((array) ($custom['garments'] ?? []))
                             ->values()
-                            ->map(function ($garment) use ($garmentTypes) {
+                            ->map(function ($garment, $garmentIndex) use ($garmentTypes, $itemIndex, $request) {
                                 $garmentTypeId = (int) ($garment['garment_type_id'] ?? 0);
                                 $garmentType = $garmentTypes->get($garmentTypeId);
                                 $garmentQty = (float) ($garment['quantity'] ?? 1);
                                 $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
                                 $taxPercent = 0.0;
                                 $tailoringTotal = $garmentQty * $tailoringAmount;
+                                $garmentDesignImagePaths = collect((array) ($garment['existing_design_images'] ?? []))
+                                    ->map(fn ($path) => trim((string) $path))
+                                    ->filter()
+                                    ->values()
+                                    ->all();
+                                $garmentDesignImages = (array) $request->file("items.{$itemIndex}.custom.garments.{$garmentIndex}.design_images", []);
+
+                                foreach ($garmentDesignImages as $garmentDesignImage) {
+                                    if (!$garmentDesignImage || !$garmentDesignImage->isValid()) {
+                                        continue;
+                                    }
+
+                                    $storedPath = Storage::disk('public')->putFile('order-designs', $garmentDesignImage);
+                                    if ($storedPath) {
+                                        $garmentDesignImagePaths[] = $storedPath;
+                                    }
+                                }
 
                                 return [
                                     'garment_type_id' => $garmentTypeId,
                                     'garment_title' => $garment['garment_title'] ?? $garmentType?->title,
                                     'quantity' => $garmentQty,
                                     'measurements' => array_values((array) ($garment['measurements'] ?? [])),
+                                    'design_note' => collect((array) ($garment['design_note'] ?? []))
+                                        ->map(fn ($note) => trim((string) $note))
+                                        ->filter()
+                                        ->values()
+                                        ->all(),
+                                    'design_images' => array_values(array_unique($garmentDesignImagePaths)),
+                                    'design_image' => $garmentDesignImagePaths[0] ?? null,
                                     'tailoring_package_id' => !empty($garment['tailoring_package_id'])
                                         ? (int) $garment['tailoring_package_id']
                                         : null,
@@ -712,24 +736,22 @@ class OrderController extends Controller
                                         ? round($tailoringTotal * ($taxPercent / 100), 2)
                                         : 0.0,
                                 ];
-                            });
+                            })
+                            ->values();
                         $itemTailoringTotal = (float) $garments->sum(fn ($garment) => (float) ($garment['tailoring_total_amount'] ?? 0));
-                        $designImagePaths = collect((array) ($custom['existing_design_images'] ?? []))
+                        $designNoteSummary = $garments
+                            ->flatMap(fn ($garment) => (array) ($garment['design_note'] ?? []))
+                            ->map(fn ($note) => trim((string) $note))
+                            ->filter()
+                            ->unique()
+                            ->implode(', ');
+                        $designImagePaths = $garments
+                            ->flatMap(fn ($garment) => (array) ($garment['design_images'] ?? []))
                             ->map(fn ($path) => trim((string) $path))
                             ->filter()
+                            ->unique()
                             ->values()
                             ->all();
-                        $designImages = (array) $request->file("items.{$itemIndex}.custom.design_images", []);
-                        foreach ($designImages as $designImage) {
-                            if (!$designImage || !$designImage->isValid()) {
-                                continue;
-                            }
-
-                            $storedPath = Storage::disk('public')->putFile('order-designs', $designImage);
-                            if ($storedPath) {
-                                $designImagePaths[] = $storedPath;
-                            }
-                        }
 
                         $order->items()->create([
                             'item_category' => 'custom',
@@ -750,7 +772,7 @@ class OrderController extends Controller
                                 'fabric_total_price' => $fabricSource === 'stock' ? ($fabricQuantity * $fabricUnitPrice) : null,
                                 'quantity_unit' => $fabricQuantityUnit,
                                 'tailoring_total_price' => $itemTailoringTotal,
-                                'design_note' => $custom['design_note'] ?? null,
+                                'design_note' => $designNoteSummary !== '' ? $designNoteSummary : null,
                                 'design_images' => $designImagePaths,
                                 'design_image' => $designImagePaths[0] ?? null,
                             ],
@@ -1488,6 +1510,8 @@ class OrderController extends Controller
                                     'title' => (string) ($garment['garment_title'] ?? 'Garment'),
                                     'quantity' => (float) ($garment['quantity'] ?? 1),
                                     'measurements' => array_values((array) ($garment['measurements'] ?? [])),
+                                    'designNotes' => array_values((array) ($garment['design_note'] ?? [])),
+                                    'existingDesignImages' => array_values((array) ($garment['design_images'] ?? [])),
                                     'tailoring' => [
                                         'packageId' => (int) ($garment['tailoring_package_id'] ?? 0),
                                         'package' => (string) ($garment['tailoring_package'] ?? 'Tailoring'),
@@ -1565,6 +1589,8 @@ class OrderController extends Controller
                         'title' => (string) ($garment['garment_title'] ?? ($garmentType?->title ?? 'Garment')),
                         'quantity' => (float) ($garment['quantity'] ?? 1),
                         'measurements' => array_values((array) ($garment['measurements'] ?? [])),
+                        'designNotes' => array_values((array) ($garment['design_note'] ?? [])),
+                        'existingDesignImages' => array_values((array) ($garment['existing_design_images'] ?? $garment['design_images'] ?? [])),
                         'tailoring' => [
                             'packageId' => (int) ($garment['tailoring_package_id'] ?? 0),
                             'package' => (string) ($garment['tailoring_package'] ?? 'Tailoring'),
