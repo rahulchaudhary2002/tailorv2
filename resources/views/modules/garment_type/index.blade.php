@@ -49,6 +49,23 @@
             height: 100%;
         }
 
+        .garment-detail-stack--compact {
+            min-width: 200px;
+        }
+
+        .garment-detail-stack--two-column {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .garment-detail-stack--two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .garment-detail-row {
             display: flex;
             justify-content: space-between;
@@ -91,7 +108,7 @@
                         </td>
                         <td>
                             @if ($garmentType->measurements->isNotEmpty())
-                                <div class="garment-detail-stack">
+                                <div class="garment-detail-stack garment-detail-stack--two-column">
                                     @foreach ($garmentType->measurements as $measurement)
                                         <div class="garment-detail-row">
                                             <span>{{ $measurement->order }}.</span>
@@ -108,9 +125,9 @@
                                 -
                             @endif
                         </td>
-                        <td>
+                        <td style="width: 250px;">
                             @if ($garmentType->tailoringPackages->isNotEmpty())
-                                <div class="garment-detail-stack">
+                                <div class="garment-detail-stack garment-detail-stack--compact">
                                     @foreach ($garmentType->tailoringPackages as $package)
                                         <div class="garment-detail-row">
                                             <span>{{ $package->name }}</span>
