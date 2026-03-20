@@ -91,7 +91,7 @@
                     <tr>
                         <td>
                             @if ($user->avatar)
-                                <img src="{{ route('files.public', ['path' => $user->avatar]) }}" alt="{{ $user->name }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                <img src="{{ \Illuminate\Support\Facades\Storage::url($user->avatar) }}" alt="{{ $user->name }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                             @else
                                 <span>-</span>
                             @endif
