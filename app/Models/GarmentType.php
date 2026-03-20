@@ -8,6 +8,11 @@ class GarmentType extends Model
 {
     protected $fillable = [
         'title',
+        'design_note',
+    ];
+
+    protected $casts = [
+        'design_note' => 'array',
     ];
 
     public function measurements()

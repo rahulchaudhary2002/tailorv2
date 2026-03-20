@@ -86,6 +86,7 @@ class GarmentTypeSeeder extends Seeder
         $types = [
             [
                 'title' => 'Coat',
+                'design_note' => ['Two button', 'Side vent', 'Notch lapel'],
                 'tailoring_packages' => [
                     ['name' => 'Set regular', 'amount' => 6000, 'order' => 1],
                     ['name' => 'Stylish', 'amount' => 6400, 'order' => 2],
@@ -94,6 +95,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Pant',
+                'design_note' => ['Single pleat', 'Turn-up hem', 'Cross pocket'],
                 'tailoring_packages' => [
                     ['name' => 'Set regular', 'amount' => 600, 'order' => 1],
                     ['name' => 'Premium', 'amount' => 850, 'order' => 2],
@@ -103,6 +105,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Shirt',
+                'design_note' => ['Spread collar', 'Round cuff', 'Front pocket'],
                 'tailoring_packages' => [
                     ['name' => 'Set regular', 'amount' => 650, 'order' => 1],
                     ['name' => 'Premium', 'amount' => 800, 'order' => 2],
@@ -111,6 +114,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Waistcoat',
+                'design_note' => ['V neck', 'Five button', 'Double welt pocket'],
                 'tailoring_packages' => [
                     ['name' => 'Set Regular', 'amount' => 1800, 'order' => 1],
                     ['name' => 'Premium', 'amount' => 2000, 'order' => 2],
@@ -119,6 +123,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Jwaricoat',
+                'design_note' => ['Mandarin collar', 'Hidden placket'],
                 'tailoring_packages' => [
                     ['name' => 'Regular', 'amount' => 2500, 'order' => 1],
                 ],
@@ -126,6 +131,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Daura Surwal',
+                'design_note' => ['Traditional tie closure', 'Side tassel'],
                 'tailoring_packages' => [
                     ['name' => 'Regular', 'amount' => 1800, 'order' => 1],
                     ['name' => 'Groom Dress', 'amount' => 2500, 'order' => 2],
@@ -134,6 +140,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Kurta Surwal',
+                'design_note' => ['Band collar', 'Side slit'],
                 'tailoring_packages' => [
                     ['name' => 'Regular', 'amount' => 1800, 'order' => 1],
                 ],
@@ -141,6 +148,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Kamij Surwal',
+                'design_note' => ['Straight cut', 'Simple cuff'],
                 'tailoring_packages' => [
                     ['name' => 'Regular', 'amount' => 1800, 'order' => 1],
                 ],
@@ -148,6 +156,7 @@ class GarmentTypeSeeder extends Seeder
             ],
             [
                 'title' => 'Long Coat',
+                'design_note' => ['Peak lapel', 'Back slit', 'Long silhouette'],
                 'tailoring_packages' => [
                     ['name' => 'Regular', 'amount' => 7500, 'order' => 1],
                 ],
@@ -158,7 +167,10 @@ class GarmentTypeSeeder extends Seeder
         foreach ($types as $data) {
             $garmentType = GarmentType::query()->updateOrCreate(
                 ['title' => $data['title']],
-                ['title' => $data['title']]
+                [
+                    'title' => $data['title'],
+                    'design_note' => $data['design_note'] ?? null,
+                ]
             );
 
             $garmentType->measurements()->delete();

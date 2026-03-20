@@ -91,18 +91,16 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>SN</th>
                     <th>Garment Type</th>
                     <th>Measurement Format</th>
                     <th>Rates</th>
-                    <th>Created</th>
+                    <th>Design Notes</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($garmentTypes as $garmentType)
                     <tr>
-                        <td>{{ ($garmentTypes->firstItem() ?? 1) + $loop->index }}</td>
                         <td style="font-weight: 600;">
                             {{ $garmentType->title }}
                         </td>
@@ -139,8 +137,12 @@
                                 -
                             @endif
                         </td>
-                        <td>
-                            {{ $garmentType->created_at->format('M d, Y') }}
+                        <td style="width: 240px;">
+                            @if (! empty($garmentType->design_note))
+                                {{ implode(', ', $garmentType->design_note) }}
+                            @else
+                                -
+                            @endif
                         </td>
                         <td>
                             <div class="actions">
@@ -165,7 +167,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="empty">No garment types found.</td>
+                        <td colspan="5" class="empty">No garment types found.</td>
                     </tr>
                 @endforelse
             </tbody>
