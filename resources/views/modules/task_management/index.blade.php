@@ -2,6 +2,212 @@
 
 @section('title', 'Task Management')
 
+@section('page-specific-style')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+<style>
+    .app-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        z-index: 1300;
+    }
+
+    .app-modal.is-open {
+        display: block;
+    }
+
+    .app-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+    }
+
+    .app-modal__panel {
+        position: relative;
+        width: min(640px, calc(100vw - 32px));
+        margin: 48px auto;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+        overflow: hidden;
+    }
+
+    .app-modal__header {
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .app-modal__header h3 {
+        margin: 0;
+    }
+
+    .app-modal__meta {
+        margin: 6px 0 0;
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    .task-assign-close {
+        width: 36px;
+        height: 36px;
+        border: 1px solid #d7dfeb;
+        border-radius: 10px;
+        background: #fff;
+        color: #334155;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .task-assign-close:hover {
+        background: #f8fafc;
+    }
+
+    .task-assign-grid {
+        padding: 20px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .outlet-form-group-full {
+        grid-column: 1 / -1;
+    }
+
+    .task-assign-check {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 500;
+    }
+
+    .task-assign-actions {
+        padding: 0 20px 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .task-assign-modal__panel .select2-container {
+        width: 100% !important;
+    }
+
+    .task-assign-modal__panel .select2-container--default .select2-selection--single {
+        height: 46px;
+        border-radius: 10px;
+        border: 1px solid #d7dfeb;
+        background: #fff;
+    }
+
+    .task-assign-modal__panel .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 44px;
+        padding-left: 12px;
+        color: #0f172a;
+        font-size: 14px;
+    }
+
+    .task-assign-modal__panel .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 44px;
+        right: 8px;
+    }
+
+    body.app-modal-open {
+        overflow: hidden;
+    }
+
+    .listing-filter-form {
+        display: grid;
+        gap: 14px;
+    }
+
+    .listing-filter-form__fields {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(200px, 1fr));
+        gap: 12px;
+        align-items: end;
+    }
+
+    .listing-filter-form__fields--task {
+        grid-template-columns: minmax(320px, 1.5fr) minmax(180px, 1fr) minmax(220px, 1fr) minmax(320px, 1.2fr);
+    }
+
+    .listing-filter-form__field {
+        margin-bottom: 0;
+    }
+
+    .date-range-picker-input {
+        cursor: pointer;
+        background: #fff;
+    }
+
+    .listing-filter-form__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .task-status-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .task-status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .task-status-assigned {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .task-status-in-progress {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .task-status-completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .task-status-cancelled {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    @media (max-width: 640px) {
+        .listing-filter-form__fields,
+        .listing-filter-form__fields--task {
+            grid-template-columns: 1fr;
+        }
+
+        .listing-filter-form__actions {
+            flex-direction: column;
+        }
+
+        .listing-filter-form__actions .btn {
+            width: 100%;
+        }
+
+        .task-assign-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="page-header">
     <div class="page-title">
@@ -25,7 +231,7 @@
     <div class="directory-reporting__filter-bar">
         <div class="directory-reporting__filter-head">
             <h3 class="directory-reporting__filter-title">Filter Records</h3>
-            @if ($query !== '' || $selectedStatus !== '' || $selectedWorkerId > 0)
+            @if ($query !== '' || $selectedStatus !== '' || $selectedWorkerId > 0 || $selectedDeadlineFrom !== '' || $selectedDeadlineTo !== '')
                 <a href="{{ url()->current() }}" class="btn btn-light btn-sm">Clear Filters</a>
             @endif
         </div>
@@ -55,6 +261,20 @@
                             <option value="{{ $worker->id }}" @selected($selectedWorkerId === (int) $worker->id)>{{ $worker->name }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div class="outlet-form-group listing-filter-form__field listing-filter-form__field--range">
+                    <label for="deadline_range_filter">Deadline Range</label>
+                    <input
+                        id="deadline_range_filter"
+                        type="text"
+                        class="outlet-input date-range-picker-input"
+                        value="{{ $selectedDeadlineFrom !== '' && $selectedDeadlineTo !== '' ? $selectedDeadlineFrom . ' - ' . $selectedDeadlineTo : '' }}"
+                        placeholder="Select deadline range"
+                        autocomplete="off"
+                    >
+                    <input id="deadline_from_filter" type="hidden" name="deadline_from" value="{{ $selectedDeadlineFrom }}">
+                    <input id="deadline_to_filter" type="hidden" name="deadline_to" value="{{ $selectedDeadlineTo }}">
                 </div>
             </div>
 
@@ -217,207 +437,9 @@
 </div>
 @endsection
 
-@section('page-specific-style')
-<style>
-    .app-modal {
-        position: fixed;
-        inset: 0;
-        display: none;
-        z-index: 1300;
-    }
-
-    .app-modal.is-open {
-        display: block;
-    }
-
-    .app-modal__backdrop {
-        position: absolute;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.45);
-    }
-
-    .app-modal__panel {
-        position: relative;
-        width: min(640px, calc(100vw - 32px));
-        margin: 48px auto;
-        background: #fff;
-        border-radius: 16px;
-        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
-        overflow: hidden;
-    }
-
-    .app-modal__header {
-        padding: 18px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        border-bottom: 1px solid #e2e8f0;
-    }
-
-    .app-modal__header h3 {
-        margin: 0;
-    }
-
-    .app-modal__meta {
-        margin: 6px 0 0;
-        color: #64748b;
-        font-size: 13px;
-    }
-
-    .task-assign-close {
-        width: 36px;
-        height: 36px;
-        border: 1px solid #d7dfeb;
-        border-radius: 10px;
-        background: #fff;
-        color: #334155;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-    }
-
-    .task-assign-close:hover {
-        background: #f8fafc;
-    }
-
-    .task-assign-grid {
-        padding: 20px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-    }
-
-    .outlet-form-group-full {
-        grid-column: 1 / -1;
-    }
-
-    .task-assign-check {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        font-weight: 500;
-    }
-
-    .task-assign-actions {
-        padding: 0 20px 20px;
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-    }
-
-    .task-assign-modal__panel .select2-container {
-        width: 100% !important;
-    }
-
-    .task-assign-modal__panel .select2-container--default .select2-selection--single {
-        height: 46px;
-        border-radius: 10px;
-        border: 1px solid #d7dfeb;
-        background: #fff;
-    }
-
-    .task-assign-modal__panel .select2-container--default .select2-selection--single .select2-selection__rendered {
-        line-height: 44px;
-        padding-left: 12px;
-        color: #0f172a;
-        font-size: 14px;
-    }
-
-    .task-assign-modal__panel .select2-container--default .select2-selection--single .select2-selection__arrow {
-        height: 44px;
-        right: 8px;
-    }
-
-    body.app-modal-open {
-        overflow: hidden;
-    }
-
-    .listing-filter-form {
-        display: grid;
-        gap: 14px;
-    }
-
-    .listing-filter-form__fields {
-        display: grid;
-        grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(200px, 1fr));
-        gap: 12px;
-        align-items: end;
-    }
-
-    .listing-filter-form__fields--task {
-        grid-template-columns: minmax(320px, 1.7fr) minmax(200px, 1fr) minmax(220px, 1fr);
-    }
-
-    .listing-filter-form__field {
-        margin-bottom: 0;
-    }
-
-    .listing-filter-form__actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-    }
-
-    .task-status-badge {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1;
-        white-space: nowrap;
-    }
-
-    .task-status-pending {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .task-status-assigned {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-
-    .task-status-in-progress {
-        background: #e0f2fe;
-        color: #0369a1;
-    }
-
-    .task-status-completed {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .task-status-cancelled {
-        background: #fee2e2;
-        color: #b91c1c;
-    }
-
-    @media (max-width: 640px) {
-        .listing-filter-form__fields,
-        .listing-filter-form__fields--task {
-            grid-template-columns: 1fr;
-        }
-
-        .listing-filter-form__actions {
-            flex-direction: column;
-        }
-
-        .listing-filter-form__actions .btn {
-            width: 100%;
-        }
-
-        .task-assign-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>
-@endsection
-
 @section('page-specific-script')
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/min/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <script>
     (() => {
         const body = document.body;
@@ -429,9 +451,46 @@
         const notesInput = document.getElementById('taskAssignNotes');
         const slipInput = document.getElementById('taskAssignSlip');
         const modalPanel = modal.querySelector('.task-assign-modal__panel');
+        const rangeInput = document.getElementById('deadline_range_filter');
+        const fromInput = document.getElementById('deadline_from_filter');
+        const toInput = document.getElementById('deadline_to_filter');
 
         if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !slipInput) {
             return;
+        }
+
+        if (rangeInput && fromInput && toInput && window.jQuery && window.jQuery.fn && window.jQuery.fn.daterangepicker) {
+            const options = {
+                autoUpdateInput: false,
+                alwaysShowCalendars: true,
+                locale: {
+                    cancelLabel: 'Clear',
+                    format: 'YYYY-MM-DD',
+                },
+            };
+
+            if (fromInput.value && toInput.value) {
+                options.startDate = fromInput.value;
+                options.endDate = toInput.value;
+                rangeInput.value = `${fromInput.value} - ${toInput.value}`;
+            }
+
+            window.jQuery(rangeInput).daterangepicker(options);
+
+            window.jQuery(rangeInput).on('apply.daterangepicker', function (_event, picker) {
+                const start = picker.startDate.format('YYYY-MM-DD');
+                const end = picker.endDate.format('YYYY-MM-DD');
+
+                fromInput.value = start;
+                toInput.value = end;
+                rangeInput.value = `${start} - ${end}`;
+            });
+
+            window.jQuery(rangeInput).on('cancel.daterangepicker', function () {
+                fromInput.value = '';
+                toInput.value = '';
+                rangeInput.value = '';
+            });
         }
 
         const initWorkerSelect2 = () => {

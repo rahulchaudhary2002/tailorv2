@@ -422,7 +422,8 @@ class DashboardController extends Controller
         if ($isWorker) {
             $workerBase = OrderTask::query()
                 ->with(['order:id,order_number,customer_id,outlet_id', 'order.customer:id,name'])
-                ->where('worker_id', (int) $user->id);
+                ->where('worker_id', (int) $user->id)
+                ->where('status', '!=', OrderTask::STATUS_PENDING);
 
             if ($outletContextId > 0) {
                 $workerBase->whereHas('order', function (Builder $query) use ($outletContextId): void {
@@ -431,7 +432,6 @@ class DashboardController extends Controller
             }
 
             $activeStatuses = [
-                OrderTask::STATUS_PENDING,
                 OrderTask::STATUS_ASSIGNED,
                 OrderTask::STATUS_IN_PROGRESS,
             ];
@@ -690,6 +690,7 @@ class DashboardController extends Controller
             ],
             'workerQueue' => $workerQueue,
             'workerRecentlyCompleted' => $workerRecentlyCompleted,
+            'workerTaskRouteWorkerId' => (int) $user->id,
             'smartWidgets' => [
                 'newCustomersThisMonth' => $newCustomersThisMonth,
                 'topCustomers' => $topCustomers,
@@ -709,11 +710,14 @@ class DashboardController extends Controller
         $todayStart = $now->copy()->startOfDay();
         $todayEnd = $now->copy()->endOfDay();
 
+        if ($request->filled('from_date') || $request->filled('to_date')) {
+            return $this->resolveCustomRange($request, $todayStart, $todayEnd);
+        }
+
         return match ($range) {
             '7d' => [$now->copy()->subDays(6)->startOfDay(), $todayEnd, 'Last 7 Days'],
             '30d' => [$now->copy()->subDays(29)->startOfDay(), $todayEnd, 'Last 30 Days'],
             'month' => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth(), 'This Month'],
-            'custom' => $this->resolveCustomRange($request, $todayStart, $todayEnd),
             default => [$todayStart, $todayEnd, 'Today'],
         };
     }

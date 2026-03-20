@@ -2,6 +2,93 @@
 
 @section('title', 'Worker Tasks')
 
+@section('page-specific-style')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+<style>
+    .listing-filter-form {
+        display: grid;
+        gap: 14px;
+    }
+
+    .listing-filter-form__fields {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(200px, 1fr));
+        gap: 12px;
+        align-items: end;
+    }
+
+    .listing-filter-form__fields--worker-task {
+        grid-template-columns: minmax(320px, 1.5fr) minmax(180px, 1fr) minmax(320px, 1.2fr);
+    }
+
+    .listing-filter-form__field {
+        margin-bottom: 0;
+    }
+
+    .date-range-picker-input {
+        cursor: pointer;
+        background: #fff;
+    }
+
+    .listing-filter-form__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .task-status-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .task-status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .task-status-assigned {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .task-status-in-progress {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .task-status-completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .task-status-cancelled {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    @media (max-width: 768px) {
+        .listing-filter-form__fields,
+        .listing-filter-form__fields--worker-task {
+            grid-template-columns: 1fr;
+        }
+
+        .listing-filter-form__actions {
+            flex-direction: column;
+        }
+
+        .listing-filter-form__actions .btn {
+            width: 100%;
+        }
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="page-header">
     <div class="page-title">
@@ -29,7 +116,7 @@
     <div class="directory-reporting__filter-bar">
         <div class="directory-reporting__filter-head">
             <h3 class="directory-reporting__filter-title">Filter Records</h3>
-            @if ($query !== '' || $selectedStatus !== '')
+            @if ($query !== '' || $selectedStatus !== '' || $selectedDeadlineFrom !== '' || $selectedDeadlineTo !== '')
                 <a href="{{ route('worker.tasks', $worker) }}" class="btn btn-light btn-sm">Clear Filters</a>
             @endif
         </div>
@@ -49,6 +136,20 @@
                             <option value="{{ $statusKey }}" @selected($selectedStatus === $statusKey)>{{ $statusLabel }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <div class="outlet-form-group listing-filter-form__field listing-filter-form__field--range">
+                    <label for="deadline_range_filter">Deadline Range</label>
+                    <input
+                        id="deadline_range_filter"
+                        type="text"
+                        class="outlet-input date-range-picker-input"
+                        value="{{ $selectedDeadlineFrom !== '' && $selectedDeadlineTo !== '' ? $selectedDeadlineFrom . ' - ' . $selectedDeadlineTo : '' }}"
+                        placeholder="Select deadline range"
+                        autocomplete="off"
+                    >
+                    <input id="deadline_from_filter" type="hidden" name="deadline_from" value="{{ $selectedDeadlineFrom }}">
+                    <input id="deadline_to_filter" type="hidden" name="deadline_to" value="{{ $selectedDeadlineTo }}">
                 </div>
             </div>
 
@@ -135,82 +236,49 @@
 @endsection
 
 @section('page-specific-script')
-<style>
-    .listing-filter-form {
-        display: grid;
-        gap: 14px;
-    }
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/min/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<script>
+    (() => {
+        const rangeInput = document.getElementById('deadline_range_filter');
+        const fromInput = document.getElementById('deadline_from_filter');
+        const toInput = document.getElementById('deadline_to_filter');
 
-    .listing-filter-form__fields {
-        display: grid;
-        grid-template-columns: minmax(280px, 1.4fr) repeat(3, minmax(200px, 1fr));
-        gap: 12px;
-        align-items: end;
-    }
-
-    .listing-filter-form__fields--worker-task {
-        grid-template-columns: minmax(320px, 1.7fr) minmax(240px, 1fr);
-    }
-
-    .listing-filter-form__field {
-        margin-bottom: 0;
-    }
-
-    .listing-filter-form__actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-    }
-
-    .task-status-badge {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1;
-        white-space: nowrap;
-    }
-
-    .task-status-pending {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .task-status-assigned {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-
-    .task-status-in-progress {
-        background: #e0f2fe;
-        color: #0369a1;
-    }
-
-    .task-status-completed {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .task-status-cancelled {
-        background: #fee2e2;
-        color: #b91c1c;
-    }
-
-    @media (max-width: 768px) {
-        .listing-filter-form__fields,
-        .listing-filter-form__fields--worker-task {
-            grid-template-columns: 1fr;
+        if (!rangeInput || !fromInput || !toInput || !window.jQuery || !window.jQuery.fn?.daterangepicker) {
+            return;
         }
 
-        .listing-filter-form__actions {
-            flex-direction: column;
+        const options = {
+            autoUpdateInput: false,
+            alwaysShowCalendars: true,
+            locale: {
+                cancelLabel: 'Clear',
+                format: 'YYYY-MM-DD',
+            },
+        };
+
+        if (fromInput.value && toInput.value) {
+            options.startDate = fromInput.value;
+            options.endDate = toInput.value;
+            rangeInput.value = `${fromInput.value} - ${toInput.value}`;
         }
 
-        .listing-filter-form__actions .btn {
-            width: 100%;
-        }
-    }
-</style>
+        window.jQuery(rangeInput).daterangepicker(options);
+
+        window.jQuery(rangeInput).on('apply.daterangepicker', function (_event, picker) {
+            const start = picker.startDate.format('YYYY-MM-DD');
+            const end = picker.endDate.format('YYYY-MM-DD');
+
+            fromInput.value = start;
+            toInput.value = end;
+            rangeInput.value = `${start} - ${end}`;
+        });
+
+        window.jQuery(rangeInput).on('cancel.daterangepicker', function () {
+            fromInput.value = '';
+            toInput.value = '';
+            rangeInput.value = '';
+        });
+    })();
+</script>
 @endsection

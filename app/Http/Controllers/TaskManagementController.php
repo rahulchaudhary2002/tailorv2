@@ -29,6 +29,8 @@ class TaskManagementController extends Controller
         $qLower = mb_strtolower($q);
         $status = trim((string) $request->query('status', ''));
         $selectedWorkerId = (int) $request->query('worker_id', 0);
+        $deadlineFrom = trim((string) $request->query('deadline_from', ''));
+        $deadlineTo = trim((string) $request->query('deadline_to', ''));
 
         $workers = User::query()
             ->where('is_super_admin', false)
@@ -81,6 +83,14 @@ class TaskManagementController extends Controller
             $tasksQuery->where('worker_id', $selectedWorkerId);
         }
 
+        if ($deadlineFrom !== '') {
+            $tasksQuery->whereDate('worker_deadline_at', '>=', $deadlineFrom);
+        }
+
+        if ($deadlineTo !== '') {
+            $tasksQuery->whereDate('worker_deadline_at', '<=', $deadlineTo);
+        }
+
         $reporting = [
             'total_tasks' => (clone $tasksQuery)->count(),
             'active_tasks' => (clone $tasksQuery)
@@ -101,6 +111,8 @@ class TaskManagementController extends Controller
             'statusLabels' => OrderTask::statusLabels(),
             'selectedStatus' => $status,
             'selectedWorkerId' => $selectedWorkerId,
+            'selectedDeadlineFrom' => $deadlineFrom,
+            'selectedDeadlineTo' => $deadlineTo,
         ]);
     }
 

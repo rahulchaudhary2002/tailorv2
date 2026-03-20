@@ -1,6 +1,212 @@
 @extends('layouts.app')
 
 @section('title', 'Dashboard')
+@section('page-specific-style')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+<style>
+    .dashboard-page-header {
+        margin-bottom: 14px;
+    }
+
+    .dashboard-filter-card {
+        margin-bottom: 14px;
+        padding: 16px;
+    }
+
+    .dashboard-quick-links {
+        margin-bottom: 14px;
+        padding: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .dashboard-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(140px, 1fr));
+        gap: 12px;
+        align-items: end;
+    }
+
+    .dashboard-filter-field--range {
+        grid-column: span 2;
+    }
+
+    .dashboard-date-range-input {
+        cursor: pointer;
+        background: #fff;
+        text-align: left;
+    }
+
+    .daterangepicker {
+        font-family: 'Poppins', sans-serif;
+    }
+
+    .daterangepicker .ranges li.active {
+        background-color: #0f766e;
+        color: #fff;
+    }
+
+    .daterangepicker .calendar-table td.active,
+    .daterangepicker .calendar-table td.active:hover {
+        background-color: #2563eb;
+        border-color: #2563eb;
+        color: #fff;
+    }
+
+    .dashboard-filter-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding-top: 6px;
+    }
+
+    .dashboard-grid {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .dashboard-kpi-grid {
+        grid-template-columns: repeat(6, minmax(150px, 1fr));
+    }
+
+    .dashboard-kpi-grid-worker {
+        grid-template-columns: repeat(4, minmax(150px, 1fr));
+    }
+
+    .dashboard-two-col {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-kpi {
+        padding: 14px;
+    }
+
+    .dashboard-kpi__label {
+        font-size: 0.84rem;
+        color: #64748b;
+        margin-bottom: 4px;
+    }
+
+    .dashboard-kpi__value {
+        font-size: 1.2rem;
+        color: #0f172a;
+        font-weight: 700;
+    }
+
+    .dashboard-chart-wrap {
+        position: relative;
+        height: 280px;
+    }
+
+    .dashboard-chart-wrap canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .dashboard-alert-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: #334155;
+    }
+
+    .dashboard-card-header {
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-card-controls {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .dashboard-control-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #f8fafc;
+    }
+
+    .dashboard-control-label {
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+
+    .dashboard-card-tabs {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .dashboard-card-tab {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        color: #334155;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        transition: all .15s ease;
+    }
+
+    .dashboard-card-tab:hover {
+        border-color: #94a3b8;
+        color: #0f172a;
+    }
+
+    .dashboard-card-tab.is-active {
+        background: #0f766e;
+        border-color: #0f766e;
+        color: #fff;
+        box-shadow: 0 1px 2px rgba(15, 118, 110, 0.25);
+    }
+
+    @media (max-width: 1200px) {
+        .dashboard-filter-grid {
+            grid-template-columns: repeat(3, minmax(140px, 1fr));
+        }
+
+        .dashboard-filter-field--range {
+            grid-column: span 1;
+        }
+
+        .dashboard-kpi-grid {
+            grid-template-columns: repeat(3, minmax(140px, 1fr));
+        }
+    }
+
+    @media (max-width: 800px) {
+        .dashboard-filter-grid,
+        .dashboard-kpi-grid,
+        .dashboard-kpi-grid-worker,
+        .dashboard-two-col {
+            grid-template-columns: 1fr;
+        }
+
+        .dashboard-card-controls {
+            width: 100%;
+            margin-left: 0;
+            justify-content: flex-start;
+        }
+    }
+</style>
+@endsection
 
 @section('content')
 @php
@@ -22,6 +228,11 @@
         <p>{{ $rangeLabel }} snapshot</p>
     </div>
     <div class="page-actions">
+        @if ($roleScope === 'worker')
+            <a class="btn btn-secondary" href="{{ route('worker.tasks', ['worker' => $workerTaskRouteWorkerId]) }}">
+                <i class="fas fa-list-check"></i> My Tasks &amp; Report
+            </a>
+        @endif
         @canany(['create-orders', 'manage-orders'])
             <a class="btn btn-primary" href="{{ route('order.create') }}"><i class="fas fa-plus"></i> Create Order</a>
         @endcanany
@@ -50,23 +261,18 @@
 
 <div class="table-card dashboard-filter-card">
     <form method="GET" class="dashboard-filter-grid">
-        <div class="outlet-form-group">
-            <label for="range">Date Range</label>
-            <select id="range" name="range" class="outlet-input">
-                <option value="today" @selected($range === 'today')>Today</option>
-                <option value="7d" @selected($range === '7d')>Last 7 Days</option>
-                <option value="30d" @selected($range === '30d')>Last 30 Days</option>
-                <option value="month" @selected($range === 'month')>This Month</option>
-                <option value="custom" @selected($range === 'custom')>Custom</option>
-            </select>
-        </div>
-        <div class="outlet-form-group">
-            <label for="from_date">From</label>
-            <input id="from_date" type="date" name="from_date" class="outlet-input" value="{{ request('from_date', $dateFrom) }}">
-        </div>
-        <div class="outlet-form-group">
-            <label for="to_date">To</label>
-            <input id="to_date" type="date" name="to_date" class="outlet-input" value="{{ request('to_date', $dateTo) }}">
+        <div class="outlet-form-group dashboard-filter-field--range">
+            <label for="dashboard_date_range">Date Range</label>
+            <input
+                id="dashboard_date_range"
+                type="text"
+                class="outlet-input dashboard-date-range-input"
+                value="{{ request('from_date') && request('to_date') ? request('from_date') . ' - ' . request('to_date') : ($dateFrom . ' - ' . $dateTo) }}"
+                placeholder="Select date range"
+                autocomplete="off"
+            >
+            <input id="from_date" type="hidden" name="from_date" value="{{ request('from_date', $dateFrom) }}">
+            <input id="to_date" type="hidden" name="to_date" value="{{ request('to_date', $dateTo) }}">
         </div>
         @if ($roleScope === 'owner_admin')
             <div class="outlet-form-group">
@@ -441,183 +647,9 @@
 @endif
 @endsection
 
-@section('page-specific-style')
-<style>
-    .dashboard-page-header {
-        margin-bottom: 14px;
-    }
-
-    .dashboard-filter-card {
-        margin-bottom: 14px;
-        padding: 16px;
-    }
-
-    .dashboard-quick-links {
-        margin-bottom: 14px;
-        padding: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .dashboard-filter-grid {
-        display: grid;
-        grid-template-columns: repeat(8, minmax(140px, 1fr));
-        gap: 12px;
-        align-items: end;
-    }
-
-    .dashboard-filter-actions {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        padding-top: 6px;
-    }
-
-    .dashboard-grid {
-        display: grid;
-        gap: 14px;
-        margin-bottom: 14px;
-    }
-
-    .dashboard-kpi-grid {
-        grid-template-columns: repeat(6, minmax(150px, 1fr));
-    }
-
-    .dashboard-kpi-grid-worker {
-        grid-template-columns: repeat(4, minmax(150px, 1fr));
-    }
-
-    .dashboard-two-col {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .dashboard-kpi {
-        padding: 14px;
-    }
-
-    .dashboard-kpi__label {
-        font-size: 0.84rem;
-        color: #64748b;
-        margin-bottom: 4px;
-    }
-
-    .dashboard-kpi__value {
-        font-size: 1.2rem;
-        color: #0f172a;
-        font-weight: 700;
-    }
-
-    .dashboard-chart-wrap {
-        position: relative;
-        height: 280px;
-    }
-
-    .dashboard-chart-wrap canvas {
-        width: 100% !important;
-        height: 100% !important;
-    }
-
-    .dashboard-alert-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        color: #334155;
-    }
-
-    .dashboard-card-header {
-        align-items: flex-start;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-
-    .dashboard-card-controls {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-left: auto;
-    }
-
-    .dashboard-control-group {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 6px;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        background: #f8fafc;
-    }
-
-    .dashboard-control-label {
-        font-size: 0.72rem;
-        color: #64748b;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        white-space: nowrap;
-    }
-
-    .dashboard-card-tabs {
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .dashboard-card-tab {
-        border: 1px solid #cbd5e1;
-        background: #fff;
-        color: #334155;
-        border-radius: 999px;
-        padding: 5px 11px;
-        font-size: 0.78rem;
-        font-weight: 600;
-        line-height: 1;
-        cursor: pointer;
-        transition: all .15s ease;
-    }
-
-    .dashboard-card-tab:hover {
-        border-color: #94a3b8;
-        color: #0f172a;
-    }
-
-    .dashboard-card-tab.is-active {
-        background: #0f766e;
-        border-color: #0f766e;
-        color: #fff;
-        box-shadow: 0 1px 2px rgba(15, 118, 110, 0.25);
-    }
-
-    @media (max-width: 1200px) {
-        .dashboard-filter-grid {
-            grid-template-columns: repeat(3, minmax(140px, 1fr));
-        }
-
-        .dashboard-kpi-grid {
-            grid-template-columns: repeat(3, minmax(140px, 1fr));
-        }
-    }
-
-    @media (max-width: 800px) {
-        .dashboard-filter-grid,
-        .dashboard-kpi-grid,
-        .dashboard-kpi-grid-worker,
-        .dashboard-two-col {
-            grid-template-columns: 1fr;
-        }
-
-        .dashboard-card-controls {
-            width: 100%;
-            margin-left: 0;
-            justify-content: flex-start;
-        }
-    }
-</style>
-@endsection
-
 @section('page-specific-script')
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/min/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script>
     (() => {
@@ -632,6 +664,9 @@
         const trendGroupInput = document.getElementById('trend_group');
         const trendMetricInput = document.getElementById('trend_metric');
         const filterForm = document.querySelector('.dashboard-filter-card form');
+        const dateRangeInput = document.getElementById('dashboard_date_range');
+        const fromDateInput = document.getElementById('from_date');
+        const toDateInput = document.getElementById('to_date');
 
         const chartViewInput = document.getElementById('chart_view');
         const outletViewInput = document.getElementById('outlet_chart_view');
@@ -644,6 +679,55 @@
 
         let trendChartInstance = null;
         let outletChartInstance = null;
+
+        if (dateRangeInput && fromDateInput && toDateInput && window.jQuery && window.jQuery.fn && window.jQuery.fn.daterangepicker) {
+            const options = {
+                autoUpdateInput: false,
+                alwaysShowCalendars: true,
+                opens: 'left',
+                linkedCalendars: false,
+                showCustomRangeLabel: true,
+                ranges: {
+                    Today: [window.moment(), window.moment()],
+                    Yesterday: [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                    'Last 7 Days': [window.moment().subtract(6, 'days'), window.moment()],
+                    'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                    'This Month': [window.moment().startOf('month'), window.moment().endOf('month')],
+                    'Last Month': [
+                        window.moment().subtract(1, 'month').startOf('month'),
+                        window.moment().subtract(1, 'month').endOf('month'),
+                    ],
+                },
+                locale: {
+                    cancelLabel: 'Clear',
+                    format: 'YYYY-MM-DD',
+                    customRangeLabel: 'Custom Range',
+                },
+            };
+
+            if (fromDateInput.value && toDateInput.value) {
+                options.startDate = fromDateInput.value;
+                options.endDate = toDateInput.value;
+                dateRangeInput.value = `${fromDateInput.value} - ${toDateInput.value}`;
+            }
+
+            window.jQuery(dateRangeInput).daterangepicker(options);
+
+            window.jQuery(dateRangeInput).on('apply.daterangepicker', function (_event, picker) {
+                const start = picker.startDate.format('YYYY-MM-DD');
+                const end = picker.endDate.format('YYYY-MM-DD');
+
+                fromDateInput.value = start;
+                toDateInput.value = end;
+                dateRangeInput.value = `${start} - ${end}`;
+            });
+
+            window.jQuery(dateRangeInput).on('cancel.daterangepicker', function () {
+                fromDateInput.value = '';
+                toDateInput.value = '';
+                dateRangeInput.value = '';
+            });
+        }
 
         const trendChartElement = document.getElementById('salesTrendChart');
         if (trendChartElement && salesTrendData.length > 0 && typeof Chart !== 'undefined') {

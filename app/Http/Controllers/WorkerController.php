@@ -162,6 +162,8 @@ class WorkerController extends Controller
         $q = trim((string) $request->query('q', ''));
         $qLower = mb_strtolower($q);
         $status = trim((string) $request->query('status', ''));
+        $deadlineFrom = trim((string) $request->query('deadline_from', ''));
+        $deadlineTo = trim((string) $request->query('deadline_to', ''));
 
         $tasksQuery = OrderTask::query()
             ->with([
@@ -190,6 +192,14 @@ class WorkerController extends Controller
 
         if ($status !== '' && array_key_exists($status, OrderTask::statusLabels())) {
             $tasksQuery->where('status', $status);
+        }
+
+        if ($deadlineFrom !== '') {
+            $tasksQuery->whereDate('worker_deadline_at', '>=', $deadlineFrom);
+        }
+
+        if ($deadlineTo !== '') {
+            $tasksQuery->whereDate('worker_deadline_at', '<=', $deadlineTo);
         }
 
         $reporting = [
@@ -222,6 +232,8 @@ class WorkerController extends Controller
             'tasks' => $tasks,
             'statusLabels' => OrderTask::statusLabels(),
             'selectedStatus' => $status,
+            'selectedDeadlineFrom' => $deadlineFrom,
+            'selectedDeadlineTo' => $deadlineTo,
             'reporting' => $reporting,
         ]);
     }
