@@ -45,6 +45,7 @@ class StoreRequest extends FormRequest
 
             foreach ((array) $this->input('items', []) as $index => $item) {
                 $reference = trim((string) ($item['product_reference'] ?? ''));
+                $productCode = trim((string) ($item['product_code'] ?? ''));
 
                 if (str_starts_with($reference, 'existing:')) {
                     $productId = (int) substr($reference, strlen('existing:'));
@@ -62,6 +63,20 @@ class StoreRequest extends FormRequest
 
                 if (!str_starts_with($reference, 'new:') || trim(substr($reference, strlen('new:'))) === '') {
                     $validator->errors()->add("items.{$index}.product_reference", 'Enter a vendor product name.');
+                }
+
+                if ($productCode === '') {
+                    $validator->errors()->add("items.{$index}.product_code", 'Product code is required for a new product.');
+                    continue;
+                }
+
+                if (!preg_match('/^[A-Za-z0-9_-]+$/', $productCode)) {
+                    $validator->errors()->add("items.{$index}.product_code", 'Product code may only contain letters, numbers, dashes, and underscores.');
+                    continue;
+                }
+
+                if (\App\Models\Product::query()->where('code', strtoupper($productCode))->exists()) {
+                    $validator->errors()->add("items.{$index}.product_code", 'This product code is already in use.');
                 }
             }
         });

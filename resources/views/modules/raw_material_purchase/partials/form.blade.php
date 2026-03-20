@@ -145,8 +145,7 @@
                                 type="text"
                                 class="outlet-input item-product-code"
                                 value="{{ $productCode }}"
-                                readonly
-                                placeholder="Auto generated"
+                                placeholder="Auto generated, editable"
                             >
                         </td>
                         <td>
@@ -218,7 +217,7 @@
                     <input type="hidden" class="item-product-type-hidden" value="fabrics">
                 </td>
                 <td>
-                    <input type="text" class="outlet-input item-product-code" value="" readonly placeholder="Auto generated">
+                    <input type="text" class="outlet-input item-product-code" value="" placeholder="Auto generated, editable">
                 </td>
                 <td>
                     <input type="number" min="0" step="0.01" class="outlet-input item-unit-price" value="0.00" required>

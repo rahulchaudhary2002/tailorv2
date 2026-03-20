@@ -235,6 +235,7 @@ class RawMaterialPurchaseController extends Controller
     {
         $reference = trim((string) ($item['product_reference'] ?? ''));
         $productType = trim((string) ($item['product_type'] ?? ''));
+        $productCode = trim((string) ($item['product_code'] ?? ''));
         $quantity = max(1, (int) ($item['quantity'] ?? 0));
         $unitPrice = max(0, (float) ($item['unit_price'] ?? 0));
 
@@ -261,7 +262,7 @@ class RawMaterialPurchaseController extends Controller
             throw new \RuntimeException('Enter a vendor product name.');
         }
 
-        $product = $this->findOrCreatePurchaseProduct($productName, $productType, $unitPrice);
+        $product = $this->findOrCreatePurchaseProduct($productName, $productType, $unitPrice, $productCode);
 
         return [
             'product_id' => (int) $product->id,
@@ -271,7 +272,7 @@ class RawMaterialPurchaseController extends Controller
         ];
     }
 
-    private function findOrCreatePurchaseProduct(string $productName, string $productType, float $unitPrice): Product
+    private function findOrCreatePurchaseProduct(string $productName, string $productType, float $unitPrice, string $productCode = ''): Product
     {
         $categoryId = (int) ProductCategory::query()
             ->where('slug', $productType)
@@ -290,10 +291,12 @@ class RawMaterialPurchaseController extends Controller
             return $existingProduct;
         }
 
+        $resolvedCode = $productCode !== '' ? Str::upper($productCode) : $this->generateProductCode($productType);
+
         return Product::query()->create([
             'product_category_id' => $categoryId,
             'name' => $productName,
-            'code' => $this->generateProductCode($productType),
+            'code' => $resolvedCode,
             'amount' => $unitPrice,
         ]);
     }

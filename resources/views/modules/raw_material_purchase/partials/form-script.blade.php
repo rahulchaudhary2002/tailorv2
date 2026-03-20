@@ -175,6 +175,7 @@
                 const reference = row.querySelector('.item-product')?.value || '';
                 const productType = productTypeInput?.value || 'fabrics';
                 const prefix = prefixes[productType] || 'FAB';
+                const hasManualCode = codeInput?.dataset.manualCode === '1';
 
                 if (!codeInput) {
                     return;
@@ -182,16 +183,35 @@
 
                 if (selectedProduct) {
                     codeInput.value = selectedProduct.code || '';
+                    codeInput.readOnly = true;
+                    delete codeInput.dataset.manualCode;
                     return;
                 }
 
                 if (reference.startsWith('new:')) {
-                    nextByType[productType] = (nextByType[productType] || 0) + 1;
-                    codeInput.value = `${prefix}-${String(nextByType[productType]).padStart(4, '0')}`;
+                    codeInput.readOnly = false;
+                    if (!hasManualCode || !codeInput.value.trim()) {
+                        nextByType[productType] = (nextByType[productType] || 0) + 1;
+                        codeInput.value = `${prefix}-${String(nextByType[productType]).padStart(4, '0')}`;
+                        delete codeInput.dataset.manualCode;
+                    }
                     return;
                 }
 
                 codeInput.value = '';
+                codeInput.readOnly = false;
+                delete codeInput.dataset.manualCode;
+            });
+        }
+
+        function selectInputText(input) {
+            if (!input) {
+                return;
+            }
+
+            window.requestAnimationFrame(() => {
+                input.focus();
+                input.select();
             });
         }
 
@@ -251,13 +271,37 @@
             const productTypeInput = row.querySelector('.item-product-type');
             const qtyInput = row.querySelector('.item-quantity');
             const unitPriceInput = row.querySelector('.item-unit-price');
+            const codeInput = row.querySelector('.item-product-code');
             const removeBtn = row.querySelector('.remove-item-row');
 
             bindProductChange(productSelect, () => syncRowFromSelection(row, { syncAmount: true }));
 
             productTypeInput?.addEventListener('change', () => {
+                if (codeInput) {
+                    delete codeInput.dataset.manualCode;
+                }
                 syncProductTypeLock(row);
                 refreshGeneratedCodes();
+            });
+
+            codeInput?.addEventListener('input', () => {
+                if (getSelectedProduct(row)) {
+                    delete codeInput.dataset.manualCode;
+                    return;
+                }
+
+                if (codeInput.value.trim()) {
+                    codeInput.dataset.manualCode = '1';
+                    return;
+                }
+
+                delete codeInput.dataset.manualCode;
+                refreshGeneratedCodes();
+                selectInputText(codeInput);
+            });
+
+            codeInput?.addEventListener('focus', () => {
+                codeInput.select();
             });
 
             qtyInput?.addEventListener('input', () => {
