@@ -812,10 +812,25 @@ class OrderController extends Controller
                 $vatAmount = $vatEnabled
                     ? round($taxableTotal * 0.13, 2)
                     : 0.0;
+                $payableAmount = max(0.0, $taxableTotal + $vatAmount);
+                $advanceAmount = min((float) ($validated['advance_payment_amount'] ?? 0), $payableAmount);
+                $paymentStatus = Order::PAYMENT_STATUS_UNPAID;
+
+                if ($payableAmount <= 0.0001) {
+                    $paymentStatus = Order::PAYMENT_STATUS_PAID;
+                    $advanceAmount = 0.0;
+                } elseif ($advanceAmount > 0.0001 && $advanceAmount + 0.0001 < $payableAmount) {
+                    $paymentStatus = Order::PAYMENT_STATUS_PARTIAL;
+                } elseif ($advanceAmount + 0.0001 >= $payableAmount) {
+                    $paymentStatus = Order::PAYMENT_STATUS_PAID;
+                    $advanceAmount = $payableAmount;
+                }
 
                 $order->subtotal_amount = $subtotal;
                 $order->tailoring_amount = $tailoringTotal;
                 $order->vat_amount = $vatAmount;
+                $order->advance_payment_amount = $advanceAmount;
+                $order->payment_status = $paymentStatus;
                 $order->save();
 
                 // The order instance may still carry previously loaded items from before edit.

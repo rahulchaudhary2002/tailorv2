@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\GarmentTypeTailoringPackage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -282,7 +283,10 @@ class StoreRequest extends FormRequest
                 $validator->errors()->add('discount_amount', 'Discount cannot be greater than order total.');
             }
 
-            if ($advanceAmount > $netTotal) {
+            $editingOrder = $this->route('order');
+            $isEditingExistingOrder = $editingOrder instanceof Model;
+
+            if ($advanceAmount > $netTotal && ! $isEditingExistingOrder) {
                 $validator->errors()->add('advance_payment_amount', 'Advance payment amount cannot be greater than payable amount after discount.');
             }
 
