@@ -72,6 +72,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [WorkerController::class, 'index'])->name('index')->middleware('can:view-users,manage-users');
         Route::get('/create', [WorkerController::class, 'create'])->name('create')->middleware('can:create-users,manage-users');
         Route::post('/', [WorkerController::class, 'store'])->name('store')->middleware('can:create-users,manage-users');
+        Route::get('/tasks/{worker}', [WorkerController::class, 'tasks'])->name('tasks')->middleware('can:view-task-management,manage-task-management,manage-orders');
         Route::get('/edit/{worker}', [WorkerController::class, 'edit'])->name('edit')->middleware('can:edit-users,manage-users');
         Route::put('/update/{worker}', [WorkerController::class, 'update'])->name('update')->middleware('can:edit-users,manage-users');
         Route::put('/update-permissions/{worker}', [WorkerController::class, 'updatePermissions'])->name('updatePermissions')->middleware('can:edit-users,manage-users');

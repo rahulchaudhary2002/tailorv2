@@ -28,6 +28,25 @@ class TaskManagementController extends Controller
         $q = trim((string) $request->query('q', ''));
         $qLower = mb_strtolower($q);
         $status = trim((string) $request->query('status', ''));
+        $selectedWorkerId = (int) $request->query('worker_id', 0);
+
+        $workers = User::query()
+            ->where('is_super_admin', false)
+            ->when($workerRoleId > 0, function ($query) use ($workerRoleId, $outletId): void {
+                $query->whereHas('roles', function ($roleQuery) use ($workerRoleId, $outletId): void {
+                    $roleQuery->where('roles.id', $workerRoleId);
+                    if ($outletId > 0) {
+                        $roleQuery->where('user_role.outlet_id', $outletId);
+                    }
+                });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $validWorkerIds = $workers->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if ($selectedWorkerId > 0 && !in_array($selectedWorkerId, $validWorkerIds, true)) {
+            $selectedWorkerId = 0;
+        }
 
         $tasksQuery = OrderTask::query()
             ->with([
@@ -58,26 +77,30 @@ class TaskManagementController extends Controller
             $tasksQuery->where('status', $status);
         }
 
-        $tasks = $tasksQuery->paginate(15)->withQueryString();
+        if ($selectedWorkerId > 0) {
+            $tasksQuery->where('worker_id', $selectedWorkerId);
+        }
 
-        $workers = User::query()
-            ->where('is_super_admin', false)
-            ->when($workerRoleId > 0, function ($query) use ($workerRoleId, $outletId): void {
-                $query->whereHas('roles', function ($roleQuery) use ($workerRoleId, $outletId): void {
-                    $roleQuery->where('roles.id', $workerRoleId);
-                    if ($outletId > 0) {
-                        $roleQuery->where('user_role.outlet_id', $outletId);
-                    }
-                });
-            })
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $reporting = [
+            'total_tasks' => (clone $tasksQuery)->count(),
+            'active_tasks' => (clone $tasksQuery)
+                ->whereIn('status', [OrderTask::STATUS_ASSIGNED, OrderTask::STATUS_IN_PROGRESS])
+                ->count(),
+            'completed_tasks' => (clone $tasksQuery)
+                ->where('status', OrderTask::STATUS_COMPLETED)
+                ->count(),
+            'total_payable' => (float) ((clone $tasksQuery)->sum('payable_amount') ?: 0),
+        ];
+
+        $tasks = $tasksQuery->paginate(15)->withQueryString();
 
         return view('modules.task_management.index', [
             'tasks' => $tasks,
             'workers' => $workers,
+            'reporting' => $reporting,
             'statusLabels' => OrderTask::statusLabels(),
             'selectedStatus' => $status,
+            'selectedWorkerId' => $selectedWorkerId,
         ]);
     }
 

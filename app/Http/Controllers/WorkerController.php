@@ -6,9 +6,11 @@ use App\Http\Requests\User\StoreRequest;
 use App\Http\Requests\User\UpdatePermissionsRequest;
 use App\Http\Requests\User\UpdateRequest;
 use App\Models\Outlet;
+use App\Models\OrderTask;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\OrderTaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,9 +18,38 @@ use Illuminate\Support\Facades\Storage;
 
 class WorkerController extends Controller
 {
+    public function __construct(private readonly OrderTaskService $taskService)
+    {
+    }
+
     private function workerRole(): ?Role
     {
         return Role::query()->where('name', 'Worker')->first();
+    }
+
+    private function ensureWorkerTaskAccessible(User $worker): void
+    {
+        $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+        $workerRoleId = (int) optional($this->workerRole())->id;
+
+        $accessible = User::query()
+            ->whereKey($worker->id)
+            ->where('is_super_admin', false)
+            ->whereExists(function ($query) use ($workerRoleId, $outletId): void {
+                $query->selectRaw('1')
+                    ->from('user_role')
+                    ->whereColumn('user_role.user_id', 'users.id')
+                    ->where('user_role.role_id', $workerRoleId);
+
+                if ($outletId > 0) {
+                    $query->where('user_role.outlet_id', $outletId);
+                }
+            })
+            ->exists();
+
+        if (!$accessible) {
+            abort(404);
+        }
     }
 
     private function ensureWorkerEditable(User $user)
@@ -119,6 +150,80 @@ class WorkerController extends Controller
         $outlets = Outlet::query()->orderBy('name')->get(['id', 'name', 'address']);
 
         return view('modules.worker.create', compact('outlets'));
+    }
+
+    public function tasks(Request $request, User $worker)
+    {
+        $this->ensureWorkerTaskAccessible($worker);
+
+        $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+        $this->taskService->syncForOutlet($outletId);
+
+        $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $status = trim((string) $request->query('status', ''));
+
+        $tasksQuery = OrderTask::query()
+            ->with([
+                'order:id,order_number,customer_id,delivery_due_at,outlet_id',
+                'order.customer:id,name,phone',
+            ])
+            ->where('worker_id', $worker->id)
+            ->where('status', '!=', OrderTask::STATUS_PENDING)
+            ->whereHas('order', function ($query) use ($outletId): void {
+                $query->where('outlet_id', $outletId);
+            });
+
+        if ($q !== '') {
+            $tasksQuery->where(function ($query) use ($qLower): void {
+                $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                    ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
+                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
+                            });
+                    });
+            });
+        }
+
+        if ($status !== '' && array_key_exists($status, OrderTask::statusLabels())) {
+            $tasksQuery->where('status', $status);
+        }
+
+        $reporting = [
+            'assigned' => (clone $tasksQuery)->where('status', OrderTask::STATUS_ASSIGNED)->count(),
+            'in_progress' => (clone $tasksQuery)->where('status', OrderTask::STATUS_IN_PROGRESS)->count(),
+            'completed' => (clone $tasksQuery)->where('status', OrderTask::STATUS_COMPLETED)->count(),
+            'cancelled' => (clone $tasksQuery)->where('status', OrderTask::STATUS_CANCELLED)->count(),
+            'total_payable' => (float) ((clone $tasksQuery)->sum('payable_amount') ?: 0),
+        ];
+
+        $tasks = $tasksQuery
+            ->orderByRaw("CASE status
+                WHEN ? THEN 1
+                WHEN ? THEN 2
+                WHEN ? THEN 3
+                WHEN ? THEN 4
+                ELSE 5
+            END", [
+                OrderTask::STATUS_ASSIGNED,
+                OrderTask::STATUS_IN_PROGRESS,
+                OrderTask::STATUS_COMPLETED,
+                OrderTask::STATUS_CANCELLED,
+            ])
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('modules.worker.tasks', [
+            'worker' => $worker,
+            'tasks' => $tasks,
+            'statusLabels' => OrderTask::statusLabels(),
+            'selectedStatus' => $status,
+            'reporting' => $reporting,
+        ]);
     }
 
     public function store(StoreRequest $request)

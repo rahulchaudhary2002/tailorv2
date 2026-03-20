@@ -14,11 +14,18 @@
     $query = trim((string) request('q', ''));
 @endphp
 
+<div class="stats-grid" style="margin-bottom: 16px;">
+    <div class="stat-card"><div class="stat-label">Total Tasks</div><div class="stat-value">{{ number_format((int) $reporting['total_tasks']) }}</div></div>
+    <div class="stat-card"><div class="stat-label">Active Tasks</div><div class="stat-value">{{ number_format((int) $reporting['active_tasks']) }}</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value">{{ number_format((int) $reporting['completed_tasks']) }}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Payable</div><div class="stat-value">{{ number_format((float) $reporting['total_payable'], 2) }}</div></div>
+</div>
+
 <div class="directory-reporting" style="margin-bottom: 16px;">
     <div class="directory-reporting__filter-bar">
         <div class="directory-reporting__filter-head">
             <h3 class="directory-reporting__filter-title">Filter Records</h3>
-            @if ($query !== '' || $selectedStatus !== '')
+            @if ($query !== '' || $selectedStatus !== '' || $selectedWorkerId > 0)
                 <a href="{{ url()->current() }}" class="btn btn-light btn-sm">Clear Filters</a>
             @endif
         </div>
@@ -36,6 +43,16 @@
                         <option value="">All Statuses</option>
                         @foreach ($statusLabels as $statusKey => $statusLabel)
                             <option value="{{ $statusKey }}" @selected($selectedStatus === $statusKey)>{{ $statusLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="outlet-form-group listing-filter-form__field">
+                    <label for="worker_filter">Worker</label>
+                    <select id="worker_filter" name="worker_id" class="outlet-input">
+                        <option value="">All Workers</option>
+                        @foreach ($workers as $worker)
+                            <option value="{{ $worker->id }}" @selected($selectedWorkerId === (int) $worker->id)>{{ $worker->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -330,7 +347,7 @@
     }
 
     .listing-filter-form__fields--task {
-        grid-template-columns: minmax(320px, 1.7fr) minmax(240px, 1fr);
+        grid-template-columns: minmax(320px, 1.7fr) minmax(200px, 1fr) minmax(220px, 1fr);
     }
 
     .listing-filter-form__field {

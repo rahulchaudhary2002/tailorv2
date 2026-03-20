@@ -103,6 +103,10 @@
                         <td>Worker</td>
                         <td>
                             <div class="actions">
+                                @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                    <a href="{{ route('worker.tasks', $worker) }}" class="btn btn-sm btn-light">Tasks &amp; Report</a>
+                                @endcanany
+
                                 @canany(['manage-users', 'edit-users'])
                                     <a href="{{ route('worker.edit', $worker) }}" class="btn btn-sm btn-secondary">Edit</a>
                                 @endcanany
