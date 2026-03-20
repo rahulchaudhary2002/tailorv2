@@ -546,6 +546,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .item-main{flex:1;min-width:0;}
 .item-price{flex-shrink:0;min-width:132px;text-align:right;padding:10px 12px;border-radius:12px;background:#f5f8fc;color:var(--primary);}
 .item-sub{font-size:.9rem;color:#5f7083;margin-top:6px;line-height:1.5;}
+.item-sub-amount{font-weight:600;color:#334155;}
 .stitching-detail{background:linear-gradient(135deg,#fbf4ff 0%,#f6ecff 100%);padding:12px 14px;border-radius:12px;font-size:.9rem;border:1px solid #e6d8f5;border-left:4px solid #7b1fa2;width:100%;box-sizing:border-box;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;grid-column:1 / -1;}
 .stitching-detail > div:first-child{flex:1;min-width:0;}
 .stitching-detail > div:last-child{flex-shrink:0;white-space:nowrap;}
@@ -558,6 +559,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tailoring-breakdown{background:linear-gradient(135deg,#fbf4ff 0%,#f5ebff 100%);padding:14px 16px;border-radius:14px;margin-bottom:16px;border:1px solid #eadcf6;}
 .tailoring-breakdown h5{margin:0 0 8px;color:#7b1fa2;}
 .tailoring-item{display:flex;justify-content:space-between;padding:4px 0;}
+.tailoring-item-amount{font-weight:600;color:#334155;}
 .tailoring-total{font-weight:700;border-top:1px solid #ddd;margin-top:8px;padding-top:8px;}
 .discount-section{background:#f7fafc;padding:16px;border-radius:14px;margin-top:15px;border:1px solid #dbe5f1;}
 .discount-row{display:flex;gap:10px;margin-top:10px;}
@@ -1501,7 +1503,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                         <div class="stitching-detail">
                             <div>
                                 <strong>${garment.title}</strong> x ${money(garment.quantity)}
-                                <div class="item-sub">${garment.tailoring?.package || 'Tailoring'} - NPR ${money(garment.tailoring?.amount || 0)} each</div>
+                                <div class="item-sub item-sub-amount">${garment.tailoring?.package || 'Tailoring'} - NPR ${money(garment.tailoring?.amount || 0)} each</div>
                                 ${measurements ? `<div class="item-sub"><i class="fas fa-ruler"></i> ${measurements}${garment.measurements.length > 3 ? ' ...' : ''}</div>` : ''}
                                 ${garment.designNotes?.length ? `<div class="item-sub"><i class="fas fa-note-sticky"></i> ${garment.designNotes.join(', ')}</div>` : ''}
                             </div>
@@ -1543,9 +1545,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             tailoringBreakdownEl.style.display = '';
             let html = '<h5><i class="fas fa-cut"></i> Tailoring Charges Breakdown</h5>';
             tailoringLines.forEach((line) => {
-                html += `<div class="tailoring-item"><span>${line.label}</span><span>NPR ${money(line.amount)}</span></div>`;
+                html += `<div class="tailoring-item"><span>${line.label}</span><span class="tailoring-item-amount">NPR ${money(line.amount)}</span></div>`;
             });
-            html += `<div class="tailoring-item tailoring-total"><span>Total Tailoring Charges</span><span>NPR ${money(totalTailoring)}</span></div>`;
+            html += `<div class="tailoring-item tailoring-total"><span>Total Tailoring Charges</span><span class="tailoring-item-amount">NPR ${money(totalTailoring)}</span></div>`;
             tailoringBreakdownEl.innerHTML = html;
         }
 
