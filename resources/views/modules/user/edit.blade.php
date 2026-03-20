@@ -73,7 +73,7 @@
                     <input id="avatar" name="avatar" type="file" class="user-input" accept=".jpg,.jpeg,.png,.webp">
                     @if ($user->avatar)
                         <div style="margin-top: 8px;">
-                            <img src="{{ asset('storage/' . $user->avatar) }}" alt="{{ $user->name }}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 50%;">
+                            <img src="{{ route('files.public', ['path' => $user->avatar]) }}" alt="{{ $user->name }}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 50%;">
                         </div>
                     @endif
                 </div>

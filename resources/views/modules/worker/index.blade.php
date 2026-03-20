@@ -91,7 +91,7 @@
                     <tr>
                         <td>
                             @if ($worker->avatar)
-                                <img src="{{ asset('storage/' . $worker->avatar) }}" alt="{{ $worker->name }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                <img src="{{ route('files.public', ['path' => $worker->avatar]) }}" alt="{{ $worker->name }}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                             @else
                                 <span>-</span>
                             @endif

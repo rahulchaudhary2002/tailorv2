@@ -7,6 +7,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RawMaterialPurchaseController;
+use App\Http\Controllers\FileController;
 use App\Http\Controllers\GarmentTypeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManufactureUnitController;
@@ -26,6 +27,10 @@ Route::get('/', function () {
 require __DIR__ . '/auth.php';
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/files/public/{path}', [FileController::class, 'public'])
+        ->where('path', '.*')
+        ->name('files.public');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');

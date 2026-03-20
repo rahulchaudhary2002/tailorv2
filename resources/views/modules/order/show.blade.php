@@ -262,7 +262,7 @@
                                                                     $imagePath = (string) $imagePath;
                                                                     $imageUrl = str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')
                                                                         ? $imagePath
-                                                                        : \Illuminate\Support\Facades\Storage::disk('public')->url(ltrim($imagePath, '/'));
+                                                                        : route('files.public', ['path' => ltrim($imagePath, '/')]);
                                                                 @endphp
                                                                 <a href="{{ $imageUrl }}" target="_blank" rel="noopener">
                                                                     <img src="{{ $imageUrl }}" alt="Design Sample">

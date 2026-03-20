@@ -49,7 +49,7 @@
             <div class="user-menu">
                 <div class="user-avatar">
                     @if ($user->avatar)
-                        <img src="{{ asset('storage/' . $user->avatar) }}" alt="{{ $user->name }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                        <img src="{{ route('files.public', ['path' => $user->avatar]) }}" alt="{{ $user->name }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
                     @else
                         {{ $initials }}
                     @endif
