@@ -323,7 +323,7 @@
                             <div>
                                 @if ($task->order)
                                     @canany(['view-orders', 'manage-orders'])
-                                        <a href="{{ route('order.show', $task->order) }}">{{ $task->order->order_number }}</a>
+                                        <a href="{{ route('order.show', $task->order) }}" style="text-decoration: underline;">{{ $task->order->order_number }}</a>
                                     @else
                                         {{ $task->order->order_number }}
                                     @endcanany
@@ -336,7 +336,7 @@
                         <td>
                             @if ($task->order?->customer)
                                 @canany(['view-customers', 'manage-customers'])
-                                    <a href="{{ route('customer.show', $task->order->customer) }}">{{ $task->order->customer->name }}</a>
+                                    <a href="{{ route('customer.show', $task->order->customer) }}" style="text-decoration: underline;">{{ $task->order->customer->name }}</a>
                                 @else
                                     {{ $task->order->customer->name }}
                                 @endcanany
@@ -360,7 +360,7 @@
                             <div>
                                 @if ($task->worker)
                                     @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
-                                        <a href="{{ route('worker.tasks', $task->worker) }}">{{ $task->worker->name }}</a>
+                                        <a href="{{ route('worker.tasks', $task->worker) }}" style="text-decoration: underline;">{{ $task->worker->name }}</a>
                                     @else
                                         {{ $task->worker->name }}
                                     @endcanany

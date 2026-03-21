@@ -74,13 +74,13 @@
                 @forelse ($fabricItems as $item)
                     @if ((string) $item->item_category === 'custom')
                         @php
-                            $customName = data_get($item->custom_details, 'garment_title')
-                                ?: (collect((array) data_get($item->custom_details, 'garments', []))->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment');
+                            $fabricProduct = $customFabricProducts->get((int) data_get($item->custom_details, 'fabric_product_id', 0));
+                            $customName = $fabricProduct?->name ?: 'Custom Fabric';
                         @endphp
                         <tr>
                             <td>{{ $customName }}</td>
                             <td>{{ ucfirst((string) data_get($item->custom_details, 'fabric_source', 'own')) }}</td>
-                            <td>{{ number_format((float) data_get($item->custom_details, 'fabric_quantity', 0), 2) }} {{ data_get($item->custom_details, 'fabric_quantity_unit', '') }}</td>
+                            <td>{{ number_format((float) data_get($item->custom_details, 'fabric_quantity', 0), 2) }} {{ data_get($item->custom_details, 'fabric_quantity_unit', 'm') }}</td>
                             <td>{{ data_get($item->custom_details, 'design_note', '-') ?: '-' }}</td>
                         </tr>
                     @else

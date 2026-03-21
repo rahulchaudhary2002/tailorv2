@@ -182,16 +182,18 @@
                         $isCustom = (string) $item->item_category === 'custom';
                         $customDetails = (array) ($item->custom_details ?? []);
                         $garments = collect((array) data_get($customDetails, 'garments', []));
+                        $fabricProduct = $isCustom
+                            ? $customFabricProducts->get((int) data_get($customDetails, 'fabric_product_id', 0))
+                            : null;
                         $displayName = $isCustom
-                            ? (data_get($customDetails, 'garment_title')
-                                ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment'))
+                            ? ($fabricProduct?->name ?: 'Custom Fabric')
                             : ($item->product?->name ?? '-');
                         $displayCode = $isCustom
-                            ? strtoupper((string) data_get($customDetails, 'fabric_source', 'custom'))
+                            ? ($fabricProduct?->code ?: '-')
                             : ($item->product?->code ?? '-');
                         $displayUnit = $isCustom
                             ? (data_get($customDetails, 'fabric_quantity_unit') ?: data_get($customDetails, 'quantity_unit') ?: 'm')
-                            : ($item->unit?->symbol ?: ($item->unit?->name ?: '-'));
+                            : ((string) $item->item_category === 'fabric' ? 'm' : 'pcs');
                     @endphp
                     <tr>
                         <td>

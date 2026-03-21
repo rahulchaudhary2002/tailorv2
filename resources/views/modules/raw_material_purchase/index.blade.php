@@ -119,7 +119,7 @@
                         <td>{{ $purchase->vendor?->name ?: '-' }}</td>
                         <td>{{ $purchase->product?->name ?: '-' }}</td>
                         <td>{{ $purchase->quantity }}</td>
-                        <td>{{ $purchase->unit?->symbol ?: ($purchase->unit?->name ?: '-') }}</td>
+                        <td>{{ $purchase->unit?->symbol ?: ($purchase->product?->defaultUnitLabel() ?: '-') }}</td>
                         <td>{{ number_format((float) $purchase->unit_price, 2) }}</td>
                         <td>{{ number_format((float) $purchase->total_amount, 2) }}</td>
                         <td>{{ $purchase->inventoryLocation?->name ?: '-' }}</td>

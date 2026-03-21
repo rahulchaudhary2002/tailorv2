@@ -10,7 +10,6 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\Unit;
 use App\Models\Vendor;
 use App\Models\VendorRawMaterialPurchase;
 use Illuminate\Http\Request;
@@ -402,10 +401,10 @@ class RawMaterialPurchaseController extends Controller
 
     private function resolveInventoryUnitIdForProduct(int $productId): ?int
     {
-        return Unit::query()
-            ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
-            ->orWhere('symbol', 'm')
-            ->value('id');
+        return Product::query()
+            ->with('category:id,slug')
+            ->find($productId)
+            ?->resolveDefaultUnitId();
     }
 
     private function applyInventoryUpdate(

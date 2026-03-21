@@ -79,9 +79,11 @@
                             ? (string) data_get($item->custom_details, 'quantity_unit', 'pcs')
                             : ((string) $item->item_category === 'fabric' ? 'm' : 'pcs');
                         $garments = collect((array) data_get($item->custom_details, 'garments', []));
+                        $fabricProduct = $isCustom
+                            ? $customFabricProducts->get((int) data_get($item->custom_details, 'fabric_product_id', 0))
+                            : null;
                         $itemName = $isCustom
-                            ? (data_get($item->custom_details, 'garment_title')
-                                ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment'))
+                            ? ($fabricProduct?->name ?: 'Custom Fabric')
                             : ($item->product?->name ?: 'Product');
                         if ((string) $item->item_category === 'readymade' && filled(data_get($item->custom_details, 'size'))) {
                             $itemName .= ' (Size: ' . data_get($item->custom_details, 'size') . ')';

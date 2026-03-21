@@ -31,6 +31,12 @@ class UnitSeeder extends Seeder
                 'symbol' => 'm',
                 'description' => 'Metric base length unit.',
             ],
+            [
+                'name' => 'Piece',
+                'code' => 'PIECE',
+                'symbol' => 'pcs',
+                'description' => 'Countable item unit.',
+            ],
         ];
 
         foreach ($units as $unit) {

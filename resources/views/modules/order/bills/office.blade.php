@@ -88,12 +88,17 @@
                     @php
                         $isCustom = (string) $item->item_category === 'custom';
                         $garments = collect((array) data_get($item->custom_details, 'garments', []));
+                        $quantityUnit = $isCustom
+                            ? (string) data_get($item->custom_details, 'quantity_unit', 'm')
+                            : ((string) $item->item_category === 'fabric' ? 'm' : 'pcs');
+                        $fabricProduct = $isCustom
+                            ? $customFabricProducts->get((int) data_get($item->custom_details, 'fabric_product_id', 0))
+                            : null;
                     @endphp
                     <tr>
                         <td>
                             @if ($isCustom)
-                                {{ data_get($item->custom_details, 'garment_title')
-                                    ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment') }}
+                                {{ $fabricProduct?->name ?: 'Custom Fabric' }}
                             @else
                                 {{ $item->product?->name ?: '-' }}
                                 @if ((string) $item->item_category === 'readymade' && filled(data_get($item->custom_details, 'size')))
@@ -102,7 +107,7 @@
                             @endif
                         </td>
                         <td>{{ ucfirst((string) $item->item_category) }}</td>
-                        <td class="bill-right">{{ number_format((float) $item->quantity, 2) }}</td>
+                        <td class="bill-right">{{ number_format((float) $item->quantity, 2) }} {{ $quantityUnit }}</td>
                         <td class="bill-right">{{ number_format((float) $item->unit_price, 2) }}</td>
                         <td class="bill-right">{{ number_format((float) $item->line_total, 2) }}</td>
                     </tr>

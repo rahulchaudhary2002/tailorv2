@@ -147,7 +147,7 @@
                         <td>
                             <div>
                                 @canany(['view-orders', 'manage-orders'])
-                                    <a href="{{ route('order.show', $order) }}">{{ $order->order_number }}</a>
+                                    <a href="{{ route('order.show', $order) }}" style="text-decoration: underline;">{{ $order->order_number }}</a>
                                 @else
                                     {{ $order->order_number }}
                                 @endcanany
@@ -158,7 +158,7 @@
                         <td>
                             @if ($order->customer)
                                 @canany(['view-customers', 'manage-customers'])
-                                    <a href="{{ route('customer.show', $order->customer) }}">{{ $order->customer->name }}</a>
+                                    <a href="{{ route('customer.show', $order->customer) }}" style="text-decoration: underline;">{{ $order->customer->name }}</a>
                                 @else
                                     {{ $order->customer->name }}
                                 @endcanany
@@ -209,7 +209,7 @@
                                 @if ($order->tasks->isNotEmpty())
                                     @foreach ($order->tasks->filter(fn ($task) => $task->worker)->unique('worker_id')->values() as $taskWorker)
                                         @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
-                                            <a href="{{ route('worker.tasks', $taskWorker->worker) }}">{{ $taskWorker->worker->name }}</a>@if (! $loop->last), @endif
+                                            <a href="{{ route('worker.tasks', $taskWorker->worker) }}" style="text-decoration: underline;">{{ $taskWorker->worker->name }}</a>@if (! $loop->last), @endif
                                         @else
                                             {{ $taskWorker->worker->name }}@if (! $loop->last), @endif
                                         @endcanany

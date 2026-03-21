@@ -384,7 +384,7 @@
                         <td>{{ $stock->product?->name ?: '-' }}</td>
                         <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
                         <td>{{ number_format((float) $stock->reserved_qty, 2) }}</td>
-                        <td>{{ $stock->unit?->symbol ?: ($stock->unit?->name ?: '-') }}</td>
+                        <td>{{ $stock->unit?->symbol ?: ($stock->product?->defaultUnitLabel() ?: '-') }}</td>
                         <td>{{ number_format((float) $stock->unit_cost, 2) }}</td>
                         <td>{{ $stock->updated_at->format('M d, Y h:i A') }}</td>
                     </tr>

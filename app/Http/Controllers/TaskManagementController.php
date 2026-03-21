@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Product;
 use App\Models\OrderTask;
 use App\Models\User;
 use App\Services\OrderTaskService;
@@ -239,11 +240,15 @@ class TaskManagementController extends Controller
         $customDetails = (array) ($task->orderItem?->custom_details ?? []);
         $garment = collect((array) ($customDetails['garments'] ?? []))
             ->get((int) $task->source_garment_index, []);
+        $fabricProduct = Product::query()
+            ->whereKey((int) data_get($customDetails, 'fabric_product_id', 0))
+            ->first(['id', 'name', 'code']);
 
         return view('modules.task_management.slip', [
             'task' => $task,
             'garment' => (array) $garment,
             'customDetails' => $customDetails,
+            'fabricProduct' => $fabricProduct,
         ]);
     }
 

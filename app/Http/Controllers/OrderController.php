@@ -226,7 +226,20 @@ class OrderController extends Controller
             'items.unit:id,name,symbol',
         ]);
 
-        return view('modules.order.show', compact('order'));
+        $customFabricProducts = Product::query()
+            ->whereIn(
+                'id',
+                $order->items
+                    ->pluck('custom_details.fabric_product_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+            )
+            ->get(['id', 'name', 'code'])
+            ->keyBy('id');
+
+        return view('modules.order.show', compact('order', 'customFabricProducts'));
     }
 
     /**
@@ -1043,6 +1056,18 @@ class OrderController extends Controller
         ]);
 
         $items = $order->items;
+        $customFabricProducts = Product::query()
+            ->whereIn(
+                'id',
+                $items
+                    ->pluck('custom_details.fabric_product_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+            )
+            ->get(['id', 'name', 'code'])
+            ->keyBy('id');
         $customItems = $items->filter(fn ($item) => (string) $item->item_category === 'custom')->values();
         $fabricItems = $items->filter(fn ($item) => in_array((string) $item->item_category, ['custom', 'fabric'], true))->values();
 
@@ -1088,6 +1113,7 @@ class OrderController extends Controller
         return [
             'order' => $order,
             'items' => $items,
+            'customFabricProducts' => $customFabricProducts,
             'customItems' => $customItems,
             'fabricItems' => $fabricItems,
             'stitchingCharges' => $stitchingCharges,

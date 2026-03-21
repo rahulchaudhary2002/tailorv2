@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    public const DEFAULT_UNIT_CODE_METER = 'METER';
+    public const DEFAULT_UNIT_CODE_PIECE = 'PIECE';
+
     protected $fillable = [
         'product_category_id',
         'name',
@@ -40,6 +43,40 @@ class Product extends Model
     public function totalInventoryQuantity(): float
     {
         return (float) $this->inventoryStocks()->sum('on_hand_qty');
+    }
+
+    public function categorySlug(): ?string
+    {
+        $slug = $this->category?->slug;
+
+        if ($slug !== null) {
+            return (string) $slug;
+        }
+
+        return ProductCategory::query()
+            ->whereKey($this->product_category_id)
+            ->value('slug');
+    }
+
+    public function defaultUnitCode(): string
+    {
+        return $this->categorySlug() === 'fabrics'
+            ? self::DEFAULT_UNIT_CODE_METER
+            : self::DEFAULT_UNIT_CODE_PIECE;
+    }
+
+    public function defaultUnitLabel(): string
+    {
+        return $this->defaultUnitCode() === self::DEFAULT_UNIT_CODE_METER ? 'm' : 'pcs';
+    }
+
+    public function resolveDefaultUnitId(): ?int
+    {
+        $unitCode = $this->defaultUnitCode();
+
+        return Unit::query()
+            ->where('code', $unitCode)
+            ->value('id');
     }
 
     // Backward compatibility for legacy reads/writes.

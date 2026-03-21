@@ -10,7 +10,6 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\InventoryReorderLevel;
 use App\Models\Product;
-use App\Models\Unit;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -656,20 +655,9 @@ class InventoryController extends Controller
 
     private function resolveInventoryUnitIdForProduct(int $productId): ?int
     {
-        $isFabric = Product::query()
-            ->whereKey($productId)
-            ->whereHas('category', function ($query) {
-                $query->where('slug', 'fabrics');
-            })
-            ->exists();
-
-        if (!$isFabric) {
-            return null;
-        }
-
-        return Unit::query()
-            ->whereIn('code', ['METER', 'meter', 'MTR', 'mtr'])
-            ->orWhere('symbol', 'm')
-            ->value('id');
+        return Product::query()
+            ->with('category:id,slug')
+            ->find($productId)
+            ?->resolveDefaultUnitId();
     }
 }

@@ -33,6 +33,7 @@
             <div class="bill-grid-item"><span class="bill-grid-label">Worker:</span> {{ $task->worker?->name ?: 'Unassigned' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Deadline:</span> {{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: ($task->order?->delivery_due_at?->format('M d, Y h:i A') ?: '-') }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Garment:</span> {{ $task->task_title }}</div>
+            <div class="bill-grid-item"><span class="bill-grid-label">Fabric:</span> {{ $fabricProduct?->name ?: '-' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Payable:</span> {{ number_format((float) $task->payable_amount, 2) }}</div>
         </div>
     </div>

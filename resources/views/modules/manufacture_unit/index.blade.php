@@ -194,7 +194,7 @@
                         <td>{{ $stock->product?->name ?: '-' }}</td>
                         <td>{{ $stock->product?->code ?: '-' }}</td>
                         <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
-                        <td>{{ $stock->unit?->symbol ?: ($stock->unit?->name ?: '-') }}</td>
+                        <td>{{ $stock->unit?->symbol ?: ($stock->product?->defaultUnitLabel() ?: '-') }}</td>
                         <td>{{ $stock->updated_at->format('M d, Y h:i A') }}</td>
                         <td>
                             @can('manage-manufacture-unit')
