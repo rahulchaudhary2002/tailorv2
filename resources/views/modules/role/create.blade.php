@@ -129,70 +129,6 @@
         resize: vertical;
     }
 
-    .role-create-permissions {
-        padding-top: 8px;
-    }
-
-    .role-create-permissions__head {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        align-items: center;
-        margin-bottom: 14px;
-    }
-
-    .role-create-permissions__head h2 {
-        margin: 0;
-        font-size: 1.85rem;
-        line-height: 1;
-        letter-spacing: -0.05em;
-        color: #191513;
-    }
-
-    .role-create-permissions__head a {
-        font-size: 0.82rem;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: #7a4f31;
-    }
-
-    .role-create-permissions__grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-    }
-
-    .role-create-permission-card {
-        min-height: 88px;
-        padding: 16px 14px;
-        border-radius: 18px;
-        background: #f4f2ef;
-        border: 1px solid #ede5dd;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: #2c231e;
-    }
-
-    .role-create-permission-card i {
-        color: #0b7a73;
-        font-size: 1.15rem;
-        width: 20px;
-        text-align: center;
-    }
-
-    .role-create-permission-card span {
-        font-size: 0.96rem;
-        line-height: 1.35;
-    }
-
-    .role-create-permission-card--add {
-        border-style: dashed;
-        color: #9a948f;
-        justify-content: center;
-    }
-
     .role-create-actions {
         margin-top: 26px;
         display: grid;
@@ -358,33 +294,6 @@
                     >{{ old('description') }}</textarea>
                 </div>
             </div>
-
-            <section class="role-create-permissions">
-                <div class="role-create-permissions__head">
-                    <h2>Quick Permissions</h2>
-                    <a href="{{ route('role.index') }}">View All</a>
-                </div>
-
-                <div class="role-create-permissions__grid">
-                    @foreach ($permissionPreview as $permission)
-                        @php
-                            $permissionIcon = str_contains(strtolower($permission->name), 'inventory')
-                                ? 'fa-box-archive'
-                                : (str_contains(strtolower($permission->name), 'bill') || str_contains(strtolower($permission->name), 'payment')
-                                    ? 'fa-money-bill-wave'
-                                    : 'fa-users');
-                        @endphp
-                        <div class="role-create-permission-card">
-                            <i class="fas {{ $permissionIcon }}"></i>
-                            <span>{{ $permission->name }}</span>
-                        </div>
-                    @endforeach
-                    <div class="role-create-permission-card role-create-permission-card--add">
-                        <i class="fas fa-plus"></i>
-                        <span>Add More</span>
-                    </div>
-                </div>
-            </section>
 
             <div class="role-create-actions">
                 <button type="submit" class="btn btn-primary">Continue to Permissions</button>
