@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Raw Material Purchases')
+@section('title', 'Purchases')
 
 @section('content')
 <div class="page-header">
     <div class="page-title">
-        <h1 class="text-dark">Raw Material Purchases</h1>
+        <h1 class="text-dark">Purchases</h1>
         <p>Create purchases and update inventory immediately.</p>
     </div>
     @canany(['manage-raw-material-purchases', 'create-raw-material-purchases'])
@@ -103,7 +103,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Vendor</th>
-                    <th>Raw Material</th>
+                    <th>Product</th>
                     <th>Quantity</th>
                     <th>Unit</th>
                     <th>Unit Price</th>

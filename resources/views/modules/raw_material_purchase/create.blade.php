@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Create Raw Material Purchase')
+@section('title', 'Create Purchase')
 
 @section('content')
 <div class="page-header">
     <div class="page-title">
-        <h1 class="text-dark">Create Raw Material Purchase</h1>
+        <h1 class="text-dark">Create Purchase</h1>
         <p>Create purchase and update warehouse inventory immediately.</p>
     </div>
 </div>

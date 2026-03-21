@@ -114,7 +114,7 @@
                 <li class="nav-item">
                     <a href="{{ route('rawMaterialPurchase.index') }}" class="nav-link {{ request()->routeIs('rawMaterialPurchase.*') ? 'active' : '' }}">
                         <i class="fas fa-cart-plus nav-icon"></i>
-                        <span class="nav-text">Raw Material Purchase</span>
+                        <span class="nav-text">Purchase</span>
                     </a>
                 </li>
             @endcanany
