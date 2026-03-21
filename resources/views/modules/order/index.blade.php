@@ -145,13 +145,23 @@
                     @endphp
                     <tr>
                         <td>
-                            <div>{{ $order->order_number }}</div>
+                            <div>
+                                @canany(['view-orders', 'manage-orders'])
+                                    <a href="{{ route('order.show', $order) }}">{{ $order->order_number }}</a>
+                                @else
+                                    {{ $order->order_number }}
+                                @endcanany
+                            </div>
                             <small>{{ $order->outlet?->name ?: '-' }}</small>
                         </td>
                         <td>{{ $order->ordered_at?->format('M d, Y h:i A') ?: '-' }}</td>
                         <td>
                             @if ($order->customer)
-                                {{ $order->customer->name }}
+                                @canany(['view-customers', 'manage-customers'])
+                                    <a href="{{ route('customer.show', $order->customer) }}">{{ $order->customer->name }}</a>
+                                @else
+                                    {{ $order->customer->name }}
+                                @endcanany
                                 @if ($order->customer->phone)
                                     ({{ $order->customer->phone }})
                                 @endif
@@ -195,7 +205,22 @@
                             <small>Delivered: {{ $order->delivered_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
                         <td>
-                            <div>{{ $taskWorkers->isNotEmpty() ? $taskWorkers->implode(', ') : '-' }}</div>
+                            <div>
+                                @if ($order->tasks->isNotEmpty())
+                                    @foreach ($order->tasks->filter(fn ($task) => $task->worker)->unique('worker_id')->values() as $taskWorker)
+                                        @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                            <a href="{{ route('worker.tasks', $taskWorker->worker) }}">{{ $taskWorker->worker->name }}</a>@if (! $loop->last), @endif
+                                        @else
+                                            {{ $taskWorker->worker->name }}@if (! $loop->last), @endif
+                                        @endcanany
+                                    @endforeach
+                                    @if ($order->tasks->filter(fn ($task) => $task->worker)->isEmpty())
+                                        -
+                                    @endif
+                                @else
+                                    -
+                                @endif
+                            </div>
                             <small>Deadline: {{ $taskDeadline?->format('M d, Y h:i A') ?: '-' }}</small>
                             <small style="display:block;">Fabric Issued: {{ $order->fabric_issued_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
