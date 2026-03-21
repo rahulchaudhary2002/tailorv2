@@ -10,6 +10,7 @@ use App\Http\Controllers\RawMaterialPurchaseController;
 use App\Http\Controllers\GarmentTypeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManufactureUnitController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentManagementController;
 use App\Http\Controllers\TaskManagementController;
@@ -32,6 +33,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('can:view-dashboard');
     Route::get('/search', [DashboardController::class, 'search'])->name('search.index');
+    Route::get('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readAll');
 
     Route::group(['prefix' => 'outlet', 'as' => 'outlet.'], function () {
         Route::get('/', [OutletController::class, 'index'])->name('index')->middleware('can:view-outlets,manage-outlets');

@@ -11,6 +11,7 @@ use App\Models\InventoryType;
 use App\Models\InventoryReorderLevel;
 use App\Models\Product;
 use App\Models\Vendor;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -332,8 +333,33 @@ class InventoryController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
+        $this->notifyInventoryRecipients(
+            $product,
+            $trxType,
+            $quantity,
+            $outletId,
+            route('inventory.index')
+        );
+
         return $this->redirectToIndex($tab)
             ->with('success', 'Inventory updated successfully.');
+    }
+
+    private function notifyInventoryRecipients(Product $product, string $trxType, float $quantity, int $outletId, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-inventory-notifications',
+            $outletId,
+            [
+                'title' => 'Inventory updated',
+                'message' => $actorName . ': ' . ucfirst($trxType) . ' transaction of ' . number_format($quantity, 2) . ' ' . $product->defaultUnitLabel() . ' recorded for ' . $product->name . '.',
+                'url' => $url,
+                'module' => 'Inventory',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     private function currentOutletId(): int

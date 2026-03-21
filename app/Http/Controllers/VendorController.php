@@ -6,6 +6,7 @@ use App\Http\Requests\Vendor\StoreRequest;
 use App\Http\Requests\Vendor\UpdateRequest;
 use App\Models\Vendor;
 use App\Models\VendorType;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class VendorController extends Controller
@@ -65,7 +66,13 @@ class VendorController extends Controller
     {
         $data = $this->preparePayload($request->validated());
 
-        Vendor::create($data);
+        $vendor = Vendor::create($data);
+
+        $this->notifyVendorRecipients(
+            'Vendor created',
+            'Vendor ' . $vendor->name . ' was created.',
+            route('vendor.index')
+        );
 
         return redirect()
             ->route('vendor.index')
@@ -101,6 +108,12 @@ class VendorController extends Controller
 
         $vendor->update($data);
 
+        $this->notifyVendorRecipients(
+            'Vendor updated',
+            'Vendor ' . $vendor->name . ' was updated.',
+            route('vendor.index')
+        );
+
         return redirect()
             ->route('vendor.index')
             ->with('success', 'Vendor updated successfully.');
@@ -111,11 +124,35 @@ class VendorController extends Controller
      */
     public function destroy(Vendor $vendor)
     {
+        $vendorName = $vendor->name;
         $vendor->delete();
+
+        $this->notifyVendorRecipients(
+            'Vendor deleted',
+            'Vendor ' . $vendorName . ' was deleted.',
+            route('vendor.index')
+        );
 
         return redirect()
             ->route('vendor.index')
             ->with('success', 'Vendor deleted successfully.');
+    }
+
+    private function notifyVendorRecipients(string $title, string $message, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-vendor-notifications',
+            (int) (auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $url,
+                'module' => 'Vendor',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     /**

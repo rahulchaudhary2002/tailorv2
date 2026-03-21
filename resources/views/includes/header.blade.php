@@ -8,6 +8,11 @@
     $roleName = $user->roles()
         ->wherePivot('outlet_id', $user->current_outlet_id)
         ->value('name') ?? 'No Role';
+    $unreadNotifications = $user->unreadNotifications()->latest()->limit(8)->get();
+    $recentNotifications = $unreadNotifications->isNotEmpty()
+        ? $unreadNotifications
+        : $user->notifications()->latest()->limit(8)->get();
+    $unreadNotificationCount = $user->unreadNotifications()->count();
 @endphp
 
 <header class="dashboard-header">
@@ -39,13 +44,55 @@
 
             <!-- Notifications -->
             <div class="notifications">
-                <button class="notification-btn">
+                <button type="button" class="notification-btn" id="notificationToggle" aria-label="Open notifications" title="Notifications">
                     <i class="fas fa-bell"></i>
-                    <span class="notification-count">3</span>
+                    @if ($unreadNotificationCount > 0)
+                        <span class="notification-count">{{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}</span>
+                    @endif
                 </button>
-                <div class="notification-dropdown">
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-dropdown-head">
+                        <div class="notification-dropdown-title">Notifications</div>
+                        <div class="notification-dropdown-actions">
+                            @if ($unreadNotificationCount > 0)
+                                <form action="{{ route('notifications.readAll') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="notification-link-btn">Mark all read</button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
                     <div class="notification-list">
-                        <!-- Notifications will be populated by JavaScript -->
+                        @forelse ($recentNotifications as $notification)
+                            @php
+                                $notificationData = (array) $notification->data;
+                                $isUnread = $notification->read_at === null;
+                            @endphp
+                            <a
+                                href="{{ route('notifications.read', $notification->id) }}"
+                                class="notification-item {{ $isUnread ? 'is-unread' : '' }}"
+                            >
+                                <div class="notification-item__top">
+                                    <div class="notification-item__title-wrap">
+                                        @if (!empty($notificationData['module']))
+                                            <span class="notification-item__badge">{{ $notificationData['module'] }}</span>
+                                        @endif
+                                        <div class="notification-item__title">{{ $notificationData['title'] ?? 'Notification' }}</div>
+                                    </div>
+                                    @if ($isUnread)
+                                        <span class="notification-item__dot" aria-hidden="true"></span>
+                                    @endif
+                                </div>
+                                <div class="notification-item__body">{{ $notificationData['message'] ?? '-' }}</div>
+                                <div class="notification-item__meta">
+                                    <span>{{ $notification->created_at?->diffForHumans() }}</span>
+                                </div>
+                            </a>
+                        @empty
+                            <div class="notification-empty">
+                                <div class="notification-empty__title">No notifications</div>
+                            </div>
+                        @endforelse
                     </div>
                 </div>
             </div>

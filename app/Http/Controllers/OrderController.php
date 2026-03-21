@@ -15,6 +15,7 @@ use App\Models\InventoryType;
 use App\Models\Order;
 use App\Models\OrderTask;
 use App\Models\Product;
+use App\Services\NotificationService;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -414,6 +415,12 @@ class OrderController extends Controller
         $order->delivery_due_at = $deliveryDueAt;
 
         $order->save();
+
+        $this->notifyOrderRecipients(
+            $order,
+            'Order delivery date updated',
+            'Delivery date for order ' . $order->order_number . ' was updated to ' . ($order->delivery_due_at?->format('M d, Y h:i A') ?: '-')
+        );
 
         return redirect()
             ->route('order.index')
@@ -872,6 +879,15 @@ class OrderController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
+        if ($savedOrder) {
+            $savedOrder->loadMissing(['customer:id,name', 'outlet:id,name']);
+            $this->notifyOrderRecipients(
+                $savedOrder,
+                $existingOrder ? 'Order updated' : 'Order created',
+                ($existingOrder ? 'Order ' : 'New order ') . $savedOrder->order_number . ' for ' . ($savedOrder->customer?->name ?: 'Walk-in') . ' was ' . ($existingOrder ? 'updated.' : 'created.')
+            );
+        }
+
         if ($printBill && $savedOrder) {
             return redirect()
                 ->route('order.bill.customer', ['order' => $savedOrder, 'autoprint' => 1]);
@@ -982,6 +998,13 @@ class OrderController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
+        $order->refresh();
+        $this->notifyOrderRecipients(
+            $order,
+            'Order status updated',
+            'Order ' . $order->order_number . ' status changed to ' . Order::statusLabel((string) $order->status) . '.'
+        );
+
         return redirect()
             ->route($redirectRoute)
             ->with('success', 'Order status updated successfully.');
@@ -1024,9 +1047,32 @@ class OrderController extends Controller
         $order->payment_status = $paymentStatus;
         $order->save();
 
+        $this->notifyOrderRecipients(
+            $order,
+            'Order payment recorded',
+            'Payment of NPR ' . number_format($paymentAmount, 2) . ' was recorded for order ' . $order->order_number . '.'
+        );
+
         return redirect()
             ->route('order.index')
             ->with('success', 'Payment recorded successfully.');
+    }
+
+    private function notifyOrderRecipients(Order $order, string $title, string $message): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-order-notifications',
+            (int) ($order->outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => route('order.show', $order),
+                'module' => 'Order',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     private function generateOrderNumber(): string

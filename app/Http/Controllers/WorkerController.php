@@ -10,6 +10,7 @@ use App\Models\OrderTask;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Services\OrderTaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -262,6 +263,12 @@ class WorkerController extends Controller
         $worker->outlets()->sync($selectedOutletIds);
         $this->syncWorkerRole($worker, $selectedOutletIds);
 
+        $this->notifyUserRecipients(
+            'Worker created',
+            'Worker ' . $worker->name . ' was created.',
+            route('worker.edit', ['worker' => $worker, 'tab' => 'worker'])
+        );
+
         return redirect()
             ->route('worker.edit', ['worker' => $worker, 'tab' => 'permissions'])
             ->with('success', 'Worker created successfully. Worker role has been assigned automatically.');
@@ -363,6 +370,12 @@ class WorkerController extends Controller
 
         $this->syncWorkerRole($worker, $selectedOutletIds);
 
+        $this->notifyUserRecipients(
+            'Worker updated',
+            'Worker ' . $worker->name . ' details were updated.',
+            route('worker.edit', ['worker' => $worker, 'tab' => 'worker'])
+        );
+
         return redirect()
             ->route('worker.edit', ['worker' => $worker, 'tab' => 'worker'])
             ->with('success', 'Worker details updated successfully.');
@@ -417,6 +430,12 @@ class WorkerController extends Controller
             ]);
         }
 
+        $this->notifyUserRecipients(
+            'Worker permissions updated',
+            'Permissions for worker ' . $worker->name . ' were updated.',
+            route('worker.edit', ['worker' => $worker, 'tab' => 'permissions', 'assignment_outlet_id' => $outletId])
+        );
+
         return redirect()
             ->route('worker.edit', ['worker' => $worker, 'tab' => 'permissions', 'assignment_outlet_id' => $outletId])
             ->with('success', 'Worker permissions updated successfully.');
@@ -438,10 +457,34 @@ class WorkerController extends Controller
             Storage::disk('public')->delete($worker->avatar);
         }
 
+        $workerName = $worker->name;
         $worker->delete();
+
+        $this->notifyUserRecipients(
+            'Worker deleted',
+            'Worker ' . $workerName . ' was deleted.',
+            route('worker.index')
+        );
 
         return redirect()
             ->route('worker.index')
             ->with('success', 'Worker deleted successfully.');
+    }
+
+    private function notifyUserRecipients(string $title, string $message, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-user-notifications',
+            (int) (auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $url,
+                'module' => 'User',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 }

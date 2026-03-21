@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Vendor;
 use App\Models\VendorRawMaterialPurchase;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -161,6 +162,12 @@ class RawMaterialPurchaseController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
+        $this->notifyPurchaseRecipients(
+            'Purchase created',
+            number_format($items->count()) . ' raw material item(s) were added to purchase records.',
+            route('rawMaterialPurchase.index')
+        );
+
         return redirect()
             ->route('rawMaterialPurchase.index')
             ->with('success', 'Purchase created and inventory updated successfully.');
@@ -249,9 +256,32 @@ class RawMaterialPurchaseController extends Controller
                 ->with('error', $exception->getMessage());
         }
 
+        $this->notifyPurchaseRecipients(
+            'Purchase updated',
+            'Purchase for ' . ($purchase->product?->name ?: 'raw material') . ' was updated.',
+            route('rawMaterialPurchase.index')
+        );
+
         return redirect()
             ->route('rawMaterialPurchase.edit', $purchase)
             ->with('success', 'Purchase updated successfully.');
+    }
+
+    private function notifyPurchaseRecipients(string $title, string $message, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-purchase-notifications',
+            (int) (auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $url,
+                'module' => 'Purchase',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     /**

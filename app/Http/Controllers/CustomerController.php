@@ -8,6 +8,7 @@ use App\Http\Requests\Customer\UpdateRequest;
 use App\Models\Customer;
 use App\Models\GarmentType;
 use App\Models\Order;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -67,6 +68,12 @@ class CustomerController extends Controller
     public function store(StoreRequest $request)
     {
         $customer = Customer::create($request->validated());
+
+        $this->notifyCustomerRecipients(
+            'Customer created',
+            'Customer ' . $customer->name . ' was created.',
+            route('customer.show', $customer)
+        );
 
         return redirect()
             ->route('customer.edit', ['customer' => $customer, 'tab' => 'measurements'])
@@ -149,6 +156,12 @@ class CustomerController extends Controller
 
         $customer->update($this->extractCustomerData($validated));
 
+        $this->notifyCustomerRecipients(
+            'Customer updated',
+            'Customer ' . $customer->name . ' details were updated.',
+            route('customer.show', $customer)
+        );
+
         return redirect()
             ->route('customer.edit', ['customer' => $customer, 'tab' => 'details'])
             ->with('success', 'Customer details updated successfully.');
@@ -165,6 +178,12 @@ class CustomerController extends Controller
             $this->syncCustomerMeasurements($customer, $validated);
         });
 
+        $this->notifyCustomerRecipients(
+            'Customer measurements updated',
+            'Measurements for customer ' . $customer->name . ' were updated.',
+            route('customer.show', $customer)
+        );
+
         return redirect()
             ->route('customer.edit', ['customer' => $customer, 'tab' => 'measurements'])
             ->with('success', 'Customer measurements updated successfully.');
@@ -175,11 +194,35 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
+        $customerName = $customer->name;
         $customer->delete();
+
+        $this->notifyCustomerRecipients(
+            'Customer deleted',
+            'Customer ' . $customerName . ' was deleted.',
+            route('customer.index')
+        );
 
         return redirect()
             ->route('customer.index')
             ->with('success', 'Customer deleted successfully.');
+    }
+
+    private function notifyCustomerRecipients(string $title, string $message, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-customer-notifications',
+            (int) (auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $url,
+                'module' => 'Customer',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     /**

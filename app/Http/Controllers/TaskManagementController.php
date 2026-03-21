@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\OrderTask;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Services\OrderTaskService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -122,6 +123,7 @@ class TaskManagementController extends Controller
         $this->ensureTaskBelongsToCurrentOutlet($task);
         $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
         $workerRoleId = $this->workerRoleId();
+        $previousWorkerId = (int) ($task->worker_id ?? 0);
 
         $validated = $request->validate([
             'worker_id' => [
@@ -177,7 +179,16 @@ class TaskManagementController extends Controller
             ? ($task->slip_received_at ?? now())
             : null;
         $task->save();
-        $this->taskService->syncOrderStatus($task->order()->firstOrFail());
+        $order = $task->order()->firstOrFail();
+        $this->taskService->syncOrderStatus($order);
+
+        $task->loadMissing(['order.customer:id,name', 'worker:id,name']);
+        $this->notifyTaskRecipients(
+            $task,
+            'Task assignment updated',
+            'Task ' . ($task->task_number ?: $task->task_title) . ' for order ' . ($task->order?->order_number ?: '-') . ' was updated.',
+            $task->worker_id && (int) $task->worker_id !== $previousWorkerId ? $task->worker : null
+        );
 
         return back()->with('success', 'Task assignment updated successfully.');
     }
@@ -213,9 +224,47 @@ class TaskManagementController extends Controller
             $task->completed_at = $task->completed_at ?? now();
         }
         $task->save();
-        $this->taskService->syncOrderStatus($task->order()->firstOrFail());
+        $order = $task->order()->firstOrFail();
+        $this->taskService->syncOrderStatus($order);
+
+        $task->loadMissing(['order.customer:id,name', 'worker:id,name']);
+        $this->notifyTaskRecipients(
+            $task,
+            'Task status updated',
+            'Task ' . ($task->task_number ?: $task->task_title) . ' is now ' . $task->statusLabel() . '.'
+        );
 
         return back()->with('success', 'Task status updated successfully.');
+    }
+
+    private function notifyTaskRecipients(OrderTask $task, string $title, string $message, ?User $directWorker = null): void
+    {
+        $notificationService = app(NotificationService::class);
+        $taskUrl = route('taskManagement.index', ['q' => $task->task_number ?: $task->task_title]);
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        $notificationService->notifyPermission(
+            'receive-task-notifications',
+            (int) ($task->order?->outlet_id ?? auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $taskUrl,
+                'module' => 'Task',
+            ],
+            array_filter([(int) auth()->id(), (int) ($directWorker?->id ?? 0)])
+        );
+
+        if ($directWorker) {
+            $notificationService->notifyUsers([
+                $directWorker,
+            ], [
+                'title' => 'New task assigned',
+                'message' => $actorName . ': You have been assigned task ' . ($task->task_number ?: $task->task_title) . ' for order ' . ($task->order?->order_number ?: '-') . '.',
+                'url' => route('order.assignedJobs', ['q' => $task->task_number ?: $task->task_title]),
+                'module' => 'Task',
+            ]);
+        }
     }
 
     public function slip(OrderTask $task)

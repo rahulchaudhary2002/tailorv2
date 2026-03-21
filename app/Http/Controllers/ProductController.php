@@ -13,6 +13,7 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -78,14 +79,16 @@ class ProductController extends Controller
     {
         $data = $request->validated();
         $data['code'] = trim((string) ($data['code'] ?? ''));
+        $savedProduct = null;
 
-        DB::transaction(function () use ($data): void {
+        DB::transaction(function () use ($data, &$savedProduct): void {
             $product = Product::create([
                 'name' => $data['name'],
                 'code' => $data['code'],
                 'product_category_id' => $data['product_category_id'],
                 'amount' => $data['amount'],
             ]);
+            $savedProduct = $product;
 
             $quantity = (float) ($data['opening_quantity'] ?? 0);
             $unitCost = (float) ($data['opening_unit_cost'] ?? 0);
@@ -141,6 +144,14 @@ class ProductController extends Controller
                 'total_cost' => $quantity * $unitCost,
             ]);
         });
+
+        if ($savedProduct) {
+            $this->notifyProductRecipients(
+                'Product created',
+                'Product ' . $savedProduct->name . ' was created.',
+                route('product.index', ['q' => $savedProduct->code ?: $savedProduct->name])
+            );
+        }
 
         return redirect()
             ->route('product.index')
@@ -209,6 +220,12 @@ class ProductController extends Controller
         $data = $request->validated();
         $data['code'] = trim((string) ($data['code'] ?? ''));
         $product->update($data);
+
+        $this->notifyProductRecipients(
+            'Product updated',
+            'Product ' . $product->name . ' was updated.',
+            route('product.index', ['q' => $product->code ?: $product->name])
+        );
 
         return redirect()
             ->route('product.index')
@@ -362,9 +379,32 @@ class ProductController extends Controller
                 ->with('inventory_error', $exception->getMessage());
         }
 
+        $this->notifyInventoryRecipients(
+            $product,
+            $trxType,
+            $quantity,
+            $outletId,
+            route('product.edit', $product) . '#inventory'
+        );
+
         return redirect()
             ->to(route('product.edit', $product) . '#inventory')
             ->with('inventory_success', 'Inventory transaction recorded successfully.');
+    }
+
+    private function notifyInventoryRecipients(Product $product, string $trxType, float $quantity, int $outletId, string $url): void
+    {
+        app(NotificationService::class)->notifyPermission(
+            'receive-inventory-notifications',
+            $outletId,
+            [
+                'title' => 'Inventory updated',
+                'message' => ucfirst($trxType) . ' transaction of ' . number_format($quantity, 2) . ' ' . $product->defaultUnitLabel() . ' recorded for ' . $product->name . '.',
+                'url' => $url,
+                'module' => 'Inventory',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     /**
@@ -372,11 +412,35 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
+        $productName = $product->name;
         $product->delete();
+
+        $this->notifyProductRecipients(
+            'Product deleted',
+            'Product ' . $productName . ' was deleted.',
+            route('product.index')
+        );
 
         return redirect()
             ->route('product.index')
             ->with('success', 'Product deleted successfully.');
+    }
+
+    private function notifyProductRecipients(string $title, string $message, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-product-notifications',
+            (int) (auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $url,
+                'module' => 'Product',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 
     private function availableInventoryLocations()

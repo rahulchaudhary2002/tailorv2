@@ -10,6 +10,7 @@ use App\Models\Outlet;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -113,6 +114,12 @@ class UserController extends Controller
         ]);
 
         $user->outlets()->sync($selectedOutletIds->all());
+
+        $this->notifyUserRecipients(
+            'User created',
+            'User ' . $user->name . ' was created.',
+            route('user.edit', ['user' => $user, 'tab' => 'user'])
+        );
 
         return redirect()
             ->route('user.edit', ['user' => $user, 'tab' => 'roles'])
@@ -233,6 +240,12 @@ class UserController extends Controller
             ->whereNotIn('outlet_id', $selectedOutletIds)
             ->delete();
 
+        $this->notifyUserRecipients(
+            'User updated',
+            'User ' . $user->name . ' details were updated.',
+            route('user.edit', ['user' => $user, 'tab' => 'user'])
+        );
+
         return redirect()
             ->route('user.edit', ['user' => $user, 'tab' => 'user'])
             ->with('success', 'User details updated successfully.');
@@ -281,6 +294,12 @@ class UserController extends Controller
                 'role_id' => $roleId,
             ]);
         }
+
+        $this->notifyUserRecipients(
+            'User roles updated',
+            'Roles for user ' . $user->name . ' were updated.',
+            route('user.edit', ['user' => $user, 'tab' => 'roles', 'assignment_outlet_id' => $outletId])
+        );
 
         return redirect()
             ->route('user.edit', ['user' => $user, 'tab' => 'roles', 'assignment_outlet_id' => $outletId])
@@ -339,6 +358,12 @@ class UserController extends Controller
             ]);
         }
 
+        $this->notifyUserRecipients(
+            'User permissions updated',
+            'Permissions for user ' . $user->name . ' were updated.',
+            route('user.edit', ['user' => $user, 'tab' => 'permissions', 'assignment_outlet_id' => $outletId])
+        );
+
         return redirect()
             ->route('user.edit', ['user' => $user, 'tab' => 'permissions', 'assignment_outlet_id' => $outletId])
             ->with('success', 'User permissions updated successfully.');
@@ -363,10 +388,34 @@ class UserController extends Controller
             Storage::disk('public')->delete($user->avatar);
         }
 
+        $userName = $user->name;
         $user->delete();
+
+        $this->notifyUserRecipients(
+            'User deleted',
+            'User ' . $userName . ' was deleted.',
+            route('user.index')
+        );
 
         return redirect()
             ->route('user.index')
             ->with('success', 'User deleted successfully.');
+    }
+
+    private function notifyUserRecipients(string $title, string $message, string $url): void
+    {
+        $actorName = (string) (auth()->user()?->name ?: 'System');
+
+        app(NotificationService::class)->notifyPermission(
+            'receive-user-notifications',
+            (int) (auth()->user()?->current_outlet_id ?? 0),
+            [
+                'title' => $title,
+                'message' => $actorName . ': ' . $message,
+                'url' => $url,
+                'module' => 'User',
+            ],
+            array_filter([(int) auth()->id()])
+        );
     }
 }
