@@ -1,4 +1,4 @@
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
     @php
         $authUser = auth()->user();
         $currentOutletId = (int) ($authUser?->current_outlet_id ?? 0);

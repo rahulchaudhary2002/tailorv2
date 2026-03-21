@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const sidebar = document.getElementById("sidebar");
+    const sidebarToggle = document.getElementById("sidebarToggle");
     const outletToggle = document.getElementById("outletToggle");
     const outletDropdown = document.getElementById("outletDropdown");
     const outletSelectorWrapper = document.querySelector(
@@ -7,6 +9,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const notificationToggle = document.getElementById("notificationToggle");
     const notificationsWrapper = document.querySelector(".notifications");
     const notificationDropdown = document.getElementById("notificationDropdown");
+
+    if (sidebar && sidebarToggle) {
+        sidebarToggle.addEventListener("click", function (e) {
+            e.stopPropagation();
+            const isOpen = sidebar.classList.toggle("active");
+            sidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+    }
 
     if (outletToggle && outletDropdown) {
         outletToggle.addEventListener("click", function (e) {
@@ -40,6 +50,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     document.addEventListener("click", function (e) {
+        if (
+            sidebar &&
+            sidebarToggle &&
+            window.innerWidth <= 1024 &&
+            !sidebar.contains(e.target) &&
+            !sidebarToggle.contains(e.target)
+        ) {
+            sidebar.classList.remove("active");
+            sidebarToggle.setAttribute("aria-expanded", "false");
+        }
+
         if (outletSelectorWrapper && !outletSelectorWrapper.contains(e.target)) {
             outletDropdown.classList.remove("active");
         }
@@ -49,6 +70,13 @@ document.addEventListener("DOMContentLoaded", function () {
             if (notificationDropdown) {
                 notificationDropdown.style.display = "none";
             }
+        }
+    });
+
+    window.addEventListener("resize", function () {
+        if (sidebar && sidebarToggle && window.innerWidth > 1024) {
+            sidebar.classList.remove("active");
+            sidebarToggle.setAttribute("aria-expanded", "false");
         }
     });
 });

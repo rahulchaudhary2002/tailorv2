@@ -230,9 +230,15 @@ class DashboardController extends Controller
 
         $ordersCount = (int) (clone $orderScope)->count();
         $advanceCollected = (float) (clone $orderScope)->sum('advance_payment_amount');
-        $pendingPayments = (int) (clone $orderScope)
+        $pendingPayments = (float) (clone $orderScope)
             ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
-            ->count();
+            ->selectRaw(
+                'COALESCE(SUM(GREATEST(0, ' .
+                '(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)' .
+                ' - COALESCE(advance_payment_amount, 0)' .
+                ')), 0) as total'
+            )
+            ->value('total');
         $deliveredOrders = (int) (clone $orderScope)
             ->where('status', Order::STATUS_DELIVERED)
             ->count();
@@ -471,7 +477,7 @@ class DashboardController extends Controller
         $outletOrdersToday = 0;
         $dueTodayCount = 0;
         $overdueOutletCount = 0;
-        $outletPendingPayments = 0;
+        $outletPendingPayments = 0.0;
         $outletStockValue = 0.0;
         $todayDeliveries = collect();
         $recentOrders = collect();
@@ -507,9 +513,15 @@ class DashboardController extends Controller
                 ->where('delivery_due_at', '<', $now)
                 ->count();
 
-            $outletPendingPayments = (int) (clone $outletBaseOrders)
+            $outletPendingPayments = (float) (clone $outletBaseOrders)
                 ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
-                ->count();
+                ->selectRaw(
+                    'COALESCE(SUM(GREATEST(0, ' .
+                    '(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)' .
+                    ' - COALESCE(advance_payment_amount, 0)' .
+                    ')), 0) as total'
+                )
+                ->value('total');
 
             $outletStockValue = (float) InventoryStock::query()
                 ->join('inventory_locations', 'inventory_locations.id', '=', 'inventory_stocks.location_id')

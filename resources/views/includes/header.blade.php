@@ -15,12 +15,25 @@
     $unreadNotificationCount = $user->unreadNotifications()->count();
 @endphp
 
-<header class="dashboard-header">
+<header class="dashboard-header {{ request()->routeIs('dashboard') ? 'dashboard-header--dashboard' : '' }}">
     <div class="header-container">
-        <!-- Logo -->
-        <a href="{{ route('dashboard') }}" class="logo">
-            <img src="{{ asset('assets/images/logo.png') }}" alt="Suit Land" width="200">
-        </a>
+        <div class="header-brand">
+            <button
+                type="button"
+                class="mobile-menu-btn {{ request()->routeIs('dashboard') ? 'mobile-menu-btn--dashboard' : '' }}"
+                id="sidebarToggle"
+                aria-label="Open navigation"
+                aria-controls="sidebar"
+                aria-expanded="false"
+            >
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <!-- Logo -->
+            <a href="{{ route('dashboard') }}" class="logo">
+                <img src="{{ asset('assets/images/logo.png') }}" alt="Suit Land" width="200">
+            </a>
+        </div>
 
         <!-- Header Controls -->
         <div class="header-controls">
