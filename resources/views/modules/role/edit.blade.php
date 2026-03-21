@@ -8,6 +8,10 @@
         display: none;
     }
 
+    .role-edit-desktop {
+        display: block;
+    }
+
     .role-edit-mobile-shell {
         width: 100%;
         padding-bottom: 108px;
@@ -330,11 +334,11 @@
 
     @media (max-width: 1024px) {
         .role-edit-desktop {
-            display: none;
+            display: block !important;
         }
 
         .role-edit-mobile {
-            display: block;
+            display: none !important;
         }
 
         .role-edit-mobile-sticky {

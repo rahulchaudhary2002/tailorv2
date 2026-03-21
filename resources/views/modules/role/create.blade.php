@@ -8,6 +8,10 @@
         display: none;
     }
 
+    .role-create-desktop {
+        display: block;
+    }
+
     .role-create-mobile-shell {
         width: 100%;
         padding-bottom: 28px;
@@ -214,11 +218,11 @@
 
     @media (max-width: 1024px) {
         .role-create-desktop {
-            display: none;
+            display: block !important;
         }
 
         .role-create-mobile {
-            display: block;
+            display: none !important;
         }
     }
 </style>

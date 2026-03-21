@@ -8,6 +8,10 @@
         display: none;
     }
 
+    .outlet-create-desktop {
+        display: block;
+    }
+
     .outlet-create-desktop .page-title p {
         max-width: 620px;
     }
@@ -246,11 +250,11 @@
 
     @media (max-width: 1024px) {
         .outlet-create-desktop {
-            display: none;
+            display: block !important;
         }
 
         .outlet-create-mobile {
-            display: block;
+            display: none !important;
         }
 
         .outlet-create-sticky {

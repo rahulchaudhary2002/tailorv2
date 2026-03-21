@@ -277,11 +277,12 @@
 
     @media (max-width: 640px) {
         .outlet-mobile-hero {
+            gap: 14px;
             margin-bottom: 16px;
         }
 
         .outlet-mobile-hero h1 {
-            font-size: 2rem;
+            font-size: 1.95rem;
         }
 
         .outlet-mobile-hero p,
@@ -294,7 +295,66 @@
         }
 
         .outlet-mobile-card__title {
-            font-size: 1.8rem;
+            font-size: 1.7rem;
+        }
+
+        .outlet-mobile-add {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+        }
+
+        .outlet-mobile-search {
+            min-height: 58px;
+            border-radius: 18px;
+        }
+
+        .outlet-mobile-actions .btn {
+            min-height: 52px;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .outlet-mobile-hero h1 {
+            font-size: 1.78rem;
+        }
+
+        .outlet-mobile-hero p {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .outlet-mobile-card {
+            padding: 18px 16px;
+            border-radius: 20px;
+        }
+
+        .outlet-mobile-card__title {
+            font-size: 1.5rem;
+        }
+
+        .outlet-mobile-card__stats {
+            gap: 14px;
+        }
+
+        .outlet-mobile-card__stat,
+        .outlet-mobile-card__line span {
+            font-size: 0.9rem;
+        }
+
+        .outlet-mobile-card__actions {
+            grid-template-columns: minmax(0, 1fr) 48px;
+        }
+
+        .outlet-mobile-card__edit {
+            min-height: 44px;
+            font-size: 0.84rem;
+        }
+
+        .outlet-mobile-card__delete {
+            width: 44px;
+            height: 44px;
+            min-height: 44px;
         }
     }
 </style>

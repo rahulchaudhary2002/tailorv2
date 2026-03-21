@@ -280,6 +280,85 @@
             display: block;
         }
     }
+
+    @media (max-width: 560px) {
+        .role-mobile-search {
+            margin-bottom: 12px;
+        }
+
+        .role-mobile-search input {
+            min-height: 52px;
+            padding: 0 16px 0 44px;
+            border-radius: 14px;
+            font-size: 0.92rem;
+        }
+
+        .role-mobile-search i {
+            left: 16px;
+            font-size: 0.94rem;
+        }
+
+        .role-mobile-actions {
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .role-mobile-actions .btn {
+            min-height: 50px;
+            border-radius: 14px;
+            font-size: 0.92rem;
+        }
+
+        .role-mobile-card {
+            padding: 18px 16px;
+            border-radius: 20px;
+        }
+
+        .role-mobile-card__head-main {
+            gap: 12px;
+        }
+
+        .role-mobile-card__icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            font-size: 0.92rem;
+        }
+
+        .role-mobile-card__title {
+            font-size: 1.05rem;
+        }
+
+        .role-mobile-card__description {
+            font-size: 0.86rem;
+        }
+
+        .role-mobile-chip {
+            padding: 5px 9px;
+            font-size: 0.72rem;
+        }
+
+        .role-mobile-card__footer {
+            font-size: 0.8rem;
+        }
+
+        .role-mobile-safeguard {
+            padding: 18px 16px;
+            border-radius: 20px;
+        }
+
+        .role-mobile-safeguard h3 {
+            font-size: 1.05rem;
+        }
+
+        .role-mobile-safeguard p {
+            font-size: 0.9rem;
+        }
+
+        .role-mobile-safeguard__stat strong {
+            font-size: 1.7rem;
+        }
+    }
 </style>
 @endsection
 

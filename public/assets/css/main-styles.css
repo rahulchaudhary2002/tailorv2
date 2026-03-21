@@ -3026,8 +3026,8 @@ img {
 /* Responsive */
 @media (max-width: 1024px) {
     .sidebar {
-        top: 64px;
-        height: calc(100vh - 64px);
+        top: 56px;
+        height: calc(100vh - 56px);
         width: min(82vw, 320px);
         transform: translateX(-100%);
         z-index: var(--z-modal);
@@ -3049,16 +3049,19 @@ img {
     .mobile-menu-btn {
         display: inline-flex;
         flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
     }
 
     .dashboard-header {
-        height: 64px;
-        padding: 0 12px;
-        box-shadow: 0 8px 22px rgba(24, 18, 13, 0.06);
+        height: 56px;
+        padding: 0 10px;
+        box-shadow: 0 6px 18px rgba(24, 18, 13, 0.05);
     }
 
     .dashboard-header .header-container {
-        gap: 10px;
+        gap: 8px;
         align-items: center;
         min-height: 100%;
     }
@@ -3087,21 +3090,21 @@ img {
 
     .dashboard-header .header-controls {
         margin-left: auto;
-        gap: 8px;
+        gap: 6px;
         height: 100%;
     }
 
     .dashboard-header .notification-btn,
     .dashboard-header .user-avatar {
-        width: 40px;
-        height: 40px;
+        width: 36px;
+        height: 36px;
     }
 
     .dashboard-header .user-menu {
         gap: 0;
         padding: 0;
         background: transparent;
-        min-height: 40px;
+        min-height: 36px;
     }
 
     .dashboard-header .user-menu:hover {
@@ -3138,7 +3141,7 @@ img {
 
 @media (max-width: 576px) {
     .dashboard-header {
-        padding: 0 var(--space-3);
+        padding: 0 8px;
     }
 
     .logo-text h1 {
@@ -3155,7 +3158,7 @@ img {
 
     .notification-dropdown {
         position: fixed;
-        top: calc(var(--header-height) - 8px);
+        top: 52px;
         right: 12px;
         left: 12px;
         width: auto;
@@ -3184,6 +3187,62 @@ img {
     .page-actions {
         width: 100%;
         overflow-x: auto;
+    }
+}
+
+@media (max-width: 360px) {
+    .sidebar {
+        top: 52px;
+        height: calc(100vh - 52px);
+        width: min(86vw, 292px);
+    }
+
+    .dashboard-header {
+        height: 52px;
+        padding: 0 6px;
+    }
+
+    .mobile-menu-btn,
+    .dashboard-header .notification-btn,
+    .dashboard-header .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+    }
+
+    .dashboard-header .header-container {
+        gap: 6px;
+    }
+
+    .dashboard-header .header-brand {
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .dashboard-header .header-controls {
+        gap: 4px;
+    }
+
+    .dashboard-header .user-menu {
+        min-height: 32px;
+    }
+
+    .notification-count {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        font-size: 10px;
+    }
+
+    .notification-dropdown {
+        top: 48px;
+        right: 8px;
+        left: 8px;
+        border-radius: 18px;
+    }
+
+    .main-content {
+        padding: 12px;
     }
 }
 
@@ -4347,9 +4406,10 @@ button {
 
 @media (max-width: 768px) {
     .dashboard-header {
-        flex-direction: column;
-        gap: 1rem;
-        padding: 1rem;
+        flex-direction: row;
+        gap: 0;
+        padding: 0 8px;
+        align-items: center;
     }
 
     .header-left,
