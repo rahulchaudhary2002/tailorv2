@@ -20,10 +20,15 @@
         <!-- Header Controls -->
         <div class="header-controls">
             <!-- Search Box -->
-            <div class="search-box">
+            <form action="{{ route('search.index') }}" method="GET" class="search-box">
                 <i class="fas fa-search"></i>
-                <input type="text" placeholder="Search orders, customers, products...">
-            </div>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ request()->routeIs('search.index') ? request('q', '') : '' }}"
+                    placeholder="Search orders, customers, products..."
+                >
+            </form>
 
             @if ($user->hasPermission('create-orders') || $user->hasPermission('manage-orders'))
                 <a href="{{ route('order.create') }}" class="btn btn-primary">

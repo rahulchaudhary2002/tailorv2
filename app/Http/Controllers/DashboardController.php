@@ -12,6 +12,8 @@ use App\Models\OrderItem;
 use App\Models\OrderTask;
 use App\Models\Outlet;
 use App\Models\Product;
+use App\Models\Role;
+use App\Models\User;
 use App\Models\VendorRawMaterialPurchase;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +22,133 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    public function search(Request $request)
+    {
+        $user = auth()->user();
+        abort_unless($user, 403);
+
+        $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $outletId = (int) ($user->current_outlet_id ?? 0);
+        $workerRoleId = (int) (Role::query()->where('name', 'Worker')->value('id') ?? 0);
+
+        $results = [
+            'orders' => collect(),
+            'customers' => collect(),
+            'products' => collect(),
+            'workers' => collect(),
+            'tasks' => collect(),
+        ];
+
+        if ($q !== '') {
+            if ($user->hasPermission('view-orders') || $user->hasPermission('manage-orders') || $user->hasPermission('view-assigned-jobs')) {
+                $ordersQuery = Order::query()
+                    ->with(['customer:id,name,phone', 'outlet:id,name'])
+                    ->when($outletId > 0, fn ($query) => $query->where('outlet_id', $outletId))
+                    ->when(
+                        !$user->hasPermission('view-orders') && !$user->hasPermission('manage-orders'),
+                        fn ($query) => $query->whereHas('tasks', fn ($taskQuery) => $taskQuery->where('worker_id', (int) $user->id))
+                    )
+                    ->where(function ($query) use ($qLower): void {
+                        $query->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
+                            });
+                    })
+                    ->latest('id')
+                    ->limit(8);
+
+                $results['orders'] = $ordersQuery->get();
+            }
+
+            if ($user->hasPermission('view-customers') || $user->hasPermission('manage-customers')) {
+                $results['customers'] = Customer::query()
+                    ->when($outletId > 0, function ($query) use ($outletId): void {
+                        $query->whereHas('orders', fn ($orderQuery) => $orderQuery->where('outlet_id', $outletId));
+                    })
+                    ->where(function ($query) use ($qLower): void {
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', ['%' . $qLower . '%']);
+                    })
+                    ->latest('id')
+                    ->limit(8)
+                    ->get();
+            }
+
+            if ($user->hasPermission('view-products') || $user->hasPermission('manage-products')) {
+                $results['products'] = Product::query()
+                    ->with('category:id,name,slug')
+                    ->where(function ($query) use ($qLower): void {
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
+                    })
+                    ->latest('id')
+                    ->limit(8)
+                    ->get();
+            }
+
+            if (($user->hasPermission('view-task-management') || $user->hasPermission('manage-task-management') || $user->hasPermission('manage-orders')) && $workerRoleId > 0) {
+                $results['workers'] = User::query()
+                    ->where('is_super_admin', false)
+                    ->whereExists(function ($query) use ($workerRoleId, $outletId): void {
+                        $query->selectRaw('1')
+                            ->from('user_role')
+                            ->whereColumn('user_role.user_id', 'users.id')
+                            ->where('user_role.role_id', $workerRoleId);
+
+                        if ($outletId > 0) {
+                            $query->where('user_role.outlet_id', $outletId);
+                        }
+                    })
+                    ->where(function ($query) use ($qLower): void {
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(email) LIKE ?', ['%' . $qLower . '%']);
+                    })
+                    ->orderBy('name')
+                    ->limit(8)
+                    ->get(['id', 'name', 'email']);
+            }
+
+            if ($user->hasPermission('view-task-management') || $user->hasPermission('manage-task-management') || $user->hasPermission('manage-orders') || $user->hasPermission('view-assigned-jobs')) {
+                $results['tasks'] = OrderTask::query()
+                    ->with([
+                        'order:id,order_number,customer_id,outlet_id',
+                        'order.customer:id,name',
+                        'worker:id,name',
+                    ])
+                    ->whereHas('order', function ($query) use ($outletId): void {
+                        if ($outletId > 0) {
+                            $query->where('outlet_id', $outletId);
+                        }
+                    })
+                    ->when(
+                        $user->hasPermission('view-assigned-jobs') && !$user->hasPermission('view-task-management') && !$user->hasPermission('manage-task-management') && !$user->hasPermission('manage-orders'),
+                        fn ($query) => $query->where('worker_id', (int) $user->id)
+                    )
+                    ->where(function ($query) use ($qLower): void {
+                        $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                            ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
+                                $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                                    ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
+                                        $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
+                                    });
+                            });
+                    })
+                    ->latest('id')
+                    ->limit(8)
+                    ->get();
+            }
+        }
+
+        return view('modules.search.index', [
+            'query' => $q,
+            'results' => $results,
+        ]);
+    }
+
     public function index(Request $request)
     {
         $user = auth()->user();

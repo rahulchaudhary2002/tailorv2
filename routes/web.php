@@ -31,6 +31,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('can:view-dashboard');
+    Route::get('/search', [DashboardController::class, 'search'])->name('search.index');
 
     Route::group(['prefix' => 'outlet', 'as' => 'outlet.'], function () {
         Route::get('/', [OutletController::class, 'index'])->name('index')->middleware('can:view-outlets,manage-outlets');
