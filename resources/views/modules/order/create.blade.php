@@ -572,8 +572,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .total-row span:last-child{font-size:1.4rem;color:#0f2942;}
 .bill-actions{margin-top:22px;display:flex;gap:12px;}
 .bill-actions>*{flex:1;}
-.tp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:stretch;justify-content:center;padding:0;}
-.tp-modal{width:100%;max-width:100%;height:100vh;height:100dvh;background:#fff;border-radius:0;box-shadow:none;overflow:hidden;display:flex;flex-direction:column;}
+.tp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1200;display:flex;align-items:stretch;justify-content:center;padding:0 20px;}
+.tp-modal{width:100%;max-width:1400px;height:100vh;background:#fff;border-radius:0;box-shadow:none;overflow:hidden;display:flex;flex-direction:column;}
 .tp-modal-header{background:var(--primary);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;}
 .tp-modal-header h3{margin:0;color:#fff;border:0;padding:0;}
 .tp-modal-close{background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
@@ -617,46 +617,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 @media(max-width:900px){.tp-design-note-list{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:560px){.tp-design-note-list{grid-template-columns:1fr;}}
 .tp-modal-footer{padding:14px 16px;background:#f8f9fa;border-top:1px solid #eef1f5;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;}
-@media(max-width:768px){
-    .tp-container{padding:12px;}
-    .demo-section{padding:18px;}
-    .order-entry,.live-bill{padding:16px;}
-    .demo-section-header{margin-bottom:14px;}
-    .customer-check-row,
-    .discount-row,
-    .bill-actions,
-    .tp-modal-footer{flex-direction:column;}
-    .customer-check-row .tp-input,
-    .discount-row .tp-input,
-    .bill-actions>*,
-    .tp-modal-footer .tp-btn{width:100%;}
-    .bill-header,
-    .item-details,
-    .tp-product-quantity-item,
-    .tp-modal-product-row,
-    .tp-garment-head{flex-direction:column;align-items:flex-start;}
-    .item-price{min-width:0;width:100%;text-align:left;}
-    .bill-items{max-height:none;}
-    .tp-modal-body{padding:14px;}
-    .tp-modal-section{padding:10px;}
-    .tp-measurement-grid,
-    .tp-tailoring-options{grid-template-columns:1fr;}
-}
-@media(max-width:576px){
-    .tp-container{padding:8px;}
-    .demo-section{padding:14px;}
-    .tp-back-link{width:100%;justify-content:center;}
-    h2{font-size:1.25rem;}
-    h3{font-size:1.1rem;}
-    .tp-size-radio-group{gap:8px;}
-    .tp-size-radio-group label{padding:8px 12px;}
-    .summary-row{gap:12px;align-items:flex-start;}
-    .summary-row span:first-child{flex:1;}
-    .tp-modal-header{padding:12px 14px;align-items:flex-start;}
-    .tp-modal-header h3{font-size:1rem;line-height:1.4;padding-right:10px;}
-    .tp-modal-body{padding:12px;}
-    .tp-modal-footer{padding:12px;}
-}
 @media print{body *{visibility:hidden !important;}#billPrintArea,#billPrintArea *{visibility:visible !important;}#billPrintArea{position:absolute !important;top:0;left:0;width:100% !important;max-width:100% !important;margin:0 !important;padding:0 !important;border:0 !important;box-shadow:none !important;background:#fff !important;}#billPrintArea .bill-actions,#billPrintArea .toggle-switch,#billPrintArea .discount-section button,#billPrintArea #clearBill,#billPrintArea #printBill{display:none !important;}}
 </style>
 @endsection
