@@ -1,20 +1,28 @@
 <aside class="sidebar">
+    @php
+        $authUser = auth()->user();
+        $currentOutletId = (int) ($authUser?->current_outlet_id ?? 0);
+        $hasWorkerRole = (bool) $authUser?->roles()
+            ->where('name', 'Worker')
+            ->when($currentOutletId > 0, fn ($query) => $query->where('user_role.outlet_id', $currentOutletId))
+            ->exists();
+    @endphp
     <div class="sidebar-header">
         <!-- Outlet Selector -->
         <div class="outlet-selector-wrapper">
             <div class="outlet-selector" id="outletToggle">
                 <i class="fas fa-store"></i>
                 <div class="outlet-info">
-                    <div class="outlet-name">{{ auth()->user()->currentOutlet?->name }}</div>
-                    <div class="outlet-location">{{ auth()->user()->currentOutlet?->address }}</div>
+                    <div class="outlet-name">{{ $authUser?->currentOutlet?->name }}</div>
+                    <div class="outlet-location">{{ $authUser?->currentOutlet?->address }}</div>
                 </div>
                 <i class="fas fa-chevron-down"></i>
             </div>
 
             <div class="outlet-dropdown" id="outletDropdown">
                 <ul class="outlet-list">
-                    @foreach(auth()->user()->outlets as $outlet)
-                    <li class="outlet-item {{ auth()->user()->current_outlet_id === $outlet->id ? 'active' : '' }}">
+                    @foreach($authUser?->outlets ?? [] as $outlet)
+                    <li class="outlet-item {{ $authUser?->current_outlet_id === $outlet->id ? 'active' : '' }}">
                         <form action="{{ route('outlet.switch') }}" method="POST" class="outlet-switch-form">
                             @csrf
                             <input type="hidden" name="outlet_id" value="{{ $outlet->id }}">
@@ -142,14 +150,14 @@
                     </a>
                 </li>
             @endcanany
-            @canany(['view-assigned-jobs', 'manage-orders'])
+            @if ($hasWorkerRole)
                 <li class="nav-item">
                     <a href="{{ route('order.assignedJobs') }}" class="nav-link {{ request()->routeIs('order.assignedJobs') ? 'active' : '' }}">
                         <i class="fas fa-user-check nav-icon"></i>
                         <span class="nav-text">Assigned Jobs</span>
                     </a>
                 </li>
-            @endcanany
+            @endif
             @canany(['view-payment-management', 'manage-payment-management', 'manage-orders'])
                 <li class="nav-item">
                     <a href="{{ route('paymentManagement.index') }}" class="nav-link {{ request()->routeIs('paymentManagement.*') ? 'active' : '' }}">
