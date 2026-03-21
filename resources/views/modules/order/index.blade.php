@@ -332,6 +332,9 @@
                                         @if ($canManageOrders || $canViewOrders || ($canViewAssignedJobs && $isOwnAssignedOrder))
                                             <a href="{{ route('order.show', $order) }}" class="order-actions-link">View</a>
                                         @endif
+                                        @if ($canManageOrders || $authUser?->hasPermission('view-task-management') || $authUser?->hasPermission('manage-task-management'))
+                                            <a href="{{ route('taskManagement.order', $order) }}" class="order-actions-link">View Tasks</a>
+                                        @endif
                                         @if (($canManageOrders || $authUser?->hasPermission('create-orders')) && $isEditable)
                                             <a href="{{ route('order.edit', $order) }}" class="order-actions-link">Edit</a>
                                         @endif

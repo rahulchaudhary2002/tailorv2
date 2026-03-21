@@ -109,6 +109,32 @@ class CustomerController extends Controller
                 'delivery_due_at',
                 'status',
                 'payment_status',
+                'advance_payment_amount',
+                'payment_method',
+                'subtotal_amount',
+                'discount_amount',
+                'tailoring_amount',
+                'vat_enabled',
+                'vat_amount',
+            ]);
+
+        $paymentHistory = (clone $ordersQuery)
+            ->where(function ($query): void {
+                $query->where('advance_payment_amount', '>', 0)
+                    ->orWhere('payment_status', '!=', Order::PAYMENT_STATUS_UNPAID);
+            })
+            ->latest('updated_at')
+            ->latest('ordered_at')
+            ->get([
+                'id',
+                'order_number',
+                'outlet_id',
+                'ordered_at',
+                'delivery_due_at',
+                'updated_at',
+                'payment_status',
+                'payment_method',
+                'advance_payment_amount',
                 'subtotal_amount',
                 'discount_amount',
                 'tailoring_amount',
@@ -117,14 +143,37 @@ class CustomerController extends Controller
             ]);
 
         $orderCount = (clone $ordersQuery)->count();
-        $totalSpent = (float) (clone $ordersQuery)->get()->sum(fn (Order $order) => $order->payableAmount());
+        $allOrders = (clone $ordersQuery)->get([
+            'id',
+            'ordered_at',
+            'payment_status',
+            'advance_payment_amount',
+            'payment_method',
+            'subtotal_amount',
+            'discount_amount',
+            'tailoring_amount',
+            'vat_enabled',
+            'vat_amount',
+        ]);
+        $totalSpent = (float) $allOrders->sum(fn (Order $order) => $order->payableAmount());
+        $totalPaid = (float) $allOrders->sum(fn (Order $order) => $order->paidAmount());
+        $totalAdvancePaid = (float) $allOrders->sum(fn (Order $order) => (float) ($order->advance_payment_amount ?? 0));
+        $totalDue = (float) $allOrders->sum(fn (Order $order) => $order->dueAmount());
+        $paidOrderCount = (int) $allOrders->filter(fn (Order $order) => (string) $order->payment_status === Order::PAYMENT_STATUS_PAID)->count();
+        $dueOrderCount = (int) $allOrders->filter(fn (Order $order) => $order->dueAmount() > 0.0001)->count();
         $lastOrderDate = (clone $ordersQuery)->latest('ordered_at')->value('ordered_at');
 
         return view('modules.customer.show', compact(
             'customer',
             'recentOrders',
+            'paymentHistory',
             'orderCount',
             'totalSpent',
+            'totalPaid',
+            'totalAdvancePaid',
+            'totalDue',
+            'paidOrderCount',
+            'dueOrderCount',
             'lastOrderDate'
         ));
     }

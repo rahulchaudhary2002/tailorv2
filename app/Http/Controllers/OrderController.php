@@ -15,6 +15,7 @@ use App\Models\InventoryType;
 use App\Models\Order;
 use App\Models\OrderTask;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
@@ -216,16 +217,32 @@ class OrderController extends Controller
     public function show(Order $order)
     {
         $this->ensureOrderBelongsToCurrentOutlet($order);
+        $outletId = $this->currentOutletId();
 
         $order->load([
             'outlet:id,name',
             'customer:id,name,phone,email,address',
             'creator:id,name',
-            'tasks:id,order_id,order_item_id,source_garment_index,worker_id,task_number,worker_deadline_at,status',
+            'tasks:id,order_id,order_item_id,source_garment_index,worker_id,task_number,worker_deadline_at,status,notes,slip_received_at',
             'tasks.worker:id,name',
             'items.product:id,name,code',
             'items.unit:id,name,symbol',
         ]);
+
+        $workerRoleId = (int) (\App\Models\Role::query()->where('name', 'Worker')->value('id') ?? 0);
+        $workers = User::query()
+            ->where('is_super_admin', false)
+            ->when($workerRoleId > 0, function ($query) use ($workerRoleId, $outletId): void {
+                $query->whereHas('roles', function ($roleQuery) use ($workerRoleId, $outletId): void {
+                    $roleQuery->where('roles.id', $workerRoleId);
+
+                    if ($outletId > 0) {
+                        $roleQuery->where('user_role.outlet_id', $outletId);
+                    }
+                });
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         $customFabricProducts = Product::query()
             ->whereIn(
@@ -240,7 +257,7 @@ class OrderController extends Controller
             ->get(['id', 'name', 'code'])
             ->keyBy('id');
 
-        return view('modules.order.show', compact('order', 'customFabricProducts'));
+        return view('modules.order.show', compact('order', 'customFabricProducts', 'workers'));
     }
 
     /**
@@ -422,8 +439,7 @@ class OrderController extends Controller
             'Delivery date for order ' . $order->order_number . ' was updated to ' . ($order->delivery_due_at?->format('M d, Y h:i A') ?: '-')
         );
 
-        return redirect()
-            ->route('order.index')
+        return back()
             ->with('success', 'Delivery date updated successfully.');
     }
 
@@ -1015,8 +1031,7 @@ class OrderController extends Controller
         $this->ensureOrderBelongsToCurrentOutlet($order);
 
         if ((string) $order->status === Order::STATUS_CANCELLED) {
-            return redirect()
-                ->route('order.index')
+            return back()
                 ->with('error', 'Cancelled orders cannot receive payments.');
         }
 
@@ -1027,8 +1042,7 @@ class OrderController extends Controller
         $dueAmount = max(0.0, $payableAmount - $currentPaid);
 
         if ($paymentAmount - 0.0001 > $dueAmount) {
-            return redirect()
-                ->route('order.index')
+            return back()
                 ->with('error', 'Payment amount cannot be greater than due amount.');
         }
 
@@ -1053,8 +1067,7 @@ class OrderController extends Controller
             'Payment of NPR ' . number_format($paymentAmount, 2) . ' was recorded for order ' . $order->order_number . '.'
         );
 
-        return redirect()
-            ->route('order.index')
+        return back()
             ->with('success', 'Payment recorded successfully.');
     }
 

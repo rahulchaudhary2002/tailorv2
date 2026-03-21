@@ -42,18 +42,9 @@ class UserController extends Controller
         $q = trim((string) $request->query('q', ''));
         $qLower = mb_strtolower($q);
         $outletId = (int) $request->query('outlet_id', 0);
-        $workerRoleId = $this->workerRoleId();
 
         $usersQuery = User::query()
             ->where('is_super_admin', false)
-            ->when($workerRoleId > 0, function ($query) use ($workerRoleId): void {
-                $query->whereNotExists(function ($subQuery) use ($workerRoleId): void {
-                    $subQuery->selectRaw('1')
-                        ->from('user_role')
-                        ->whereColumn('user_role.user_id', 'users.id')
-                        ->where('user_role.role_id', $workerRoleId);
-                });
-            })
             ->with('currentOutlet:id,name')
             ->withCount('outlets');
 
@@ -139,7 +130,6 @@ class UserController extends Controller
 
         $outlets = Outlet::query()->orderBy('name')->get(['id', 'name', 'address']);
         $roles = Role::query()
-            ->where('name', '!=', 'Worker')
             ->orderBy('name')
             ->get(['id', 'name', 'description']);
         $permissionsByGroup = Permission::query()
@@ -276,10 +266,11 @@ class UserController extends Controller
         }
 
         $user->outlets()->syncWithoutDetaching([$outletId]);
-        $workerRoleId = $this->workerRoleId();
         $roleIds = collect($validated['role_ids'] ?? [])
             ->map(fn($id) => (int) $id)
-            ->reject(fn($id) => $workerRoleId > 0 && $id === $workerRoleId)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
             ->all();
 
         DB::table('user_role')

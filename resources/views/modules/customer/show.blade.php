@@ -649,6 +649,10 @@ $measurementSetCount = $garmentMeasurementSets->count();
                     <i class="fas fa-file-invoice"></i> Orders
                     <span class="tab-badge">{{ $orderCount }}</span>
                 </button>
+                <button class="tab-btn" data-tab="payments">
+                    <i class="fas fa-money-bill-wave"></i> Payment History
+                    <span class="tab-badge">{{ $paymentHistory->count() }}</span>
+                </button>
             </div>
 
             <!-- Tab 1: Complete Profile -->
@@ -768,6 +772,20 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                 </thead>
                                 <tbody>
                                     @foreach ($recentOrders as $order)
+                                        @php
+                                            $authUser = auth()->user();
+                                            $canManageOrders = (bool) $authUser?->hasPermission('manage-orders');
+                                            $paidAmount = $order->paidAmount();
+                                            $remainingDue = $order->dueAmount();
+                                            $canTakePayment = $canManageOrders
+                                                && (string) $order->status !== \App\Models\Order::STATUS_CANCELLED
+                                                && $remainingDue > 0;
+                                            $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-orders'))
+                                                && !in_array((string) $order->status, [
+                                                    \App\Models\Order::STATUS_DELIVERED,
+                                                    \App\Models\Order::STATUS_CANCELLED,
+                                                ], true);
+                                        @endphp
                                         <tr>
                                             <td>
                                                 @canany(['view-orders', 'manage-orders'])
@@ -779,23 +797,181 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                 @endcanany
                                             </td>
                                             <td>{{ $order->ordered_at?->format('M d, Y') ?? '-' }}</td>
-                                            <td>{{ $order->delivery_due_at?->format('M d, Y') ?? '-' }}</td>
+                                            <td>
+                                                <div style="display:grid; gap:8px;">
+                                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
+                                                        <span>{{ $order->delivery_due_at?->format('M d, Y') ?? '-' }}</span>
+                                                        @if ($canEditDeliveryDate)
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm btn-light"
+                                                                data-customer-order-delivery-toggle
+                                                                aria-label="Edit delivery date"
+                                                                title="Edit delivery date"
+                                                                style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;"
+                                                            >
+                                                                <i class="fas fa-pen"></i>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                    @if ($canEditDeliveryDate)
+                                                        <form action="{{ route('order.deliveryDate.update', $order) }}" method="POST" class="customer-order-delivery-form" style="display:none; align-items:flex-end; gap:8px; flex-wrap:wrap; margin:0;">
+                                                            @csrf
+                                                            @method('PUT')
+                                                            <input
+                                                                type="datetime-local"
+                                                                name="delivery_due_at"
+                                                                class="outlet-input"
+                                                                value="{{ $order->delivery_due_at?->format('Y-m-d\\TH:i') }}"
+                                                                min="{{ $order->ordered_at?->format('Y-m-d\\TH:i') }}"
+                                                                style="min-width:220px;"
+                                                                required
+                                                            >
+                                                            <button type="submit" class="btn btn-sm btn-secondary">Save</button>
+                                                            <button type="button" class="btn btn-sm btn-light" data-customer-order-delivery-cancel>Cancel</button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+                                            </td>
                                             <td>
                                                 <span class="app-badge {{ $order->displayStatusBadgeClass() }}">
                                                     {{ $order->displayStatusLabel() }}
                                                 </span>
                                             </td>
                                             <td>
+                                                <div style="display:grid; gap:8px;">
+                                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
+                                                        <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
+                                                            {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}
+                                                        </span>
+                                                        @if ($canTakePayment)
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm btn-light"
+                                                                data-customer-order-payment-toggle
+                                                                aria-label="Record payment"
+                                                                title="Record payment"
+                                                                style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;"
+                                                            >
+                                                                <i class="fas fa-money-bill-wave"></i>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                    @if ($canTakePayment)
+                                                        <form action="{{ route('order.payment.update', $order) }}" method="POST" class="customer-order-payment-form" style="display:none; align-items:flex-end; gap:8px; flex-wrap:wrap; margin:0;">
+                                                            @csrf
+                                                            @method('PUT')
+                                                            <input
+                                                                type="number"
+                                                                name="payment_amount"
+                                                                class="outlet-input"
+                                                                min="0.01"
+                                                                max="{{ number_format($remainingDue, 2, '.', '') }}"
+                                                                step="0.01"
+                                                                value="{{ number_format($remainingDue, 2, '.', '') }}"
+                                                                placeholder="Payment amount"
+                                                                style="width:120px;"
+                                                                required
+                                                            >
+                                                            <input
+                                                                type="text"
+                                                                name="payment_method"
+                                                                class="outlet-input"
+                                                                value="{{ old('payment_method', $order->payment_method) }}"
+                                                                placeholder="Payment method"
+                                                                style="width:140px;"
+                                                                required
+                                                            >
+                                                            <button type="submit" class="btn btn-sm btn-secondary">Pay</button>
+                                                            <button type="button" class="btn btn-sm btn-light" data-customer-order-payment-cancel>Cancel</button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                            <td>Rs. {{ number_format($order->payableAmount(), 2) }}</td>
+                                            <td>
+                                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                                    @canany(['view-orders', 'manage-orders'])
+                                                        <a href="{{ route('order.show', $order) }}" class="btn btn-sm btn-info">View Order</a>
+                                                    @endcanany
+                                                    @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                                        <a href="{{ route('taskManagement.order', $order) }}" class="btn btn-sm btn-light">View Tasks</a>
+                                                    @endcanany
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            <div class="tab-content" id="tab-payments">
+                @if ($paymentHistory->isEmpty())
+                    <div class="info-section">
+                        <div class="info-value empty">No payment history found for this customer in the current outlet.</div>
+                    </div>
+                @else
+                    <div class="stats-grid" style="margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Paid Amount</div>
+                            <div class="stat-value">Rs. {{ number_format($totalPaid, 2) }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Advance Paid</div>
+                            <div class="stat-value">Rs. {{ number_format($totalAdvancePaid, 2) }}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Due Amount</div>
+                            <div class="stat-value">Rs. {{ number_format($totalDue, 2) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <div class="section-header">
+                            <div class="section-title">
+                                <i class="fas fa-money-bill-wave"></i>
+                                Customer Payment History
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Order No</th>
+                                        <th>Payment Date</th>
+                                        <th>Method</th>
+                                        <th>Status</th>
+                                        <th>Payable</th>
+                                        <th>Received</th>
+                                        <th>Due</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($paymentHistory as $order)
+                                        <tr>
+                                            <td>
+                                                @canany(['view-orders', 'manage-orders'])
+                                                    <a href="{{ route('order.show', $order) }}" style="text-decoration: underline;">
+                                                        {{ $order->order_number }}
+                                                    </a>
+                                                @else
+                                                    {{ $order->order_number }}
+                                                @endcanany
+                                            </td>
+                                            <td>{{ $order->updated_at?->format('M d, Y h:i A') ?? ($order->ordered_at?->format('M d, Y h:i A') ?? '-') }}</td>
+                                            <td>{{ $order->payment_method ?: '-' }}</td>
+                                            <td>
                                                 <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
                                                     {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}
                                                 </span>
                                             </td>
                                             <td>Rs. {{ number_format($order->payableAmount(), 2) }}</td>
-                                            <td>
-                                                @canany(['view-orders', 'manage-orders'])
-                                                    <a href="{{ route('order.show', $order) }}" class="btn btn-sm btn-info">View Order</a>
-                                                @endcanany
-                                            </td>
+                                            <td>Rs. {{ number_format($order->paidAmount(), 2) }}</td>
+                                            <td>Rs. {{ number_format($order->dueAmount(), 2) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -850,8 +1026,62 @@ $measurementSetCount = $garmentMeasurementSets->count();
             });
         });
 
-        // Set initial tab
-        switchTab('profile');
+        const initialTab = window.location.hash ? window.location.hash.replace('#', '') : 'profile';
+        const availableTabs = Array.from(document.querySelectorAll('.tab-btn')).map((btn) => btn.dataset.tab);
+
+        switchTab(availableTabs.includes(initialTab) ? initialTab : 'profile');
+
+        document.querySelectorAll('[data-customer-order-delivery-toggle]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const cell = button.closest('td');
+                const form = cell?.querySelector('.customer-order-delivery-form');
+
+                document.querySelectorAll('.customer-order-delivery-form').forEach((otherForm) => {
+                    if (otherForm !== form) {
+                        otherForm.style.display = 'none';
+                    }
+                });
+
+                if (form) {
+                    form.style.display = form.style.display === 'none' || form.style.display === '' ? 'inline-flex' : 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-customer-order-delivery-cancel]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.customer-order-delivery-form');
+                if (form) {
+                    form.style.display = 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-customer-order-payment-toggle]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const cell = button.closest('td');
+                const form = cell?.querySelector('.customer-order-payment-form');
+
+                document.querySelectorAll('.customer-order-payment-form').forEach((otherForm) => {
+                    if (otherForm !== form) {
+                        otherForm.style.display = 'none';
+                    }
+                });
+
+                if (form) {
+                    form.style.display = form.style.display === 'none' || form.style.display === '' ? 'inline-flex' : 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-customer-order-payment-cancel]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.customer-order-payment-form');
+                if (form) {
+                    form.style.display = 'none';
+                }
+            });
+        });
     });
 
     const CustomerDetail = {
