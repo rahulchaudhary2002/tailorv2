@@ -84,4 +84,16 @@ class OrderTask extends Model
     {
         return static::statusLabels()[$this->status] ?? ucfirst(str_replace('_', ' ', (string) $this->status));
     }
+
+    public static function statusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            self::STATUS_PENDING => 'app-badge--warning',
+            self::STATUS_ASSIGNED => 'app-badge--info',
+            self::STATUS_IN_PROGRESS => 'app-badge--accent',
+            self::STATUS_COMPLETED => 'app-badge--success',
+            self::STATUS_CANCELLED => 'app-badge--danger',
+            default => 'app-badge--muted',
+        };
+    }
 }

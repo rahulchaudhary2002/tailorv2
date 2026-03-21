@@ -1265,7 +1265,11 @@
                                         <td>{{ $row->order_number }}</td>
                                         <td>{{ $row->customer?->name ?: '-' }}</td>
                                         <td>{{ $row->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</td>
-                                        <td>{{ \App\Models\Order::statusLabel((string) $row->status) }}</td>
+                                        <td>
+                                            <span class="app-badge {{ $row->displayStatusBadgeClass() }}">
+                                                {{ $row->displayStatusLabel() }}
+                                            </span>
+                                        </td>
                                     </tr>
                                 @else
                                     <tr>
@@ -1425,7 +1429,11 @@
                                         <td>{{ $row->order_number }}</td>
                                         <td>{{ $row->customer?->name ?: '-' }}</td>
                                         <td>{{ $row->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</td>
-                                        <td>{{ \App\Models\Order::statusLabel((string) $row->status) }}</td>
+                                        <td>
+                                            <span class="app-badge {{ $row->displayStatusBadgeClass() }}">
+                                                {{ $row->displayStatusLabel() }}
+                                            </span>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="4">No overdue deliveries.</td></tr>
@@ -1457,7 +1465,11 @@
                                         <td>{{ $row->order_number }}</td>
                                         <td>{{ $row->customer?->name ?: '-' }}</td>
                                         <td>{{ $row->delivery_due_at?->format('M d, h:i A') ?: '-' }}</td>
-                                        <td>{{ \App\Models\Order::statusLabel((string) $row->status) }}</td>
+                                        <td>
+                                            <span class="app-badge {{ $row->displayStatusBadgeClass() }}">
+                                                {{ $row->displayStatusLabel() }}
+                                            </span>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="4">No deliveries due in selected range.</td></tr>
@@ -1546,7 +1558,11 @@
                                         <td>{{ $row->order?->order_number ?: '-' }}</td>
                                         <td>{{ $row->order?->customer?->name ?: '-' }}</td>
                                         <td>{{ $row->worker_deadline_at?->format('M d, h:i A') ?: '-' }}</td>
-                                        <td>{{ \App\Models\OrderTask::statusLabels()[(string) $row->status] ?? ucfirst((string) $row->status) }}</td>
+                                        <td>
+                                            <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $row->status) }}">
+                                                {{ \App\Models\OrderTask::statusLabels()[(string) $row->status] ?? ucfirst((string) $row->status) }}
+                                            </span>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="5">No active assignments.</td></tr>
@@ -1575,7 +1591,11 @@
                                         <td>{{ $row->order?->order_number ?: '-' }}</td>
                                         <td>{{ $row->order?->customer?->name ?: '-' }}</td>
                                         <td>{{ $row->completed_at?->format('M d, h:i A') ?: '-' }}</td>
-                                        <td>{{ \App\Models\OrderTask::statusLabels()[(string) $row->status] ?? ucfirst((string) $row->status) }}</td>
+                                        <td>
+                                            <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $row->status) }}">
+                                                {{ \App\Models\OrderTask::statusLabels()[(string) $row->status] ?? ucfirst((string) $row->status) }}
+                                            </span>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr><td colspan="5">No recently completed tasks.</td></tr>

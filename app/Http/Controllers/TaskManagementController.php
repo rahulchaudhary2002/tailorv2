@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\OrderTask;
 use App\Models\User;
@@ -22,6 +23,24 @@ class TaskManagementController extends Controller
     }
 
     public function index(Request $request)
+    {
+        return $this->renderTaskIndex($request);
+    }
+
+    public function orderTasks(Request $request, Order $order)
+    {
+        $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
+
+        if ($outletId > 0 && (int) $order->outlet_id !== $outletId) {
+            abort(404);
+        }
+
+        $order->load(['customer:id,name']);
+
+        return $this->renderTaskIndex($request, $order);
+    }
+
+    private function renderTaskIndex(Request $request, ?Order $scopedOrder = null)
     {
         $outletId = (int) (auth()->user()?->current_outlet_id ?? 0);
         $workerRoleId = $this->workerRoleId();
@@ -62,6 +81,10 @@ class TaskManagementController extends Controller
                 $query->where('outlet_id', $outletId);
             })
             ->latest('id');
+
+        if ($scopedOrder) {
+            $tasksQuery->where('order_id', (int) $scopedOrder->id);
+        }
 
         if ($q !== '') {
             $tasksQuery->where(function ($query) use ($qLower): void {
@@ -115,6 +138,7 @@ class TaskManagementController extends Controller
             'selectedWorkerId' => $selectedWorkerId,
             'selectedDeadlineFrom' => $deadlineFrom,
             'selectedDeadlineTo' => $deadlineTo,
+            'scopedOrder' => $scopedOrder,
         ]);
     }
 

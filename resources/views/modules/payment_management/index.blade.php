@@ -35,7 +35,19 @@
             <tbody>
                 @forelse ($customerPayments as $row)
                     <tr>
-                        <td>{{ $row['customer']?->name ?: 'Walk-in' }}</td>
+                        <td>
+                            @if ($row['customer'])
+                                @canany(['view-customers', 'manage-customers'])
+                                    <a href="{{ route('customer.show', $row['customer']) }}" style="text-decoration: underline;">
+                                        {{ $row['customer']->name }}
+                                    </a>
+                                @else
+                                    {{ $row['customer']->name }}
+                                @endcanany
+                            @else
+                                Walk-in
+                            @endif
+                        </td>
                         <td>{{ $row['orders'] }}</td>
                         <td>{{ number_format((float) $row['payable'], 2) }}</td>
                         <td>{{ number_format((float) $row['received'], 2) }}</td>
@@ -67,7 +79,19 @@
             <tbody>
                 @forelse ($workerPayments as $row)
                     <tr>
-                        <td>{{ $row['worker']?->name ?: '-' }}</td>
+                        <td>
+                            @if ($row['worker'])
+                                @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                    <a href="{{ route('worker.tasks', $row['worker']) }}" style="text-decoration: underline;">
+                                        {{ $row['worker']->name }}
+                                    </a>
+                                @else
+                                    {{ $row['worker']->name }}
+                                @endcanany
+                            @else
+                                -
+                            @endif
+                        </td>
                         <td>{{ $row['tasks'] }}</td>
                         <td>{{ number_format((float) $row['payable'], 2) }}</td>
                         <td>{{ number_format((float) $row['paid'], 2) }}</td>
@@ -101,10 +125,54 @@
             <tbody>
                 @forelse ($payableTasks as $task)
                     <tr>
-                        <td>{{ $task->task_title }}</td>
-                        <td>{{ $task->order?->order_number ?: '-' }}</td>
-                        <td>{{ $task->worker?->name ?: '-' }}</td>
-                        <td>{{ $task->order?->customer?->name ?: '-' }}</td>
+                        <td>
+                            @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                <a href="{{ route('taskManagement.index', ['q' => $task->task_number ?: $task->task_title]) }}" style="text-decoration: underline;">
+                                    {{ $task->task_title }}
+                                </a>
+                            @else
+                                {{ $task->task_title }}
+                            @endcanany
+                        </td>
+                        <td>
+                            @if ($task->order)
+                                @canany(['view-orders', 'manage-orders'])
+                                    <a href="{{ route('order.show', $task->order) }}" style="text-decoration: underline;">
+                                        {{ $task->order->order_number }}
+                                    </a>
+                                @else
+                                    {{ $task->order->order_number }}
+                                @endcanany
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
+                            @if ($task->worker)
+                                @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                    <a href="{{ route('worker.tasks', $task->worker) }}" style="text-decoration: underline;">
+                                        {{ $task->worker->name }}
+                                    </a>
+                                @else
+                                    {{ $task->worker->name }}
+                                @endcanany
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
+                            @if ($task->order?->customer)
+                                @canany(['view-customers', 'manage-customers'])
+                                    <a href="{{ route('customer.show', $task->order->customer) }}" style="text-decoration: underline;">
+                                        {{ $task->order->customer->name }}
+                                    </a>
+                                @else
+                                    {{ $task->order->customer->name }}
+                                @endcanany
+                            @else
+                                -
+                            @endif
+                        </td>
                         <td>{{ number_format((float) $task->payable_amount, 2) }}</td>
                         <td>{{ $task->slip_received_at ? 'Received' : 'Pending' }}</td>
                         <td>

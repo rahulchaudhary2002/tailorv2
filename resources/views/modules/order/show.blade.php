@@ -4,7 +4,11 @@
 
 @section('content')
 @php
-    $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
+    $taskWorkers = $order->tasks
+        ->map(fn ($task) => $task->worker)
+        ->filter()
+        ->unique('id')
+        ->values();
     $taskDeadline = $order->tasks->pluck('worker_deadline_at')->filter()->sort()->first();
 @endphp
 <div class="page-header">
@@ -12,6 +16,11 @@
         <h1 class="text-dark">Order {{ $order->order_number }}</h1>
         <p>Read-only order details, items, and customer information.</p>
     </div>
+    @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+        <div class="page-actions">
+            <a href="{{ route('taskManagement.order', $order) }}" class="btn btn-light">View Order Tasks</a>
+        </div>
+    @endcanany
 </div>
 
 <div class="table-card" style="margin-bottom: 16px;">
@@ -25,11 +34,19 @@
         </div>
         <div class="outlet-form-group">
             <label>Status</label>
-            <div>{{ \App\Models\Order::statusLabel((string) $order->status) }}</div>
+            <div>
+                <span class="app-badge {{ $order->displayStatusBadgeClass() }}">
+                    {{ $order->displayStatusLabel() }}
+                </span>
+            </div>
         </div>
         <div class="outlet-form-group">
             <label>Payment Status</label>
-            <div>{{ ucfirst((string) $order->payment_status) }}</div>
+            <div>
+                <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
+                    {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}
+                </span>
+            </div>
         </div>
         <div class="outlet-form-group">
             <label>Outlet</label>
@@ -45,7 +62,21 @@
         </div>
         <div class="outlet-form-group">
             <label>Task Workers</label>
-            <div>{{ $taskWorkers->isNotEmpty() ? $taskWorkers->implode(', ') : 'Unassigned' }}</div>
+            <div>
+                @if ($taskWorkers->isNotEmpty())
+                    @foreach ($taskWorkers as $worker)
+                        @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                            <a href="{{ route('worker.tasks', $worker) }}" style="text-decoration: underline;">
+                                {{ $worker->name }}
+                            </a>@if (! $loop->last), @endif
+                        @else
+                            {{ $worker->name }}@if (! $loop->last), @endif
+                        @endcanany
+                    @endforeach
+                @else
+                    Unassigned
+                @endif
+            </div>
         </div>
         <div class="outlet-form-group">
             <label>Task Deadline</label>
@@ -69,7 +100,19 @@
     <div class="outlet-form-grid" style="padding: 16px;">
         <div class="outlet-form-group">
             <label>Name</label>
-            <div>{{ $order->customer?->name ?? '-' }}</div>
+            <div>
+                @if ($order->customer)
+                    @canany(['view-customers', 'manage-customers'])
+                        <a href="{{ route('customer.show', $order->customer) }}" style="text-decoration: underline;">
+                            {{ $order->customer->name }}
+                        </a>
+                    @else
+                        {{ $order->customer->name }}
+                    @endcanany
+                @else
+                    -
+                @endif
+            </div>
         </div>
         <div class="outlet-form-group">
             <label>Phone</label>
@@ -198,6 +241,44 @@
                     <tr>
                         <td>
                             {{ $displayName }}
+                            @php
+                                $itemTasks = $order->tasks
+                                    ->where('order_item_id', $item->id)
+                                    ->values();
+                            @endphp
+                            @if (! $isCustom && $itemTasks->isNotEmpty())
+                                <div class="order-item-meta">
+                                    Assigned:
+                                    @foreach ($itemTasks as $itemTask)
+                                        @if ($itemTask->worker)
+                                            @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                                <a href="{{ route('worker.tasks', $itemTask->worker) }}" style="text-decoration: underline;">
+                                                    {{ $itemTask->worker->name }}
+                                                </a>
+                                            @else
+                                                {{ $itemTask->worker->name }}
+                                            @endcanany
+                                        @else
+                                            Unassigned
+                                        @endif
+                                        <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $itemTask->status) }}" style="margin-left: 6px; min-width: 0;">
+                                            {{ $itemTask->statusLabel() }}
+                                        </span>
+                                        @if ($itemTask->task_number)
+                                            @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                                <a href="{{ route('taskManagement.order', ['order' => $order, 'q' => $itemTask->task_number]) }}" style="margin-left: 6px; text-decoration: underline;">
+                                                    {{ $itemTask->task_number }}
+                                                </a>
+                                            @else
+                                                <span style="margin-left: 6px;">{{ $itemTask->task_number }}</span>
+                                            @endcanany
+                                        @endif
+                                        @if (! $loop->last)
+                                            ,
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
                             @if ($isCustom)
                                 <div class="order-item-meta">
                                     Fabric Source: {{ ucfirst((string) data_get($customDetails, 'fabric_source', 'own')) }}
@@ -222,6 +303,11 @@
                                         <div class="order-custom-grid">
                                             @foreach ($garments as $garment)
                                                 @php
+                                                    $garmentTask = $order->tasks
+                                                        ->first(function ($task) use ($item, $loop) {
+                                                            return (int) $task->order_item_id === (int) $item->id
+                                                                && (int) $task->source_garment_index === (int) $loop->index;
+                                                        });
                                                     $garmentNotes = collect((array) ($garment['design_note'] ?? []))
                                                         ->map(fn ($note) => trim((string) $note))
                                                         ->filter()
@@ -241,11 +327,50 @@
                                                             <div class="order-custom-card-meta">
                                                                 {{ $garment['tailoring_package'] ?? 'Tailoring' }} | NPR {{ number_format((float) ($garment['tailoring_amount'] ?? 0), 2) }}
                                                             </div>
+                                                            <div class="order-custom-card-meta">
+                                                                Worker:
+                                                                @if ($garmentTask?->worker)
+                                                                    @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                                                        <a href="{{ route('worker.tasks', $garmentTask->worker) }}" style="text-decoration: underline;">
+                                                                            {{ $garmentTask->worker->name }}
+                                                                        </a>
+                                                                    @else
+                                                                        {{ $garmentTask->worker->name }}
+                                                                    @endcanany
+                                                                @else
+                                                                    Unassigned
+                                                                @endif
+                                                                @if ($garmentTask)
+                                                                    | Task
+                                                                    @if ($garmentTask->task_number)
+                                                                        @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                                                            <a href="{{ route('taskManagement.order', ['order' => $order, 'q' => $garmentTask->task_number]) }}" style="text-decoration: underline;">
+                                                                                {{ $garmentTask->task_number }}
+                                                                            </a>
+                                                                        @else
+                                                                            {{ $garmentTask->task_number }}
+                                                                        @endcanany
+                                                                    @else
+                                                                        -
+                                                                    @endif
+                                                                @endif
+                                                            </div>
                                                         </div>
                                                         <div style="font-weight:700;color:#1f3d5a;">
                                                             NPR {{ number_format((float) ($garment['tailoring_total_amount'] ?? 0), 2) }}
                                                         </div>
                                                     </div>
+                                                    @if ($garmentTask)
+                                                        <div class="order-custom-measurements">
+                                                            <strong>Status:</strong>
+                                                            <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $garmentTask->status) }}" style="min-width: 0; margin-left: 6px;">
+                                                                {{ $garmentTask->statusLabel() }}
+                                                            </span>
+                                                            @if ($garmentTask->worker_deadline_at)
+                                                                <span style="margin-left: 8px;">Deadline: {{ $garmentTask->worker_deadline_at->format('M d, Y h:i A') }}</span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
                                                     <div class="order-custom-measurements">
                                                         <strong>Measurements:</strong>
                                                         {{ collect((array) ($garment['measurements'] ?? []))->map(function ($measurement) {

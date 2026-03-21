@@ -70,4 +70,24 @@ class InventoryTransaction extends Model
         return $this->belongsTo(Product::class, 'target_product_id');
     }
 
+    public static function statusLabel(?string $status): string
+    {
+        return match ((string) $status) {
+            self::STATUS_PENDING => 'Pending',
+            self::STATUS_PROGRESS => 'Progress',
+            self::STATUS_COMPLETED => 'Completed',
+            default => ucfirst(str_replace('_', ' ', (string) $status)),
+        };
+    }
+
+    public static function statusBadgeClass(?string $status): string
+    {
+        return match ((string) $status) {
+            self::STATUS_PENDING => 'app-badge--warning',
+            self::STATUS_PROGRESS => 'app-badge--accent',
+            self::STATUS_COMPLETED => 'app-badge--success',
+            default => 'app-badge--muted',
+        };
+    }
+
 }

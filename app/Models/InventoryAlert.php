@@ -36,4 +36,22 @@ class InventoryAlert extends Model
     {
         return $this->belongsTo(InventoryLocation::class, 'location_id');
     }
+
+    public static function statusLabel(?string $status): string
+    {
+        return match ((string) $status) {
+            self::STATUS_OPEN => 'Open',
+            self::STATUS_CLOSED => 'Closed',
+            default => ucfirst(str_replace('_', ' ', (string) $status)),
+        };
+    }
+
+    public static function statusBadgeClass(?string $status): string
+    {
+        return match ((string) $status) {
+            self::STATUS_OPEN => 'app-badge--warning',
+            self::STATUS_CLOSED => 'app-badge--success',
+            default => 'app-badge--muted',
+        };
+    }
 }

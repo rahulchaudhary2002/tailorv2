@@ -278,7 +278,11 @@
                         <td>{{ $transfer->targetProduct?->name ?: '-' }}</td>
                         <td>{{ number_format((float) ($transferItem?->qty ?? 0), 2) }}</td>
                         <td>{{ $transfer->fromLocation?->name ?: '-' }}</td>
-                        <td>{{ ucfirst($transfer->status ?: 'pending') }}</td>
+                        <td>
+                            <span class="app-badge {{ \App\Models\InventoryTransaction::statusBadgeClass((string) ($transfer->status ?: 'pending')) }}">
+                                {{ \App\Models\InventoryTransaction::statusLabel((string) ($transfer->status ?: 'pending')) }}
+                            </span>
+                        </td>
                         <td>{{ $transfer->creator?->name ?: '-' }}</td>
                         <td>
                             @can('manage-manufacture-unit')

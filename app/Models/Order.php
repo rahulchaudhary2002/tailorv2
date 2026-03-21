@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
+    public const DISPLAY_STATUS_UNASSIGNED = 'unassigned';
+    public const DISPLAY_STATUS_PARTIAL_ASSIGNED = 'partial_assigned';
     public const STATUS_PENDING = 'pending';
     public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_FABRIC_ISSUED = 'fabric_issued';
@@ -165,6 +167,70 @@ class Order extends Model
         return static::statusLabels()[$status] ?? ucfirst(str_replace('_', ' ', $status));
     }
 
+    public static function statusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            self::DISPLAY_STATUS_UNASSIGNED => 'app-badge--muted',
+            self::DISPLAY_STATUS_PARTIAL_ASSIGNED => 'app-badge--warning',
+            self::STATUS_PENDING => 'app-badge--warning',
+            self::STATUS_CONFIRMED, self::STATUS_ASSIGNED => 'app-badge--info',
+            self::STATUS_FABRIC_ISSUED, self::STATUS_IN_PROGRESS => 'app-badge--accent',
+            self::STATUS_NEAR_COMPLETION => 'app-badge--primary',
+            self::STATUS_COMPLETED, self::STATUS_DELIVERED => 'app-badge--success',
+            self::STATUS_CANCELLED => 'app-badge--danger',
+            default => 'app-badge--muted',
+        };
+    }
+
+    public function displayStatusKey(): string
+    {
+        $status = (string) $this->status;
+
+        if (!in_array($status, [self::STATUS_FABRIC_ISSUED, self::STATUS_ASSIGNED], true)) {
+            return $status;
+        }
+
+        $tasks = $this->relationLoaded('tasks')
+            ? $this->tasks
+            : $this->tasks()->get(['worker_id', 'status']);
+
+        $activeTasks = $tasks
+            ->filter(fn ($task) => (string) $task->status !== OrderTask::STATUS_CANCELLED)
+            ->values();
+
+        if ($activeTasks->isEmpty()) {
+            return self::DISPLAY_STATUS_UNASSIGNED;
+        }
+
+        $assignedCount = $activeTasks
+            ->filter(fn ($task) => (int) ($task->worker_id ?? 0) > 0)
+            ->count();
+
+        if ($assignedCount === 0) {
+            return self::DISPLAY_STATUS_UNASSIGNED;
+        }
+
+        if ($assignedCount === $activeTasks->count()) {
+            return self::STATUS_ASSIGNED;
+        }
+
+        return self::DISPLAY_STATUS_PARTIAL_ASSIGNED;
+    }
+
+    public function displayStatusLabel(): string
+    {
+        return match ($this->displayStatusKey()) {
+            self::DISPLAY_STATUS_UNASSIGNED => 'Unassigned',
+            self::DISPLAY_STATUS_PARTIAL_ASSIGNED => 'Partial Assigned',
+            default => static::statusLabel($this->displayStatusKey()),
+        };
+    }
+
+    public function displayStatusBadgeClass(): string
+    {
+        return static::statusBadgeClass($this->displayStatusKey());
+    }
+
     /**
      * @return array<string, array<int, string>>
      */
@@ -218,5 +284,20 @@ class Order extends Model
             self::PAYMENT_STATUS_PARTIAL => 'Partial',
             self::PAYMENT_STATUS_PAID => 'Paid',
         ];
+    }
+
+    public static function paymentStatusLabel(string $status): string
+    {
+        return static::paymentStatusLabels()[$status] ?? ucfirst(str_replace('_', ' ', $status));
+    }
+
+    public static function paymentStatusBadgeClass(string $status): string
+    {
+        return match ($status) {
+            self::PAYMENT_STATUS_UNPAID => 'app-badge--danger',
+            self::PAYMENT_STATUS_PARTIAL => 'app-badge--warning',
+            self::PAYMENT_STATUS_PAID => 'app-badge--success',
+            default => 'app-badge--muted',
+        };
     }
 }

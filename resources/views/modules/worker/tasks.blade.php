@@ -36,42 +36,6 @@
         gap: 10px;
     }
 
-    .task-status-badge {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1;
-        white-space: nowrap;
-    }
-
-    .task-status-pending {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .task-status-assigned {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-
-    .task-status-in-progress {
-        background: #e0f2fe;
-        color: #0369a1;
-    }
-
-    .task-status-completed {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .task-status-cancelled {
-        background: #fee2e2;
-        color: #b91c1c;
-    }
-
     @media (max-width: 768px) {
         .listing-filter-form__fields,
         .listing-filter-form__fields--worker-task {
@@ -224,7 +188,7 @@
                         <td>{{ number_format((float) $task->quantity, 2) }}</td>
                         <td>{{ number_format((float) $task->payable_amount, 2) }}</td>
                         <td>
-                            <span class="task-status-badge task-status-{{ str_replace('_', '-', (string) $task->status) }}">
+                            <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $task->status) }}">
                                 {{ $task->statusLabel() }}
                             </span>
                         </td>

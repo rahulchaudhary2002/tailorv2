@@ -98,7 +98,11 @@
                         </td>
                         <td>{{ $task->task_title }}</td>
                         <td>{{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: ($task->order?->delivery_due_at?->format('M d, Y h:i A') ?: '-') }}</td>
-                        <td>{{ $task->statusLabel() }}</td>
+                        <td>
+                            <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $task->status) }}">
+                                {{ $task->statusLabel() }}
+                            </span>
+                        </td>
                         <td>
                             <a href="{{ route('taskManagement.slip', $task) }}" class="btn btn-sm btn-light" target="_blank">Print Slip</a>
                         </td>

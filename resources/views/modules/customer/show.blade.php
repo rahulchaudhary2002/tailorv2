@@ -611,7 +611,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Total Spent</div>
-                            <div class="meta-value">₹{{ number_format($totalSpent, 2) }}</div>
+                            <div class="meta-value">Rs. {{ number_format($totalSpent, 2) }}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Member Since</div>
@@ -769,12 +769,28 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                 <tbody>
                                     @foreach ($recentOrders as $order)
                                         <tr>
-                                            <td>{{ $order->order_number }}</td>
+                                            <td>
+                                                @canany(['view-orders', 'manage-orders'])
+                                                    <a href="{{ route('order.show', $order) }}" style="text-decoration: underline;">
+                                                        {{ $order->order_number }}
+                                                    </a>
+                                                @else
+                                                    {{ $order->order_number }}
+                                                @endcanany
+                                            </td>
                                             <td>{{ $order->ordered_at?->format('M d, Y') ?? '-' }}</td>
                                             <td>{{ $order->delivery_due_at?->format('M d, Y') ?? '-' }}</td>
-                                            <td>{{ \App\Models\Order::statusLabel((string) $order->status) }}</td>
-                                            <td>{{ ucfirst((string) $order->payment_status) }}</td>
-                                            <td>₹{{ number_format($order->payableAmount(), 2) }}</td>
+                                            <td>
+                                                <span class="app-badge {{ $order->displayStatusBadgeClass() }}">
+                                                    {{ $order->displayStatusLabel() }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
+                                                    {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}
+                                                </span>
+                                            </td>
+                                            <td>Rs. {{ number_format($order->payableAmount(), 2) }}</td>
                                             <td>
                                                 @canany(['view-orders', 'manage-orders'])
                                                     <a href="{{ route('order.show', $order) }}" class="btn btn-sm btn-info">View Order</a>

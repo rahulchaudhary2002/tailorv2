@@ -224,10 +224,16 @@
                             <small>Deadline: {{ $taskDeadline?->format('M d, Y h:i A') ?: '-' }}</small>
                             <small style="display:block;">Fabric Issued: {{ $order->fabric_issued_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
-                        <td>{{ $statusLabels[$order->status] ?? ucfirst($order->status ?: '-') }}</td>
+                        <td>
+                            <span class="app-badge {{ $order->displayStatusBadgeClass() }}">
+                                {{ $order->displayStatusLabel() }}
+                            </span>
+                        </td>
                         <td>
                             <div class="order-payment-cell">
-                                <span>{{ ucfirst($order->payment_status ?: '-') }}</span>
+                                <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
+                                    {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}
+                                </span>
                                 @if ($canTakePayment)
                                     <button
                                         type="button"

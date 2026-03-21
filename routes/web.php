@@ -158,6 +158,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::group(['prefix' => 'task-management', 'as' => 'taskManagement.'], function () {
         Route::get('/', [TaskManagementController::class, 'index'])->name('index')->middleware('can:view-task-management,manage-task-management,manage-orders');
+        Route::get('/order/{order}', [TaskManagementController::class, 'orderTasks'])->name('order')->middleware('can:view-task-management,manage-task-management,manage-orders');
         Route::put('/update/{task}', [TaskManagementController::class, 'update'])->name('update')->middleware('can:manage-task-management,manage-orders');
         Route::put('/worker-update/{task}', [TaskManagementController::class, 'workerUpdate'])->name('workerUpdate')->middleware('can:view-assigned-jobs,manage-orders');
         Route::get('/slip/{task}', [TaskManagementController::class, 'slip'])->name('slip')->middleware('can:view-task-management,manage-task-management,view-assigned-jobs,manage-orders');

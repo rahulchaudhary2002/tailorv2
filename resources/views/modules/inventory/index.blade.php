@@ -341,7 +341,11 @@
                         <td>{{ $alert->location?->name }} ({{ $alert->location?->type }})</td>
                         <td>{{ number_format((float) $alert->current_qty, 2) }}</td>
                         <td>{{ number_format((float) $alert->min_qty, 2) }}</td>
-                        <td>{{ $alert->status }}</td>
+                        <td>
+                            <span class="app-badge {{ \App\Models\InventoryAlert::statusBadgeClass((string) $alert->status) }}">
+                                {{ \App\Models\InventoryAlert::statusLabel((string) $alert->status) }}
+                            </span>
+                        </td>
                     </tr>
                 @empty
                     <tr>
