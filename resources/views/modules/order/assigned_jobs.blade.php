@@ -83,6 +83,7 @@
                             \App\Models\OrderTask::STATUS_IN_PROGRESS => [\App\Models\OrderTask::STATUS_COMPLETED],
                             default => [],
                         };
+                        $canSetDeadline = $task->worker_deadline_at === null;
                     @endphp
                     <tr>
                         <td>{{ $task->task_number ?: '-' }}</td>
@@ -97,7 +98,38 @@
                             @endif
                         </td>
                         <td>{{ $task->task_title }}</td>
-                        <td>{{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: ($task->order?->delivery_due_at?->format('M d, Y h:i A') ?: '-') }}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span>{{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: ($task->order?->delivery_due_at?->format('M d, Y h:i A') ?: '-') }}</span>
+                                @if ($canSetDeadline)
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-light"
+                                        data-assigned-job-deadline-toggle
+                                        aria-label="Set task deadline"
+                                        title="Set task deadline"
+                                        style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center;"
+                                    >
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                @endif
+                            </div>
+                            @if ($canSetDeadline)
+                                <form action="{{ route('taskManagement.workerUpdate', $task) }}" method="POST" class="assigned-job-deadline-form" style="display:none; margin-top:8px; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+                                    @csrf
+                                    @method('PUT')
+                                    <input
+                                        type="datetime-local"
+                                        name="worker_deadline_at"
+                                        class="outlet-input"
+                                        value="{{ $task->worker_deadline_at?->format('Y-m-d\\TH:i') }}"
+                                        style="min-width:220px;"
+                                    >
+                                    <button type="submit" class="btn btn-sm btn-secondary">Save</button>
+                                    <button type="button" class="btn btn-sm btn-light" data-assigned-job-deadline-cancel>Cancel</button>
+                                </form>
+                            @endif
+                        </td>
                         <td>
                             <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $task->status) }}">
                                 {{ $task->statusLabel() }}
@@ -184,4 +216,33 @@
         }
     }
 </style>
+<script>
+    (() => {
+        document.querySelectorAll('[data-assigned-job-deadline-toggle]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const cell = button.closest('td');
+                const form = cell?.querySelector('.assigned-job-deadline-form');
+
+                document.querySelectorAll('.assigned-job-deadline-form').forEach((otherForm) => {
+                    if (otherForm !== form) {
+                        otherForm.style.display = 'none';
+                    }
+                });
+
+                if (form) {
+                    form.style.display = form.style.display === 'none' || form.style.display === '' ? 'inline-flex' : 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-assigned-job-deadline-cancel]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.assigned-job-deadline-form');
+                if (form) {
+                    form.style.display = 'none';
+                }
+            });
+        });
+    })();
+</script>
 @endsection

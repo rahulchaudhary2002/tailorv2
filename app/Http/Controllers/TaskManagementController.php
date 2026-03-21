@@ -222,12 +222,24 @@ class TaskManagementController extends Controller
         $this->ensureTaskAccessibleToWorker($task);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:' . implode(',', [
+            'status' => ['nullable', 'string', 'in:' . implode(',', [
                 OrderTask::STATUS_ASSIGNED,
                 OrderTask::STATUS_IN_PROGRESS,
                 OrderTask::STATUS_COMPLETED,
             ])],
+            'worker_deadline_at' => ['nullable', 'date'],
         ]);
+
+        $targetStatus = (string) ($validated['status'] ?? '');
+        $deadlineInput = $validated['worker_deadline_at'] ?? null;
+
+        if ($targetStatus === '' && $deadlineInput === null) {
+            return back()->with('error', 'Provide a new status or deadline to update the task.');
+        }
+
+        if ($deadlineInput !== null && $task->worker_deadline_at !== null) {
+            return back()->with('error', 'Task deadline is already set and cannot be changed by the worker.');
+        }
 
         $allowedTransitions = [
             OrderTask::STATUS_ASSIGNED => [OrderTask::STATUS_IN_PROGRESS, OrderTask::STATUS_COMPLETED],
@@ -236,29 +248,43 @@ class TaskManagementController extends Controller
         ];
 
         $currentStatus = (string) $task->status;
-        $targetStatus = (string) $validated['status'];
         $nextStatuses = $allowedTransitions[$currentStatus] ?? [];
 
-        if (!in_array($targetStatus, $nextStatuses, true)) {
+        if ($targetStatus !== '' && !in_array($targetStatus, $nextStatuses, true)) {
             return back()->with('error', 'Invalid task status update.');
         }
 
-        $task->status = $targetStatus;
-        if ($targetStatus === OrderTask::STATUS_COMPLETED) {
-            $task->completed_at = $task->completed_at ?? now();
+        if ($targetStatus !== '') {
+            $task->status = $targetStatus;
+            if ($targetStatus === OrderTask::STATUS_COMPLETED) {
+                $task->completed_at = $task->completed_at ?? now();
+            }
         }
+
+        if (array_key_exists('worker_deadline_at', $validated)) {
+            $task->worker_deadline_at = $deadlineInput;
+        }
+
         $task->save();
         $order = $task->order()->firstOrFail();
         $this->taskService->syncOrderStatus($order);
 
         $task->loadMissing(['order.customer:id,name', 'worker:id,name']);
-        $this->notifyTaskRecipients(
-            $task,
-            'Task status updated',
-            'Task ' . ($task->task_number ?: $task->task_title) . ' is now ' . $task->statusLabel() . '.'
-        );
+        if ($targetStatus !== '' && array_key_exists('worker_deadline_at', $validated)) {
+            $message = 'Task ' . ($task->task_number ?: $task->task_title)
+                . ' deadline was updated and status is now ' . $task->statusLabel() . '.';
+            $title = 'Task updated';
+        } elseif ($targetStatus !== '') {
+            $message = 'Task ' . ($task->task_number ?: $task->task_title) . ' is now ' . $task->statusLabel() . '.';
+            $title = 'Task status updated';
+        } else {
+            $message = 'Task ' . ($task->task_number ?: $task->task_title) . ' deadline was updated.';
+            $title = 'Task deadline updated';
+        }
 
-        return back()->with('success', 'Task status updated successfully.');
+        $this->notifyTaskRecipients($task, $title, $message);
+
+        return back()->with('success', 'Task updated successfully.');
     }
 
     private function notifyTaskRecipients(OrderTask $task, string $title, string $message, ?User $directWorker = null): void

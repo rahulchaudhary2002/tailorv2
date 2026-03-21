@@ -210,6 +210,22 @@
         grid-column: span 12;
     }
 
+    .atelier-card-link,
+    .atelier-inline-link {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .atelier-card-link {
+        display: block;
+    }
+
+    .atelier-card-link:hover .atelier-card,
+    .atelier-card-link:focus-visible .atelier-card {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 36px rgba(24, 18, 13, 0.08);
+    }
+
     .atelier-card__top {
         display: flex;
         justify-content: space-between;
@@ -822,6 +838,13 @@
 @php
     $formatMoney = fn ($value) => number_format((float) $value, 2);
     $formatQty = fn ($value) => number_format((float) $value, 2);
+    $dashboardUser = auth()->user();
+    $canViewOrdersBoard = $dashboardUser?->hasPermission('view-orders') || $dashboardUser?->hasPermission('manage-orders');
+    $canViewCustomersBoard = $dashboardUser?->hasPermission('view-customers') || $dashboardUser?->hasPermission('manage-customers');
+    $canViewInventoryBoard = $dashboardUser?->hasPermission('view-inventory') || $dashboardUser?->hasPermission('manage-inventory');
+    $canViewPaymentBoard = $dashboardUser?->hasPermission('view-payment-management') || $dashboardUser?->hasPermission('manage-payment-management') || $dashboardUser?->hasPermission('manage-orders');
+    $canViewProductBoard = $dashboardUser?->hasPermission('view-products') || $dashboardUser?->hasPermission('manage-products');
+    $workerDashboardRoute = route('order.assignedJobs');
 
     $heroTitle = match ($roleScope) {
         'owner_admin' => 'Atelier Overview',
@@ -861,22 +884,22 @@
 
     $statCards = match ($roleScope) {
         'owner_admin' => [
-            ['label' => 'Active Orders', 'value' => number_format($kpis['ordersCount'] ?? 0), 'icon' => 'fa-solid fa-scissors', 'tone' => 'color:#8a5a44;'],
-            ['label' => 'Pending Payments', 'value' => 'Rs ' . $formatMoney($kpis['pendingPayments'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;'],
-            ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($kpis['advanceCollected'] ?? 0), 'icon' => 'fa-solid fa-wallet', 'tone' => 'color:#0d6e69;'],
-            ['label' => 'Delivered', 'value' => number_format($kpis['deliveredOrders'] ?? 0), 'icon' => 'fa-solid fa-award', 'tone' => 'color:#8c715d;'],
+            ['label' => 'Active Orders', 'value' => number_format($kpis['ordersCount'] ?? 0), 'icon' => 'fa-solid fa-scissors', 'tone' => 'color:#8a5a44;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
+            ['label' => 'Pending Payments', 'value' => 'Rs ' . $formatMoney($kpis['pendingPayments'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($kpis['advanceCollected'] ?? 0), 'icon' => 'fa-solid fa-wallet', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Delivered', 'value' => number_format($kpis['deliveredOrders'] ?? 0), 'icon' => 'fa-solid fa-award', 'tone' => 'color:#8c715d;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
         ],
         'outlet_manager' => [
-            ['label' => 'Orders', 'value' => number_format($outletKpis['outletOrdersToday'] ?? 0), 'icon' => 'fa-solid fa-bag-shopping', 'tone' => 'color:#8a5a44;'],
-            ['label' => 'Overdue', 'value' => number_format($outletKpis['overdueOutletCount'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;'],
-            ['label' => 'Pending Payment', 'value' => 'Rs ' . $formatMoney($outletKpis['outletPendingPayments'] ?? 0), 'icon' => 'fa-solid fa-money-bill-wave', 'tone' => 'color:#0d6e69;'],
-            ['label' => 'Stock Value', 'value' => 'Rs ' . $formatMoney($outletKpis['outletStockValue'] ?? 0), 'icon' => 'fa-solid fa-layer-group', 'tone' => 'color:#8c715d;'],
+            ['label' => 'Orders', 'value' => number_format($outletKpis['outletOrdersToday'] ?? 0), 'icon' => 'fa-solid fa-bag-shopping', 'tone' => 'color:#8a5a44;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
+            ['label' => 'Overdue', 'value' => number_format($outletKpis['overdueOutletCount'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
+            ['label' => 'Pending Payment', 'value' => 'Rs ' . $formatMoney($outletKpis['outletPendingPayments'] ?? 0), 'icon' => 'fa-solid fa-money-bill-wave', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Stock Value', 'value' => 'Rs ' . $formatMoney($outletKpis['outletStockValue'] ?? 0), 'icon' => 'fa-solid fa-layer-group', 'tone' => 'color:#8c715d;', 'href' => $canViewInventoryBoard ? route('inventory.index') : null],
         ],
         default => [
-            ['label' => 'Due Today', 'value' => number_format($workerKpis['dueToday'] ?? 0), 'icon' => 'fa-solid fa-calendar-day', 'tone' => 'color:#8a5a44;'],
-            ['label' => 'Overdue', 'value' => number_format($workerKpis['overdue'] ?? 0), 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'color:#c1362b;'],
-            ['label' => 'Completed Week', 'value' => number_format($workerKpis['completedThisWeek'] ?? 0), 'icon' => 'fa-solid fa-check-double', 'tone' => 'color:#0d6e69;'],
-            ['label' => 'Queue Size', 'value' => number_format(collect($workerQueue ?? [])->count()), 'icon' => 'fa-solid fa-list-check', 'tone' => 'color:#8c715d;'],
+            ['label' => 'Due Today', 'value' => number_format($workerKpis['dueToday'] ?? 0), 'icon' => 'fa-solid fa-calendar-day', 'tone' => 'color:#8a5a44;', 'href' => $workerDashboardRoute],
+            ['label' => 'Overdue', 'value' => number_format($workerKpis['overdue'] ?? 0), 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'color:#c1362b;', 'href' => $workerDashboardRoute],
+            ['label' => 'Completed Week', 'value' => number_format($workerKpis['completedThisWeek'] ?? 0), 'icon' => 'fa-solid fa-check-double', 'tone' => 'color:#0d6e69;', 'href' => $workerDashboardRoute],
+            ['label' => 'Queue Size', 'value' => number_format(collect($workerQueue ?? [])->count()), 'icon' => 'fa-solid fa-list-check', 'tone' => 'color:#8c715d;', 'href' => $workerDashboardRoute],
         ],
     };
 
@@ -956,7 +979,7 @@
     };
 
     $attentionLink = $roleScope === 'worker'
-        ? route('worker.tasks', ['worker' => $workerTaskRouteWorkerId])
+        ? $workerDashboardRoute
         : ($roleScope === 'outlet_manager' ? route('inventory.index') : route('order.index'));
 
     $attentionLinkLabel = $roleScope === 'worker' ? 'Review Tasks' : 'Take Action';
@@ -973,9 +996,15 @@
         default => 'Recently Completed',
     };
 
-    $dashboardUser = auth()->user();
-    $canViewInventoryBoard = $dashboardUser?->hasPermission('view-inventory') || $dashboardUser?->hasPermission('manage-inventory');
-    $canViewProductBoard = $dashboardUser?->hasPermission('view-products') || $dashboardUser?->hasPermission('manage-products');
+    $primaryLink = match ($roleScope) {
+        'owner_admin', 'outlet_manager' => $canViewOrdersBoard ? route('order.index') : null,
+        default => $workerDashboardRoute,
+    };
+    $secondaryPanelLink = match ($roleScope) {
+        'owner_admin' => $canViewInventoryBoard ? route('inventory.index') : null,
+        'outlet_manager' => $canViewOrdersBoard ? route('order.index') : null,
+        default => $workerDashboardRoute,
+    };
 @endphp
 
 <div class="atelier-dashboard">
@@ -996,7 +1025,7 @@
 
         <div class="atelier-actions">
             @if ($roleScope === 'worker')
-                <a class="atelier-action atelier-action--primary" href="{{ route('worker.tasks', ['worker' => $workerTaskRouteWorkerId]) }}">
+                <a class="atelier-action atelier-action--primary" href="{{ $workerDashboardRoute }}">
                     <i class="fa-solid fa-list-check"></i>
                     <span>My Tasks</span>
                 </a>
@@ -1096,46 +1125,64 @@
     </section>
 
     <section class="atelier-grid">
-        <article class="atelier-card atelier-card--hero">
-            <div class="atelier-card__top">
-                <span class="atelier-icon-badge">
-                    <i class="fa-solid {{ $roleScope === 'worker' ? 'fa-list-check' : 'fa-money-bill-trend-up' }}"></i>
-                </span>
-                <span class="atelier-growth">
-                    <i class="fa-solid fa-arrow-trend-up"></i>
-                    <span>{{ $primaryGrowth }}</span>
-                </span>
-            </div>
-            <p class="atelier-card__eyebrow">{{ $primaryLabel }}</p>
-            <h2 class="atelier-card__value">{{ $primaryValue }}</h2>
-            <p class="atelier-card__meta">{{ $primaryMeta }}</p>
-        </article>
+        @if ($primaryLink)
+            <a href="{{ $primaryLink }}" class="atelier-card-link atelier-card--hero">
+        @endif
+            <article class="atelier-card atelier-card--hero">
+                <div class="atelier-card__top">
+                    <span class="atelier-icon-badge">
+                        <i class="fa-solid {{ $roleScope === 'worker' ? 'fa-list-check' : 'fa-money-bill-trend-up' }}"></i>
+                    </span>
+                    <span class="atelier-growth">
+                        <i class="fa-solid fa-arrow-trend-up"></i>
+                        <span>{{ $primaryGrowth }}</span>
+                    </span>
+                </div>
+                <p class="atelier-card__eyebrow">{{ $primaryLabel }}</p>
+                <h2 class="atelier-card__value">{{ $primaryValue }}</h2>
+                <p class="atelier-card__meta">{{ $primaryMeta }}</p>
+            </article>
+        @if ($primaryLink)
+            </a>
+        @endif
 
-        <article class="atelier-card atelier-card--side">
-            <p class="atelier-card__eyebrow">{{ $secondaryPanelEyebrow }}</p>
-            <h2 class="atelier-section-title" style="margin-top:0;">
-                {{ $secondaryPanelTitle }}
-            </h2>
-            <p class="atelier-card__meta" style="margin-top:0;">
-                {{ $secondaryPanelText }}
-            </p>
-            <div class="atelier-mini-grid">
-                @foreach (array_slice($statCards, 0, 2) as $mini)
-                    <div class="atelier-mini">
-                        <p class="atelier-mini__label">{{ $mini['label'] }}</p>
-                        <p class="atelier-mini__value">{{ $mini['value'] }}</p>
-                    </div>
-                @endforeach
-            </div>
-        </article>
+        @if ($secondaryPanelLink)
+            <a href="{{ $secondaryPanelLink }}" class="atelier-card-link atelier-card--side">
+        @endif
+            <article class="atelier-card atelier-card--side">
+                <p class="atelier-card__eyebrow">{{ $secondaryPanelEyebrow }}</p>
+                <h2 class="atelier-section-title" style="margin-top:0;">
+                    {{ $secondaryPanelTitle }}
+                </h2>
+                <p class="atelier-card__meta" style="margin-top:0;">
+                    {{ $secondaryPanelText }}
+                </p>
+                <div class="atelier-mini-grid">
+                    @foreach (array_slice($statCards, 0, 2) as $mini)
+                        <div class="atelier-mini">
+                            <p class="atelier-mini__label">{{ $mini['label'] }}</p>
+                            <p class="atelier-mini__value">{{ $mini['value'] }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            </article>
+        @if ($secondaryPanelLink)
+            </a>
+        @endif
 
         <div class="atelier-stats">
             @foreach ($statCards as $card)
-                <article class="atelier-card atelier-stat">
-                    <p class="atelier-card__eyebrow">{{ $card['label'] }}</p>
-                    <h3 class="atelier-stat__value">{{ $card['value'] }}</h3>
-                    <i class="atelier-stat__icon {{ $card['icon'] }}" style="{{ $card['tone'] }}"></i>
-                </article>
+                @if (!empty($card['href']))
+                    <a href="{{ $card['href'] }}" class="atelier-card-link">
+                @endif
+                    <article class="atelier-card atelier-stat">
+                        <p class="atelier-card__eyebrow">{{ $card['label'] }}</p>
+                        <h3 class="atelier-stat__value">{{ $card['value'] }}</h3>
+                        <i class="atelier-stat__icon {{ $card['icon'] }}" style="{{ $card['tone'] }}"></i>
+                    </article>
+                @if (!empty($card['href']))
+                    </a>
+                @endif
             @endforeach
         </div>
 
@@ -1255,15 +1302,43 @@
                             @foreach ($tableRows as $row)
                                 @if ($roleScope === 'worker')
                                     <tr>
-                                        <td>{{ $row->task_title ?: ($row->task_number ?: '-') }}</td>
-                                        <td>{{ $row->order?->order_number ?: '-' }}</td>
-                                        <td>{{ $row->order?->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            <a href="{{ route('order.assignedJobs', ['q' => $row->task_number ?: $row->task_title]) }}" class="atelier-inline-link">
+                                                {{ $row->task_title ?: ($row->task_number ?: '-') }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            @if ($row->order?->order_number)
+                                                <a href="{{ route('order.assignedJobs', ['q' => $row->order->order_number]) }}" class="atelier-inline-link">{{ $row->order->order_number }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($row->order?->customer?->name)
+                                                <a href="{{ route('order.assignedJobs', ['q' => $row->order->customer->name]) }}" class="atelier-inline-link">{{ $row->order->customer->name }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
                                         <td>{{ $row->completed_at?->format('M d, h:i A') ?: '-' }}</td>
                                     </tr>
                                 @elseif ($roleScope === 'owner_admin')
                                     <tr>
-                                        <td>{{ $row->order_number }}</td>
-                                        <td>{{ $row->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            @if ($canViewOrdersBoard)
+                                                <a href="{{ route('order.show', $row) }}" class="atelier-inline-link">{{ $row->order_number }}</a>
+                                            @else
+                                                {{ $row->order_number }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($canViewCustomersBoard && $row->customer)
+                                                <a href="{{ route('customer.show', $row->customer) }}" class="atelier-inline-link">{{ $row->customer->name }}</a>
+                                            @else
+                                                {{ $row->customer?->name ?: '-' }}
+                                            @endif
+                                        </td>
                                         <td>{{ $row->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</td>
                                         <td>
                                             <span class="app-badge {{ $row->displayStatusBadgeClass() }}">
@@ -1273,8 +1348,20 @@
                                     </tr>
                                 @else
                                     <tr>
-                                        <td>{{ $row->order_number }}</td>
-                                        <td>{{ $row->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            @if ($canViewOrdersBoard)
+                                                <a href="{{ route('order.show', $row) }}" class="atelier-inline-link">{{ $row->order_number }}</a>
+                                            @else
+                                                {{ $row->order_number }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($canViewCustomersBoard && $row->customer)
+                                                <a href="{{ route('customer.show', $row->customer) }}" class="atelier-inline-link">{{ $row->customer->name }}</a>
+                                            @else
+                                                {{ $row->customer?->name ?: '-' }}
+                                            @endif
+                                        </td>
                                         <td>{{ $row->ordered_at?->format('M d, h:i A') ?: '-' }}</td>
                                         <td>Rs {{ $formatMoney(((float) $row->subtotal_amount) - ((float) $row->discount_amount)) }}</td>
                                     </tr>
@@ -1426,8 +1513,20 @@
                             <tbody>
                                 @forelse ($overdueDeliveries as $row)
                                     <tr>
-                                        <td>{{ $row->order_number }}</td>
-                                        <td>{{ $row->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            @if ($canViewOrdersBoard)
+                                                <a href="{{ route('order.show', $row) }}" class="atelier-inline-link">{{ $row->order_number }}</a>
+                                            @else
+                                                {{ $row->order_number }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($canViewCustomersBoard && $row->customer)
+                                                <a href="{{ route('customer.show', $row->customer) }}" class="atelier-inline-link">{{ $row->customer->name }}</a>
+                                            @else
+                                                {{ $row->customer?->name ?: '-' }}
+                                            @endif
+                                        </td>
                                         <td>{{ $row->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</td>
                                         <td>
                                             <span class="app-badge {{ $row->displayStatusBadgeClass() }}">
@@ -1462,8 +1561,20 @@
                             <tbody>
                                 @forelse ($todayDeliveries as $row)
                                     <tr>
-                                        <td>{{ $row->order_number }}</td>
-                                        <td>{{ $row->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            @if ($canViewOrdersBoard)
+                                                <a href="{{ route('order.show', $row) }}" class="atelier-inline-link">{{ $row->order_number }}</a>
+                                            @else
+                                                {{ $row->order_number }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($canViewCustomersBoard && $row->customer)
+                                                <a href="{{ route('customer.show', $row->customer) }}" class="atelier-inline-link">{{ $row->customer->name }}</a>
+                                            @else
+                                                {{ $row->customer?->name ?: '-' }}
+                                            @endif
+                                        </td>
                                         <td>{{ $row->delivery_due_at?->format('M d, h:i A') ?: '-' }}</td>
                                         <td>
                                             <span class="app-badge {{ $row->displayStatusBadgeClass() }}">
@@ -1494,8 +1605,20 @@
                             <tbody>
                                 @forelse ($recentOrders as $row)
                                     <tr>
-                                        <td>{{ $row->order_number }}</td>
-                                        <td>{{ $row->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            @if ($canViewOrdersBoard)
+                                                <a href="{{ route('order.show', $row) }}" class="atelier-inline-link">{{ $row->order_number }}</a>
+                                            @else
+                                                {{ $row->order_number }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($canViewCustomersBoard && $row->customer)
+                                                <a href="{{ route('customer.show', $row->customer) }}" class="atelier-inline-link">{{ $row->customer->name }}</a>
+                                            @else
+                                                {{ $row->customer?->name ?: '-' }}
+                                            @endif
+                                        </td>
                                         <td>{{ $row->ordered_at?->format('M d, h:i A') ?: '-' }}</td>
                                         <td>Rs {{ $formatMoney(((float) $row->subtotal_amount) - ((float) $row->discount_amount)) }}</td>
                                     </tr>
@@ -1554,9 +1677,25 @@
                             <tbody>
                                 @forelse ($workerQueue as $row)
                                     <tr>
-                                        <td>{{ $row->task_title ?: ($row->task_number ?: '-') }}</td>
-                                        <td>{{ $row->order?->order_number ?: '-' }}</td>
-                                        <td>{{ $row->order?->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            <a href="{{ route('order.assignedJobs', ['q' => $row->task_number ?: $row->task_title]) }}" class="atelier-inline-link">
+                                                {{ $row->task_title ?: ($row->task_number ?: '-') }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            @if ($row->order?->order_number)
+                                                <a href="{{ route('order.assignedJobs', ['q' => $row->order->order_number]) }}" class="atelier-inline-link">{{ $row->order->order_number }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($row->order?->customer?->name)
+                                                <a href="{{ route('order.assignedJobs', ['q' => $row->order->customer->name]) }}" class="atelier-inline-link">{{ $row->order->customer->name }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
                                         <td>{{ $row->worker_deadline_at?->format('M d, h:i A') ?: '-' }}</td>
                                         <td>
                                             <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $row->status) }}">
@@ -1587,9 +1726,25 @@
                             <tbody>
                                 @forelse ($workerRecentlyCompleted as $row)
                                     <tr>
-                                        <td>{{ $row->task_title ?: ($row->task_number ?: '-') }}</td>
-                                        <td>{{ $row->order?->order_number ?: '-' }}</td>
-                                        <td>{{ $row->order?->customer?->name ?: '-' }}</td>
+                                        <td>
+                                            <a href="{{ route('order.assignedJobs', ['q' => $row->task_number ?: $row->task_title]) }}" class="atelier-inline-link">
+                                                {{ $row->task_title ?: ($row->task_number ?: '-') }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            @if ($row->order?->order_number)
+                                                <a href="{{ route('order.assignedJobs', ['q' => $row->order->order_number]) }}" class="atelier-inline-link">{{ $row->order->order_number }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if ($row->order?->customer?->name)
+                                                <a href="{{ route('order.assignedJobs', ['q' => $row->order->customer->name]) }}" class="atelier-inline-link">{{ $row->order->customer->name }}</a>
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
                                         <td>{{ $row->completed_at?->format('M d, h:i A') ?: '-' }}</td>
                                         <td>
                                             <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $row->status) }}">
@@ -1624,7 +1779,17 @@
                             </thead>
                             <tbody>
                                 @forelse ($smartWidgets['topCustomers'] as $row)
-                                    <tr><td>{{ $row->customer_name }}</td><td>{{ number_format((int) $row->total_orders) }}</td><td>Rs {{ $formatMoney($row->total_sales) }}</td></tr>
+                                    <tr>
+                                        <td>
+                                            @if ($canViewCustomersBoard && !empty($row->customer_id))
+                                                <a href="{{ route('customer.show', $row->customer_id) }}" class="atelier-inline-link">{{ $row->customer_name }}</a>
+                                            @else
+                                                {{ $row->customer_name }}
+                                            @endif
+                                        </td>
+                                        <td>{{ number_format((int) $row->total_orders) }}</td>
+                                        <td>Rs {{ $formatMoney($row->total_sales) }}</td>
+                                    </tr>
                                 @empty
                                     <tr><td colspan="3">No customer insights data.</td></tr>
                                 @endforelse

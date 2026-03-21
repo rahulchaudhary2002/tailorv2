@@ -345,7 +345,27 @@
                                     -
                                 @endif
                             </div>
-                            <div><small>Deadline: {{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</small></div>
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <small>Deadline: {{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</small>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-light js-open-assign-modal"
+                                    data-task-id="{{ $task->id }}"
+                                    data-task-number="{{ $task->task_number ?: '-' }}"
+                                    data-order-number="{{ $task->order?->order_number ?: '-' }}"
+                                    data-customer-name="{{ $task->order?->customer?->name ?: '-' }}"
+                                    data-task-title="{{ $task->task_title }}"
+                                    data-worker-id="{{ (int) ($task->worker_id ?? 0) }}"
+                                    data-worker-deadline="{{ $task->worker_deadline_at?->format('Y-m-d\\TH:i') }}"
+                                    data-notes="{{ $task->notes }}"
+                                    data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
+                                    aria-label="Edit task assignment"
+                                    title="Edit task assignment"
+                                    style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center;"
+                                >
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                            </div>
                         </td>
                         <td>
                             <div><small>Slip: {{ $task->slip_received_at ? 'Received' : 'Pending' }}</small></div>

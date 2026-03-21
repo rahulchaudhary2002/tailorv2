@@ -566,7 +566,11 @@ class DashboardController extends Controller
                 ->where('worker_id', (int) $user->id)
                 ->where('status', '!=', OrderTask::STATUS_PENDING);
 
-            if ($outletContextId > 0) {
+            if ($accessibleOutletIds->isNotEmpty()) {
+                $workerBase->whereHas('order', function (Builder $query) use ($accessibleOutletIds): void {
+                    $query->whereIn('outlet_id', $accessibleOutletIds);
+                });
+            } elseif ($outletContextId > 0) {
                 $workerBase->whereHas('order', function (Builder $query) use ($outletContextId): void {
                     $query->where('outlet_id', $outletContextId);
                 });

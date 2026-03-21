@@ -66,6 +66,9 @@
 
 @php
     $query = trim((string) request('q', ''));
+    $authUser = auth()->user();
+    $canManageOrders = (bool) $authUser?->hasPermission('manage-orders');
+    $canManageTaskManagement = (bool) $authUser?->hasPermission('manage-task-management');
 @endphp
 
 <div class="stats-grid" style="margin-bottom: 16px;">
@@ -154,6 +157,9 @@
             </thead>
             <tbody>
                 @forelse ($tasks as $task)
+                    @php
+                        $canEditTaskDeadline = $canManageOrders || $canManageTaskManagement;
+                    @endphp
                     <tr>
                         <td>{{ $task->task_number ?: '-' }}</td>
                         <td>
@@ -192,7 +198,41 @@
                                 {{ $task->statusLabel() }}
                             </span>
                         </td>
-                        <td>{{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span>{{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</span>
+                                @if ($canEditTaskDeadline)
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-light"
+                                        data-worker-task-deadline-toggle
+                                        aria-label="Edit task deadline"
+                                        title="Edit task deadline"
+                                        style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center;"
+                                    >
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                @endif
+                            </div>
+                            @if ($canEditTaskDeadline)
+                                <form action="{{ route('taskManagement.update', $task) }}" method="POST" class="worker-task-deadline-form" style="display:none; margin-top:8px; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="worker_id" value="{{ (int) ($task->worker_id ?? 0) }}">
+                                    <input type="hidden" name="notes" value="{{ $task->notes }}">
+                                    <input type="hidden" name="slip_received" value="{{ $task->slip_received_at ? '1' : '0' }}">
+                                    <input
+                                        type="datetime-local"
+                                        name="worker_deadline_at"
+                                        class="outlet-input"
+                                        value="{{ $task->worker_deadline_at?->format('Y-m-d\\TH:i') }}"
+                                        style="min-width:220px;"
+                                    >
+                                    <button type="submit" class="btn btn-sm btn-secondary">Save</button>
+                                    <button type="button" class="btn btn-sm btn-light" data-worker-task-deadline-cancel>Cancel</button>
+                                </form>
+                            @endif
+                        </td>
                         <td>
                             <div><small>Slip: {{ $task->slip_received_at ? 'Received' : 'Pending' }}</small></div>
                             <div style="margin-top: 8px;">
@@ -260,6 +300,32 @@
             fromInput.value = '';
             toInput.value = '';
             rangeInput.value = '';
+        });
+
+        document.querySelectorAll('[data-worker-task-deadline-toggle]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const cell = button.closest('td');
+                const form = cell?.querySelector('.worker-task-deadline-form');
+
+                document.querySelectorAll('.worker-task-deadline-form').forEach((otherForm) => {
+                    if (otherForm !== form) {
+                        otherForm.style.display = 'none';
+                    }
+                });
+
+                if (form) {
+                    form.style.display = form.style.display === 'none' || form.style.display === '' ? 'inline-flex' : 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-worker-task-deadline-cancel]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const form = button.closest('.worker-task-deadline-form');
+                if (form) {
+                    form.style.display = 'none';
+                }
+            });
         });
     })();
 </script>
