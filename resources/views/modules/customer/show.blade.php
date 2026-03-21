@@ -211,7 +211,9 @@
     .tab-header {
         display: flex;
         border-bottom: 2px solid var(--light-border);
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
     }
 
     .tab-btn {
@@ -440,6 +442,22 @@
         transform: translateX(5px);
     }
 
+    .customer-detail-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 350px;
+        gap: 30px;
+    }
+
+    .customer-main-column,
+    .customer-side-column {
+        min-width: 0;
+    }
+
+    .customer-orders-table,
+    .customer-payments-table {
+        width: 100%;
+    }
+
     .action-icon {
         width: 40px;
         height: 40px;
@@ -454,12 +472,21 @@
 
     /* Responsive */
     @media (max-width: 1200px) {
+        .customer-detail-layout {
+            grid-template-columns: 1fr;
+        }
+
         .profile-content {
             gap: 30px;
         }
 
         .profile-grid {
             grid-template-columns: 1fr;
+        }
+
+        .quick-actions-sidebar {
+            position: static;
+            top: auto;
         }
     }
 
@@ -468,8 +495,29 @@
             padding: 10px;
         }
 
+        .breadcrumb {
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 20px;
+        }
+
         .profile-header {
             padding: 30px 20px;
+        }
+
+        .profile-content {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 20px;
+        }
+
+        .profile-info {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .profile-avatar {
+            align-self: center;
         }
 
         .avatar-large {
@@ -480,6 +528,17 @@
 
         .profile-name {
             font-size: var(--text-2xl);
+            word-break: break-word;
+        }
+
+        .profile-category {
+            max-width: 100%;
+            white-space: normal;
+        }
+
+        .profile-contact,
+        .profile-meta {
+            width: 100%;
         }
 
         .tab-btn {
@@ -491,20 +550,71 @@
             padding: 20px;
         }
 
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
         .info-row {
             grid-template-columns: 1fr;
             gap: 5px;
         }
+
+        .measurement-timeline {
+            padding-left: 22px;
+        }
+
+        .measurement-entry::before {
+            left: -28px;
+        }
+
+        .measurement-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        }
+
+        .quick-actions-sidebar {
+            padding: 20px;
+        }
     }
 
     @media (max-width: 576px) {
+        .profile-header {
+            padding: 24px 16px;
+        }
+
+        .profile-content {
+            align-items: stretch;
+        }
+
+        .profile-avatar {
+            align-self: center;
+        }
+
         .profile-contact {
             flex-direction: column;
             gap: 15px;
         }
 
+        .contact-item {
+            align-items: flex-start;
+            gap: 8px;
+            word-break: break-word;
+        }
+
         .profile-meta {
-            gap: 20px;
+            gap: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .meta-item {
+            min-width: 0;
+        }
+
+        .meta-value {
+            font-size: var(--text-base);
+            word-break: break-word;
         }
 
         .profile-actions {
@@ -517,21 +627,89 @@
             justify-content: center;
         }
 
-        .tab-header {
-            flex-direction: column;
+        .tab-btn {
+            padding: 14px 16px;
+            font-size: var(--text-xs);
         }
 
-        .tab-btn {
+        .tab-content {
+            padding: 16px;
+        }
+
+        .measurement-entry {
+            padding: 16px;
+        }
+
+        .measurement-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .customer-orders-table thead,
+        .customer-payments-table thead {
+            display: none;
+        }
+
+        .customer-orders-table,
+        .customer-orders-table tbody,
+        .customer-orders-table tr,
+        .customer-orders-table td,
+        .customer-payments-table,
+        .customer-payments-table tbody,
+        .customer-payments-table tr,
+        .customer-payments-table td {
+            display: block;
             width: 100%;
-            text-align: left;
+        }
+
+        .customer-orders-table tr,
+        .customer-payments-table tr {
+            padding: 14px 0;
             border-bottom: 1px solid var(--light-border);
         }
 
-        .tab-btn.active::after {
-            bottom: 0;
-            height: 100%;
-            width: 4px;
-            right: auto;
+        .customer-orders-table td,
+        .customer-payments-table td {
+            border: none;
+            padding: 8px 0;
+        }
+
+        .customer-orders-table td::before,
+        .customer-payments-table td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 4px;
+            font-size: var(--text-xs);
+            font-weight: var(--font-semibold);
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .customer-orders-table td:last-child,
+        .customer-payments-table td:last-child {
+            padding-bottom: 0;
+        }
+
+        .customer-orders-table td > div[style*="display:flex"],
+        .customer-orders-table td > div[style*="display:grid"] {
+            width: 100%;
+        }
+
+        .customer-orders-table td form,
+        .customer-payments-table td form {
+            width: 100%;
+        }
+
+        .customer-orders-table td input,
+        .customer-payments-table td input {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        .customer-orders-table td .btn,
+        .customer-payments-table td .btn {
+            white-space: nowrap;
         }
     }
 
@@ -567,8 +745,8 @@ $measurementSetCount = $garmentMeasurementSets->count();
     <span>{{ $customer->name }}</span>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 350px; gap: 30px;">
-    <div>
+<div class="customer-detail-layout">
+    <div class="customer-main-column">
         <div class="profile-header">
             <div class="profile-content">
                 <div class="profile-avatar">
@@ -758,7 +936,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                         </div>
 
                         <div class="table-container">
-                            <table class="table">
+                            <table class="table customer-orders-table">
                                 <thead>
                                     <tr>
                                         <th>Order No</th>
@@ -787,7 +965,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                 ], true);
                                         @endphp
                                         <tr>
-                                            <td>
+                                            <td data-label="Order No">
                                                 @canany(['view-orders', 'manage-orders'])
                                                     <a href="{{ route('order.show', $order) }}" style="text-decoration: underline;">
                                                         {{ $order->order_number }}
@@ -796,8 +974,8 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                     {{ $order->order_number }}
                                                 @endcanany
                                             </td>
-                                            <td>{{ $order->ordered_at?->format('M d, Y') ?? '-' }}</td>
-                                            <td>
+                                            <td data-label="Ordered At">{{ $order->ordered_at?->format('M d, Y') ?? '-' }}</td>
+                                            <td data-label="Delivery Due">
                                                 <div style="display:grid; gap:8px;">
                                                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
                                                         <span>{{ $order->delivery_due_at?->format('M d, Y') ?? '-' }}</span>
@@ -833,12 +1011,12 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                     @endif
                                                 </div>
                                             </td>
-                                            <td>
+                                            <td data-label="Status">
                                                 <span class="app-badge {{ $order->displayStatusBadgeClass() }}">
                                                     {{ $order->displayStatusLabel() }}
                                                 </span>
                                             </td>
-                                            <td>
+                                            <td data-label="Payment">
                                                 <div style="display:grid; gap:8px;">
                                                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:nowrap;">
                                                         <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
@@ -888,8 +1066,8 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                     @endif
                                                 </div>
                                             </td>
-                                            <td>Rs. {{ number_format($order->payableAmount(), 2) }}</td>
-                                            <td>
+                                            <td data-label="Amount">Rs. {{ number_format($order->payableAmount(), 2) }}</td>
+                                            <td data-label="Actions">
                                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                                     @canany(['view-orders', 'manage-orders'])
                                                         <a href="{{ route('order.show', $order) }}" class="btn btn-sm btn-info">View Order</a>
@@ -938,7 +1116,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                         </div>
 
                         <div class="table-container">
-                            <table class="table">
+                            <table class="table customer-payments-table">
                                 <thead>
                                     <tr>
                                         <th>Order No</th>
@@ -953,7 +1131,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                 <tbody>
                                     @foreach ($paymentHistory as $order)
                                         <tr>
-                                            <td>
+                                            <td data-label="Order No">
                                                 @canany(['view-orders', 'manage-orders'])
                                                     <a href="{{ route('order.show', $order) }}" style="text-decoration: underline;">
                                                         {{ $order->order_number }}
@@ -962,16 +1140,16 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                     {{ $order->order_number }}
                                                 @endcanany
                                             </td>
-                                            <td>{{ $order->updated_at?->format('M d, Y h:i A') ?? ($order->ordered_at?->format('M d, Y h:i A') ?? '-') }}</td>
-                                            <td>{{ $order->payment_method ?: '-' }}</td>
-                                            <td>
+                                            <td data-label="Payment Date">{{ $order->updated_at?->format('M d, Y h:i A') ?? ($order->ordered_at?->format('M d, Y h:i A') ?? '-') }}</td>
+                                            <td data-label="Method">{{ $order->payment_method ?: '-' }}</td>
+                                            <td data-label="Status">
                                                 <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
                                                     {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}
                                                 </span>
                                             </td>
-                                            <td>Rs. {{ number_format($order->payableAmount(), 2) }}</td>
-                                            <td>Rs. {{ number_format($order->paidAmount(), 2) }}</td>
-                                            <td>Rs. {{ number_format($order->dueAmount(), 2) }}</td>
+                                            <td data-label="Payable">Rs. {{ number_format($order->payableAmount(), 2) }}</td>
+                                            <td data-label="Received">Rs. {{ number_format($order->paidAmount(), 2) }}</td>
+                                            <td data-label="Due">Rs. {{ number_format($order->dueAmount(), 2) }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -982,7 +1160,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
             </div>
         </div>
     </div>
-    <div>
+    <div class="customer-side-column">
         <!-- Quick Actions Sidebar -->
         <div class="quick-actions-sidebar">
             <h3 style="margin-bottom: 20px; color: var(--dark);">Quick Actions</h3>
