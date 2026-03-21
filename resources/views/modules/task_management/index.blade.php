@@ -320,11 +320,29 @@
                     <tr>
                         <td>{{ $task->task_number ?: '-' }}</td>
                         <td>
-                            <div>{{ $task->order?->order_number ?: '-' }}</div>
+                            <div>
+                                @if ($task->order)
+                                    @canany(['view-orders', 'manage-orders'])
+                                        <a href="{{ route('order.show', $task->order) }}">{{ $task->order->order_number }}</a>
+                                    @else
+                                        {{ $task->order->order_number }}
+                                    @endcanany
+                                @else
+                                    -
+                                @endif
+                            </div>
                             <small>Due: {{ $task->order?->delivery_due_at?->format('M d, Y h:i A') ?: '-' }}</small>
                         </td>
                         <td>
-                            {{ $task->order?->customer?->name ?: '-' }}
+                            @if ($task->order?->customer)
+                                @canany(['view-customers', 'manage-customers'])
+                                    <a href="{{ route('customer.show', $task->order->customer) }}">{{ $task->order->customer->name }}</a>
+                                @else
+                                    {{ $task->order->customer->name }}
+                                @endcanany
+                            @else
+                                -
+                            @endif
                             @if ($task->order?->customer?->phone)
                                 <div><small>{{ $task->order->customer->phone }}</small></div>
                             @endif
@@ -339,7 +357,17 @@
                             </span>
                         </td>
                         <td>
-                            <div>{{ $task->worker?->name ?: '-' }}</div>
+                            <div>
+                                @if ($task->worker)
+                                    @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
+                                        <a href="{{ route('worker.tasks', $task->worker) }}">{{ $task->worker->name }}</a>
+                                    @else
+                                        {{ $task->worker->name }}
+                                    @endcanany
+                                @else
+                                    -
+                                @endif
+                            </div>
                             <div><small>Deadline: {{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</small></div>
                         </td>
                         <td>
