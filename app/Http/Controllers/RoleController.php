@@ -66,7 +66,13 @@ class RoleController extends Controller
      */
     public function create()
     {
-        return view('modules.role.create');
+        $permissionPreview = Permission::query()
+            ->orderBy('group')
+            ->orderBy('name')
+            ->limit(3)
+            ->get(['id', 'name', 'group']);
+
+        return view('modules.role.create', compact('permissionPreview'));
     }
 
     /**
