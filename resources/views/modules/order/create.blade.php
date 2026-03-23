@@ -281,6 +281,21 @@ $customerLookupPayload = $customers->map(function ($customer) {
         </section>
     </div>
 
+    {{-- Edit Quantity Modal --}}
+    <div id="editQtyModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1300; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:var(--radius); padding:24px; min-width:280px; max-width:360px; box-shadow:var(--shadow);">
+            <h4 style="margin:0 0 14px; padding-bottom:8px; border-bottom:2px solid #eee; color:var(--primary);">Update Quantity</h4>
+            <div class="form-group">
+                <label id="editQtyLabel" style="display:block; margin-bottom:5px; font-weight:600; color:var(--secondary);">Quantity</label>
+                <input id="editQtyInput" type="number" min="0.01" step="any" class="tp-input">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:16px; justify-content:flex-end;">
+                <button type="button" id="cancelEditQty" class="btn-secondary">Cancel</button>
+                <button type="button" id="confirmEditQty" class="tp-btn">Update</button>
+            </div>
+        </div>
+    </div>
+
     {{-- Measurement Modal --}}
     <div class="tp-modal-overlay" id="measurementModal" style="display:none;">
         <div class="tp-modal">
@@ -305,33 +320,34 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     </div>
                     <div><strong>Fabric Price:</strong> <span id="modalProductPrice">NPR 0.00 per meter</span></div>
                     <div><strong>Fabric Quantity (meters):</strong> <span id="modalProductQuantity">0.00</span></div>
+                    <div class="tp-form-group">
+                        <label>Fabric Source</label>
+                        <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                            <label style="display:flex; gap:8px; align-items:center;">
+                                <input type="radio" name="customFabricSource" id="customFabricOwn" value="own" checked>
+                                Customer Fabric
+                            </label>
+                            <label style="display:flex; gap:8px; align-items:center;">
+                                <input type="radio" name="customFabricSource" id="customFabricStock" value="stock">
+                                Stock Fabric (from current outlet)
+                            </label>
+                        </div>
+                    </div>
+                    <div id="customOwnFabricFields" class="tp-form-group">
+                        <label for="customOwnFabricQty">Fabric Quantity *</label>
+                        <input id="customOwnFabricQty" type="number" min="0.01" step="0.01" class="tp-input" value="1.00">
+                    </div>
+                    <div id="customStockFabricFields" style="display:none;" class="tp-form-group">
+                        <label for="customStockFabricQty">Stock Fabric Quantity *</label>
+                        <input id="customStockFabricQty" type="number" min="0.01" step="0.01" class="tp-input" value="1.00">
+                        <small id="customStockFabricHint" class="tp-hint"></small>
+                    </div>
                 </div>
 
                 <div class="tp-form-group" style="margin-top: 14px;">
                     <label>Garment Type *</label>
                     <div id="garmentTypeCheckboxes" class="tp-garment-check-group"></div>
                     <small class="tp-hint">Select one or more garments for the current fabric.</small>
-                </div>
-
-                <div class="tp-modal-section">
-                    <h4><i class="fas fa-tshirt"></i> Fabric Source</h4>
-                    <div class="tp-form-group">
-                        <label style="display:flex; gap:8px; align-items:center;">
-                            <input type="radio" name="customFabricSource" id="customFabricOwn" value="own" checked>
-                            Customer Fabric
-                        </label>
-                        <label style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-                            <input type="radio" name="customFabricSource" id="customFabricStock" value="stock">
-                            Stock Fabric (from current outlet)
-                        </label>
-                    </div>
-                    <div id="customStockFabricFields" style="display:none;">
-                        <div class="tp-form-group">
-                            <label for="customStockFabricQty">Stock Fabric Quantity *</label>
-                            <input id="customStockFabricQty" type="number" min="0.01" step="0.01" class="tp-input" value="1.00">
-                            <small id="customStockFabricHint" class="tp-hint"></small>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="tp-modal-section">
@@ -707,9 +723,14 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const measurementFieldsEl = document.getElementById('measurementFields');
     const customFabricOwnRadio = document.getElementById('customFabricOwn');
     const customFabricStockRadio = document.getElementById('customFabricStock');
+    const customOwnFabricFields = document.getElementById('customOwnFabricFields');
+    const customOwnFabricQty = document.getElementById('customOwnFabricQty');
     const customStockFabricFields = document.getElementById('customStockFabricFields');
     const customStockFabricQty = document.getElementById('customStockFabricQty');
     const customStockFabricHint = document.getElementById('customStockFabricHint');
+    const editQtyModal = document.getElementById('editQtyModal');
+    const editQtyInput = document.getElementById('editQtyInput');
+    const editQtyLabel = document.getElementById('editQtyLabel');
 
     let billItems = Array.isArray(initialOrderState?.items) ? initialOrderState.items : [];
     let discount = initialOrderState?.discount || { type: 'none', value: 0 };
@@ -1036,7 +1057,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
         productSelect.multiple = isCustom;
         singleQuantityGroup.style.display = isCustom ? 'none' : '';
-        customQuantityContainer.style.display = isCustom ? '' : 'none';
+        customQuantityContainer.style.display = 'none';
+        qtyInput.step = isCustom ? '0.01' : '1';
         sizeSelector.style.display = category === 'readymade' ? '' : 'none';
         if (!isCustom) {
             selectedCustomProductIds = [];
@@ -1108,9 +1130,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function updateProductSelectionUI() {
         if (categorySelect.value === 'custom') {
             const selectedIds = selectedCustomProductIds.slice();
-            renderCustomQuantityInputs();
             unitHint.textContent = selectedIds.length
-                ? `${selectedIds.length} custom fabric${selectedIds.length > 1 ? 's' : ''} selected. Specify quantity for each.`
+                ? `${selectedIds.length} custom fabric${selectedIds.length > 1 ? 's' : ''} selected.`
                 : 'Select one or more custom fabrics.';
             return;
         }
@@ -1125,7 +1146,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         categorySelect.value = 'fabric';
         selectedCustomProductIds = [];
         qtyInput.value = '1';
-        customQuantityContainer.innerHTML = '';
         sizeRadios.forEach((radio) => {
             radio.checked = false;
         });
@@ -1139,10 +1159,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         selectedCustomProductIds = getSelectedProductIds();
-        renderCustomQuantityInputs();
         const selectedIds = selectedCustomProductIds.slice();
         unitHint.textContent = selectedIds.length
-            ? `${selectedIds.length} custom fabric${selectedIds.length > 1 ? 's' : ''} selected. Specify quantity for each.`
+            ? `${selectedIds.length} custom fabric${selectedIds.length > 1 ? 's' : ''} selected.`
             : 'Select one or more custom fabrics.';
     }
 
@@ -1334,6 +1353,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function updateCustomFabricSourceUI() {
         const pending = getCurrentPendingCustom();
         const source = selectedCustomFabricSource();
+        customOwnFabricFields.style.display = source === 'own' ? '' : 'none';
         customStockFabricFields.style.display = source === 'stock' ? '' : 'none';
 
         if (!pending) {
@@ -1353,7 +1373,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 : 'Selected stock fabric is unavailable.';
         } else {
             modalProductPrice.textContent = formatFabricPrice(stockUnitPrice, unitLabel);
-            modalProductQuantity.textContent = money(Number(pending.qty || 0));
+            modalProductQuantity.textContent = money(Number(customOwnFabricQty?.value || 0));
             customStockFabricHint.textContent = '';
         }
     }
@@ -1367,6 +1387,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         modal.dataset.itemState = JSON.stringify({ garments: [] });
         customFabricOwnRadio.checked = true;
         customFabricStockRadio.checked = false;
+        if (customOwnFabricQty) customOwnFabricQty.value = '1.00';
         customStockFabricQty.value = '1.00';
         Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
             input.checked = false;
@@ -1391,7 +1412,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             renderBill();
             productSelect.value = '';
             qtyInput.value = '1';
-            customQuantityContainer.innerHTML = '';
             rebuildProductSelect(categorySelect.value);
             return;
         }
@@ -1411,6 +1431,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
         modalProductPrice.textContent = formatFabricPrice(pending.unitPrice, pending.unitLabel || 'meter');
         modalProductQuantity.textContent = money(pending.qty);
+        if (customOwnFabricQty) {
+            customOwnFabricQty.value = money(pending.qty);
+        }
         if (modalProductCounter) {
             modalProductCounter.textContent = `${pendingCustomIndex + 1}/${pendingCustomQueue.length}`;
         }
@@ -1636,14 +1659,49 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         return false;
     }
 
+    let editingQtyItemIndex = -1;
+
+    function openEditQtyModal(index) {
+        const item = billItems[index];
+        if (!item) return;
+        editingQtyItemIndex = index;
+        editQtyLabel.textContent = `Quantity for ${item.name}`;
+        editQtyInput.step = (item.category === 'fabric' || item.category === 'custom') ? '0.01' : '1';
+        editQtyInput.value = String(item.fabricQuantity || item.qty);
+        editQtyModal.style.display = 'flex';
+    }
+
+    document.getElementById('cancelEditQty')?.addEventListener('click', () => {
+        editQtyModal.style.display = 'none';
+        editingQtyItemIndex = -1;
+    });
+
+    document.getElementById('confirmEditQty')?.addEventListener('click', () => {
+        const qty = Number(editQtyInput.value || 0);
+        if (qty <= 0) {
+            alert('Quantity must be greater than zero.');
+            return;
+        }
+        if (editingQtyItemIndex > -1 && billItems[editingQtyItemIndex]) {
+            const target = billItems[editingQtyItemIndex];
+            target.qty = qty;
+            if (target.fabricQuantity !== undefined) {
+                target.fabricQuantity = qty;
+            }
+            editQtyModal.style.display = 'none';
+            editingQtyItemIndex = -1;
+            renderBill();
+        }
+    });
+
     function updateCustomQueueFromSelection() {
         const selectedIds = selectedCustomProductIds.slice();
+        const sharedQty = 1;
         return selectedIds.map((productId) => {
             const product = productMap.get(String(productId));
-            const qtyValue = Number(customQuantityContainer.querySelector(`input[data-product-id="${productId}"]`)?.value || 0);
             return {
                 productId,
-                qty: qtyValue,
+                qty: sharedQty,
                 unitPrice: resolveDefaultPrice(productId),
                 name: product ? `${product.name} (${product.code})` : 'Custom Product',
                 unitLabel: product?.unitLabel || '',
@@ -1665,23 +1723,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             return;
         }
 
-        const item = billItems[index];
-        if (item.category === 'custom') {
-            openCustomMeasurementModal([{
-                productId: item.productId,
-                qty: Number(item.fabricQuantity || item.qty || 0),
-                unitPrice: Number(item.baseUnitPrice || item.unitPrice || resolveDefaultPrice(item.productId) || 0),
-                name: item.name,
-                unitLabel: item.unitLabel || '',
-            }], item, index);
-            return;
-        }
-
-        const nextQty = prompt(`Update quantity for ${item.name}:`, String(item.qty));
-        if (nextQty && !isNaN(nextQty) && Number(nextQty) > 0) {
-            item.qty = Number(nextQty);
-            renderBill();
-        }
+        openEditQtyModal(index);
     });
 
     addBtn.addEventListener('click', () => {
@@ -1694,19 +1736,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         if (category === 'custom') {
-            const queue = updateCustomQueueFromSelection().filter((item) => item.qty > 0 && item.productId);
+            const queue = updateCustomQueueFromSelection().filter((item) => item.productId);
             if (!queue.length) {
-                alert('Select at least one custom fabric and enter quantity for each.');
-                return;
-            }
-
-            const invalidStock = queue.find((item) => {
-                const product = productMap.get(String(item.productId));
-                return Number(item.qty || 0) > Number(product?.availableQty || 0);
-            });
-            if (invalidStock) {
-                const product = productMap.get(String(invalidStock.productId));
-                alert(`Only ${money(product?.availableQty || 0)} ${product?.unitLabel || ''} is available for ${product?.name || 'selected product'}.`);
+                alert('Select at least one custom fabric.');
                 return;
             }
 
@@ -1757,6 +1789,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     });
     customFabricOwnRadio?.addEventListener('change', updateCustomFabricSourceUI);
     customFabricStockRadio?.addEventListener('change', updateCustomFabricSourceUI);
+    customOwnFabricQty?.addEventListener('input', updateCustomFabricSourceUI);
     customStockFabricQty?.addEventListener('input', updateCustomFabricSourceUI);
 
     saveMeasurementBtn.addEventListener('click', () => {
@@ -1776,7 +1809,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const fabricSource = selectedCustomFabricSource();
         const fabricQuantity = fabricSource === 'stock'
             ? Number(customStockFabricQty.value || 0)
-            : Number(pending.qty || 0);
+            : Number(customOwnFabricQty?.value || 0);
         if (fabricQuantity <= 0) {
             alert('Fabric quantity must be greater than zero.');
             return;
