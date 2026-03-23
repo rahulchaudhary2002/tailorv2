@@ -236,13 +236,17 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
                 <div class="bill-summary">
                     <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">0.00</span>
+                    </div>
+                    <!-- <div class="summary-row">
                         <span>Subtotal (Fabric & Ready-made):</span>
                         <span id="subtotalFabric">0.00</span>
                     </div>
                     <div class="summary-row">
                         <span>Subtotal (Custom Products):</span>
                         <span id="subtotalCustom">0.00</span>
-                    </div>
+                    </div> -->
                     <div class="summary-row">
                         <span>Discount:</span>
                         <span id="discountTotal">0.00</span>
@@ -673,6 +677,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const vatRow = document.getElementById('vatRow');
     const vatAmountEl = document.getElementById('vatAmount');
 
+    const subtotalEl = document.getElementById('subtotal');
     const subtotalFabricEl = document.getElementById('subtotalFabric');
     const subtotalCustomEl = document.getElementById('subtotalCustom');
     const tailoringTotalEl = document.getElementById('tailoringTotal');
@@ -1540,9 +1545,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const taxableTotal = taxableSubtotal + totalTailoring;
         const vatAmount = vatEnabled ? taxableTotal * 0.13 : 0;
         const grandTotal = taxableTotal + vatAmount;
+        const subtotal = subtotalFabric + subtotalCustom;
 
-        subtotalFabricEl.textContent = `NPR ${money(subtotalFabric)}`;
-        subtotalCustomEl.textContent = `NPR ${money(subtotalCustom)}`;
+        subtotalEl.textContent = `NPR ${money(subtotal)}`;
+        // subtotalFabricEl.textContent = `NPR ${money(subtotalFabric)}`;
+        // subtotalCustomEl.textContent = `NPR ${money(subtotalCustom)}`;
         tailoringTotalEl.textContent = `NPR ${money(totalTailoring)}`;
         discountTotalEl.textContent = `NPR ${money(discountAmount)}`;
         vatAmountEl.textContent = `NPR ${money(vatAmount)}`;
