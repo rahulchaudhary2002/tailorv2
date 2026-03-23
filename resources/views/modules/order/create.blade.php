@@ -1482,18 +1482,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             let customSummary = '';
             if (item.category === 'custom' && item.garments?.length) {
                 customSummary = item.garments.map((garment) => {
-                    const measurements = (garment.measurements || [])
-                        .slice(0, 3)
-                        .map((measurement) => `${measurement.type}: ${measurement.measurement}${measurement.unit ? ` ${measurement.unit}` : ''}`)
-                        .join(', ');
-
                     return `
                         <div class="stitching-detail">
                             <div>
                                 <strong>${garment.title}</strong> x ${money(garment.quantity)}
                                 <div class="item-sub item-sub-amount">${garment.tailoring?.package || 'Tailoring'} - NPR ${money(garment.tailoring?.amount || 0)} each</div>
-                                ${measurements ? `<div class="item-sub"><i class="fas fa-ruler"></i> ${measurements}${garment.measurements.length > 3 ? ' ...' : ''}</div>` : ''}
-                                ${garment.designNotes?.length ? `<div class="item-sub"><i class="fas fa-note-sticky"></i> ${garment.designNotes.join(', ')}</div>` : ''}
                             </div>
                             <div><strong>NPR ${money(Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0))}</strong></div>
                         </div>
