@@ -292,11 +292,8 @@ $customerLookupPayload = $customers->map(function ($customer) {
                             <strong>Product:</strong>
                             <span id="modalProductName">-</span>
                         </div>
-                        <button type="button" id="changeModalProductBtn" class="tp-modal-edit-btn" style="display:none;" aria-label="Change selected product" title="Change selected product">
-                            <i class="fas fa-rotate"></i>
-                        </button>
                     </div>
-                    <div id="modalProductSelectWrap" class="tp-form-group" style="display:none; margin-top:14px;">
+                    <div id="modalProductSelectWrap" class="tp-form-group">
                         <label for="modalProductSelect">Change Product</label>
                         <select id="modalProductSelect" class="tp-input">
                             <option value="">Select Product</option>
@@ -579,9 +576,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-modal-close{background:transparent;border:0;color:#fff;font-size:24px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
 .tp-modal-body{padding:16px;flex:1 1 auto;overflow:auto;}
 .tp-modal-info{background:#f8f9fa;border:1px solid #eef1f5;border-radius:10px;padding:10px;display:grid;gap:6px;}
-.tp-modal-product-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.tp-modal-edit-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1px solid #d7e0ec;background:#fff;color:var(--primary);text-decoration:none;transition:.2s;}
-.tp-modal-edit-btn:hover{background:#eef3f9;border-color:#c7d4e3;}
+.tp-modal-product-row{display:flex;align-items:center;gap:12px;}
 .tp-modal-section{margin-top:14px;border:1px solid #eef1f5;border-radius:10px;padding:12px;}
 .tp-modal-section h4{margin:0 0 10px;color:var(--primary);}
 .tp-measurement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
@@ -770,10 +765,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         modalProductName.textContent = pending.name;
         modalProductPrice.textContent = formatFabricPrice(pending.unitPrice, pending.unitLabel || 'meter');
         updateCustomFabricSourceUI();
-
-        if (modalProductSelectWrap) {
-            modalProductSelectWrap.style.display = 'none';
-        }
     }
 
     function normalizePhone(value) {
@@ -1376,9 +1367,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             input.checked = false;
         });
         measurementFieldsEl.innerHTML = '<div class="tp-hint">Select at least one garment type.</div>';
-        if (modalProductSelectWrap) {
-            modalProductSelectWrap.style.display = 'none';
-        }
     }
 
     function closeModal() {
@@ -1900,9 +1888,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (!modalProductSelectWrap || !modalProductSelect) {
             return;
         }
-
-        const shouldShow = modalProductSelectWrap.style.display === 'none';
-        modalProductSelectWrap.style.display = shouldShow ? '' : 'none';
 
         if (!shouldShow) {
             return;
