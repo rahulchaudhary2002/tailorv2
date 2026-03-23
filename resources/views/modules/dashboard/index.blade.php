@@ -846,11 +846,7 @@
     $canViewProductBoard = $dashboardUser?->hasPermission('view-products') || $dashboardUser?->hasPermission('manage-products');
     $workerDashboardRoute = route('order.assignedJobs');
 
-    $heroTitle = match ($roleScope) {
-        'owner_admin' => 'Atelier Overview',
-        'outlet_manager' => 'Studio Dashboard',
-        default => 'Craft Floor Overview',
-    };
+    $heroTitle = 'Overview';
 
     $heroSubtitle = match ($roleScope) {
         'owner_admin' => number_format($kpis['ordersCount'] ?? 0) . ' orders, Rs ' . $formatMoney($kpis['inventoryValue'] ?? 0) . ' inventory value, and ' . number_format($overdueDeliveriesCount ?? 0) . ' overdue deliveries in the selected range.',
