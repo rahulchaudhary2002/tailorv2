@@ -1671,6 +1671,19 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         editQtyModal.style.display = 'flex';
     }
 
+    function buildCustomEditQueueItem(item) {
+        const product = productMap.get(String(item?.productId || ''));
+        const qty = Number(item?.fabricQuantity || item?.qty || 1);
+
+        return {
+            productId: item?.productId || '',
+            qty,
+            unitPrice: Number(item?.baseUnitPrice ?? item?.unitPrice ?? resolveDefaultPrice(item?.productId)),
+            name: item?.name || (product ? `${product.name} (${product.code})` : 'Custom Product'),
+            unitLabel: item?.unitLabel || product?.unitLabel || '',
+        };
+    }
+
     document.getElementById('cancelEditQty')?.addEventListener('click', () => {
         editQtyModal.style.display = 'none';
         editingQtyItemIndex = -1;
@@ -1720,6 +1733,12 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (btn.dataset.action === 'remove') {
             billItems.splice(index, 1);
             renderBill();
+            return;
+        }
+
+        const item = billItems[index];
+        if (item?.category === 'custom') {
+            openCustomMeasurementModal([buildCustomEditQueueItem(item)], item, index);
             return;
         }
 
