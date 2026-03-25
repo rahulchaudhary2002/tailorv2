@@ -569,7 +569,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .stitching-detail > div:last-child{flex-shrink:0;white-space:nowrap;}
 .product-actions{display:flex;gap:10px;margin-top:10px;}
 .product-actions button{padding:6px 12px;font-size:.8rem;border-radius:999px;}
-.product-category{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:600;margin-left:10px;}
+.product-category{display:inline-block!important;padding:4px 10px;border-radius:20px;font-size:.8rem;font-weight:600;margin-left:10px;}
 .fabric-cat{background:#e3f2fd;color:#1565c0;}
 .ready-made-cat{background:#e8f5e9;color:#2e7d32;}
 .custom-cat{background:#f3e5f5;color:#7b1fa2;}
@@ -1529,7 +1529,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             row.innerHTML = `
                 <div class="item-details">
                     <div class="item-main">
-                        <div>
+                        <div style="position:relative;">
                             ${item.name}
                             <span class="${chipClass}">${label}</span>
                             <div class="item-sub">${money(item.qty)} ${item.unitLabel || ''} × NPR ${money(item.unitPrice)}</div>
