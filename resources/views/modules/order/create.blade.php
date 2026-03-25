@@ -236,6 +236,10 @@ $customerLookupPayload = $customers->map(function ($customer) {
 
                 <div class="bill-summary">
                     <div class="summary-row">
+                        <span>Tailoring Charges:</span>
+                        <span id="tailoringTotal">0.00</span>
+                    </div>
+                    <div class="summary-row">
                         <span>Subtotal:</span>
                         <span id="subtotal">0.00</span>
                     </div>
@@ -250,10 +254,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <div class="summary-row">
                         <span>Discount:</span>
                         <span id="discountTotal">0.00</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tailoring Charges:</span>
-                        <span id="tailoringTotal">0.00</span>
                     </div>
                     <div class="summary-row" id="vatRow" style="display:none;">
                         <span>VAT (13%):</span>
@@ -1568,7 +1568,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const taxableTotal = taxableSubtotal + totalTailoring;
         const vatAmount = vatEnabled ? taxableTotal * 0.13 : 0;
         const grandTotal = taxableTotal + vatAmount;
-        const subtotal = subtotalFabric + subtotalCustom;
+        const subtotal = subtotalFabric + subtotalCustom + totalTailoring;
 
         subtotalEl.textContent = `NPR ${money(subtotal)}`;
         // subtotalFabricEl.textContent = `NPR ${money(subtotalFabric)}`;
