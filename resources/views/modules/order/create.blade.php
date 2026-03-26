@@ -1968,8 +1968,30 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const value = Number(discountValueEl.value || 0);
         discount = { type, value: type === 'none' ? 0 : value };
         if (type === 'none') discountDisplayEl.textContent = '';
-        if (type === 'flat') discountDisplayEl.textContent = `Flat discount: NPR ${money(value)}`;
-        if (type === 'percent') discountDisplayEl.textContent = `Percent discount: ${money(value)}%`;
+        const subtotal = billItems.reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.unitPrice || 0)), 0);
+        const maxDiscount = subtotal;
+        
+        if (type === 'flat') {
+            if (value > 0 && value <= maxDiscount) {
+            discountDisplayEl.textContent = `Flat discount: NPR ${money(value)}`;
+            } else if (value > maxDiscount) {
+            discountDisplayEl.textContent = `⚠️ Discount is not applicable (Max: NPR ${money(maxDiscount)})`;
+            } else {
+            discountDisplayEl.textContent = '';
+            }
+        }
+        if (type === 'percent') {
+            const discountAmount = subtotal * (value / 100);
+            if (value > 0 && value <= 100 && discountAmount > 0) {
+            discountDisplayEl.textContent = `Percent discount: ${money(value)}%`;
+            } else if (value > 100) {
+            discountDisplayEl.textContent = `⚠️ Discount is not applicable`;
+            } else if (value > 0 && discountAmount <= 0) {
+            discountDisplayEl.textContent = `⚠️ Discount is not applicable`;
+            } else {
+            discountDisplayEl.textContent = '';
+            }
+        }
         renderBill();
     });
 
