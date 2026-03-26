@@ -315,11 +315,6 @@
             });
 
             removeBtn?.addEventListener('click', () => {
-                const rows = body.querySelectorAll('.purchase-item-row');
-                if (rows.length <= 1) {
-                    return;
-                }
-
                 row.remove();
                 reindexRows();
                 syncTotals();
