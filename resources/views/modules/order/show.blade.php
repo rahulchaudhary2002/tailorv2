@@ -44,6 +44,47 @@
     <div class="alert alert-danger">{{ session('error') }}</div>
 @endif
 
+<style>
+    .order-view-tabs {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .order-view-tab {
+        border: 1px solid #d7dfeb;
+        background: #fff;
+        color: #334155;
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .order-view-tab.is-active {
+        background: #1f3d5a;
+        border-color: #1f3d5a;
+        color: #fff;
+    }
+
+    .order-view-panel {
+        display: none;
+    }
+
+    .order-view-panel.is-active {
+        display: block;
+    }
+</style>
+
+<div class="order-view-tabs" role="tablist" aria-label="Order view tabs">
+    <button type="button" class="order-view-tab is-active js-order-view-tab" data-tab="summary" role="tab" aria-selected="true">Summary</button>
+    <button type="button" class="order-view-tab js-order-view-tab" data-tab="customer" role="tab" aria-selected="false">Customer</button>
+    <button type="button" class="order-view-tab js-order-view-tab" data-tab="items" role="tab" aria-selected="false">Items</button>
+</div>
+
+<div class="order-view-panel is-active js-order-view-panel" data-panel="summary">
 <div class="table-card" style="margin-bottom: 16px;">
     <div class="table-header">
         <div class="table-title">Order Summary</div>
@@ -148,6 +189,72 @@
     </div>
 </div>
 
+<div class="table-card" style="margin-top: 16px;">
+    <div class="table-header">
+        <div class="table-title">Payment Summary</div>
+    </div>
+    <div class="outlet-form-grid" style="padding: 16px;">
+        <div class="outlet-form-group">
+            <label>Payable Amount</label>
+            <div>Rs. {{ number_format($netPayable, 2) }}</div>
+        </div>
+        <div class="outlet-form-group">
+            <label>Paid Amount</label>
+            <div>Rs. {{ number_format($paidAmount, 2) }}</div>
+        </div>
+        <div class="outlet-form-group">
+            <label>Due Amount</label>
+            <div>Rs. {{ number_format($remainingDue, 2) }}</div>
+        </div>
+        <div class="outlet-form-group">
+            <label>Payment Method</label>
+            <div>{{ $order->payment_method ?: '-' }}</div>
+        </div>
+    </div>
+
+    @if ($canTakePayment)
+        <form action="{{ route('order.payment.update', $order) }}" method="POST" style="padding: 0 16px 16px;">
+            @csrf
+            @method('PUT')
+
+            <div class="outlet-form-grid">
+                <div class="outlet-form-group">
+                    <label for="payment_amount">Payment Amount</label>
+                    <input
+                        id="payment_amount"
+                        type="number"
+                        name="payment_amount"
+                        class="outlet-input"
+                        min="0.01"
+                        max="{{ number_format($remainingDue, 2, '.', '') }}"
+                        step="0.01"
+                        value="{{ number_format($remainingDue, 2, '.', '') }}"
+                        required
+                    >
+                </div>
+                <div class="outlet-form-group">
+                    <label for="payment_method">Payment Method</label>
+                    <input
+                        id="payment_method"
+                        type="text"
+                        name="payment_method"
+                        class="outlet-input"
+                        value="{{ old('payment_method', $order->payment_method) }}"
+                        placeholder="Payment method"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="outlet-form-actions" style="padding: 0; margin-top: 12px;">
+                <button type="submit" class="btn btn-secondary">Record Payment</button>
+            </div>
+        </form>
+    @endif
+</div>
+</div>
+
+<div class="order-view-panel js-order-view-panel" data-panel="customer">
 <div class="table-card" style="margin-bottom: 16px;">
     <div class="table-header">
         <div class="table-title">Customer</div>
@@ -183,7 +290,9 @@
         </div>
     </div>
 </div>
+</div>
 
+<div class="order-view-panel js-order-view-panel" data-panel="items">
 <div class="table-card">
     <div class="table-header">
         <div class="table-title">Order Items</div>
@@ -685,69 +794,7 @@
             </tfoot>
         </table>
 </div>
-
-<div class="table-card" style="margin-top: 16px;">
-    <div class="table-header">
-        <div class="table-title">Payment Summary</div>
-    </div>
-    <div class="outlet-form-grid" style="padding: 16px;">
-        <div class="outlet-form-group">
-            <label>Payable Amount</label>
-            <div>Rs. {{ number_format($netPayable, 2) }}</div>
-        </div>
-        <div class="outlet-form-group">
-            <label>Paid Amount</label>
-            <div>Rs. {{ number_format($paidAmount, 2) }}</div>
-        </div>
-        <div class="outlet-form-group">
-            <label>Due Amount</label>
-            <div>Rs. {{ number_format($remainingDue, 2) }}</div>
-        </div>
-        <div class="outlet-form-group">
-            <label>Payment Method</label>
-            <div>{{ $order->payment_method ?: '-' }}</div>
-        </div>
-    </div>
-
-    @if ($canTakePayment)
-        <form action="{{ route('order.payment.update', $order) }}" method="POST" style="padding: 0 16px 16px;">
-            @csrf
-            @method('PUT')
-
-            <div class="outlet-form-grid">
-                <div class="outlet-form-group">
-                    <label for="payment_amount">Payment Amount</label>
-                    <input
-                        id="payment_amount"
-                        type="number"
-                        name="payment_amount"
-                        class="outlet-input"
-                        min="0.01"
-                        max="{{ number_format($remainingDue, 2, '.', '') }}"
-                        step="0.01"
-                        value="{{ number_format($remainingDue, 2, '.', '') }}"
-                        required
-                    >
-                </div>
-                <div class="outlet-form-group">
-                    <label for="payment_method">Payment Method</label>
-                    <input
-                        id="payment_method"
-                        type="text"
-                        name="payment_method"
-                        class="outlet-input"
-                        value="{{ old('payment_method', $order->payment_method) }}"
-                        placeholder="Payment method"
-                        required
-                    >
-                </div>
-            </div>
-
-            <div class="outlet-form-actions" style="padding: 0; margin-top: 12px;">
-                <button type="submit" class="btn btn-secondary">Record Payment</button>
-            </div>
-        </form>
-    @endif
+</div>
 </div>
 
 <div class="outlet-form-actions" style="padding: 16px;">
@@ -759,7 +806,6 @@
             <a href="{{ route('order.edit', $order) }}" class="btn btn-primary">Edit Order</a>
         @endif
     </div>
-</div>
 
 <div id="orderTaskAssignModal" class="app-modal" aria-hidden="true">
     <div class="app-modal__backdrop js-order-task-modal-close"></div>
@@ -828,10 +874,28 @@
         const notesInput = document.getElementById('orderTaskAssignNotes');
         const slipInput = document.getElementById('orderTaskAssignSlip');
         const modalPanel = modal?.querySelector('.app-modal__panel');
+        const tabButtons = document.querySelectorAll('.js-order-view-tab');
+        const tabPanels = document.querySelectorAll('.js-order-view-panel');
 
         if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !slipInput) {
             return;
         }
+
+        const setActiveTab = (tabName) => {
+            tabButtons.forEach((button) => {
+                const isActive = button.dataset.tab === tabName;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            tabPanels.forEach((panel) => {
+                panel.classList.toggle('is-active', panel.dataset.panel === tabName);
+            });
+        };
+
+        tabButtons.forEach((button) => {
+            button.addEventListener('click', () => setActiveTab(button.dataset.tab || 'summary'));
+        });
 
         const initWorkerSelect2 = () => {
             if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
