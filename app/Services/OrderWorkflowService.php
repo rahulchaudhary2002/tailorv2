@@ -11,9 +11,36 @@ class OrderWorkflowService
      */
     public function transition(Order $order, array $payload): void
     {
+
         $toStatus = (string) ($payload['status'] ?? '');
 
-        if (!Order::canTransition((string) $order->status, $toStatus)) {
+        // Check if order has any fabric or custom with fabric
+        $hasFabricOrCustom = false;
+        $order->loadMissing('items');
+        foreach ($order->items as $item) {
+            if ((string) $item->item_category === 'custom') {
+                $fabricProductId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
+                $fabricQty = (float) data_get($item->custom_details, 'fabric_quantity', 0);
+                if ($fabricProductId > 0 && $fabricQty > 0) {
+                    $hasFabricOrCustom = true;
+                    break;
+                }
+            } elseif ((string) $item->item_category === 'fabric') {
+                $hasFabricOrCustom = true;
+                break;
+            }
+        }
+
+        $fromStatus = (string) $order->status;
+        $allowSimple = false;
+        if (!$hasFabricOrCustom) {
+            if (($fromStatus === Order::STATUS_CONFIRMED && $toStatus === Order::STATUS_IN_PROGRESS)
+                || ($fromStatus === Order::STATUS_IN_PROGRESS && $toStatus === Order::STATUS_DELIVERED)) {
+                $allowSimple = true;
+            }
+        }
+
+        if (!$allowSimple && !Order::canTransition($fromStatus, $toStatus)) {
             throw new \RuntimeException('Invalid order status transition.');
         }
 

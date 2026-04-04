@@ -71,38 +71,63 @@ class OrderTaskService
             return;
         }
 
-        $tasks = $order->tasks()
-            ->get(['status']);
-
+        $tasks = $order->tasks()->get(['status']);
         if ($tasks->isEmpty()) {
             return;
         }
 
-        $activeTasks = $tasks
-            ->filter(fn ($task) => (string) $task->status !== OrderTask::STATUS_CANCELLED)
-            ->values();
+        // Check if any order item is fabric or custom with fabric
+        $hasFabricOrCustom = false;
+        foreach ($order->items as $item) {
+            if ((string) $item->item_category === 'custom') {
+                $fabricProductId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
+                $fabricQty = (float) data_get($item->custom_details, 'fabric_quantity', 0);
+                if ($fabricProductId > 0 && $fabricQty > 0) {
+                    $hasFabricOrCustom = true;
+                    break;
+                }
+            } elseif ((string) $item->item_category === 'fabric') {
+                $hasFabricOrCustom = true;
+                break;
+            }
+        }
 
-        if ($activeTasks->isEmpty()) {
-            $nextStatus = $order->fabric_issued_at
-                ? Order::STATUS_FABRIC_ISSUED
-                : Order::STATUS_CONFIRMED;
-        } elseif ($activeTasks->every(fn ($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
-            $nextStatus = Order::STATUS_COMPLETED;
-        } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_IN_PROGRESS)) {
-            $nextStatus = Order::STATUS_IN_PROGRESS;
-        } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
-            $nextStatus = Order::STATUS_NEAR_COMPLETION;
-        } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_ASSIGNED)) {
-            $nextStatus = Order::STATUS_ASSIGNED;
+        $activeTasks = $tasks->filter(fn ($task) => (string) $task->status !== OrderTask::STATUS_CANCELLED)->values();
+
+        if (!$hasFabricOrCustom) {
+            // For non-fabric/non-custom, only allow in progress and delivered
+            if ($activeTasks->isEmpty()) {
+                $nextStatus = Order::STATUS_CONFIRMED;
+            } elseif ($activeTasks->every(fn($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
+                $nextStatus = Order::STATUS_DELIVERED;
+            } elseif ($activeTasks->contains(fn($task) => (string) $task->status === OrderTask::STATUS_IN_PROGRESS)) {
+                $nextStatus = Order::STATUS_IN_PROGRESS;
+            } else {
+                $nextStatus = Order::STATUS_CONFIRMED;
+            }
         } else {
-            $nextStatus = $order->fabric_issued_at
-                ? Order::STATUS_FABRIC_ISSUED
-                : Order::STATUS_CONFIRMED;
+            if ($activeTasks->isEmpty()) {
+                $nextStatus = $order->fabric_issued_at
+                    ? Order::STATUS_FABRIC_ISSUED
+                    : Order::STATUS_CONFIRMED;
+            } elseif ($activeTasks->every(fn ($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
+                $nextStatus = Order::STATUS_COMPLETED;
+            } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_IN_PROGRESS)) {
+                $nextStatus = Order::STATUS_IN_PROGRESS;
+            } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
+                $nextStatus = Order::STATUS_NEAR_COMPLETION;
+            } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_ASSIGNED)) {
+                $nextStatus = Order::STATUS_ASSIGNED;
+            } else {
+                $nextStatus = $order->fabric_issued_at
+                    ? Order::STATUS_FABRIC_ISSUED
+                    : Order::STATUS_CONFIRMED;
+            }
         }
 
         $order->status = $nextStatus;
 
-        if (in_array($nextStatus, [
+        if ($hasFabricOrCustom && in_array($nextStatus, [
             Order::STATUS_FABRIC_ISSUED,
             Order::STATUS_ASSIGNED,
             Order::STATUS_IN_PROGRESS,
@@ -112,7 +137,7 @@ class OrderTaskService
             $order->fabric_issued_at = $order->fabric_issued_at ?? now();
         }
 
-        $order->completed_at = $nextStatus === Order::STATUS_COMPLETED
+        $order->completed_at = $nextStatus === Order::STATUS_COMPLETED || $nextStatus === Order::STATUS_DELIVERED
             ? ($order->completed_at ?? now())
             : null;
 
