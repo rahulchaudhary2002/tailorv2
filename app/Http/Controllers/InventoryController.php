@@ -113,11 +113,6 @@ class InventoryController extends Controller
             ->get();
 
         $stats = [
-            'locations_count' => InventoryLocation::query()
-                ->where('is_active', true)
-                ->where('type', InventoryLocation::TYPE_OUTLET)
-                ->where('outlet_id', $outletId)
-                ->count(),
             'products_in_stock' => InventoryStock::query()
                 ->whereHas('location', function ($query) use ($outletId) {
                     $query->where('type', InventoryLocation::TYPE_OUTLET)

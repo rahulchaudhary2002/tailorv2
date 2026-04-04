@@ -16,12 +16,6 @@
 <div class="stats-grid" style="margin-bottom: 16px;">
     <div class="stat-card">
         <div class="stat-content">
-            <div class="stat-number">{{ $stats['locations_count'] }}</div>
-            <div class="stat-label">Locations</div>
-        </div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-content">
             <div class="stat-number">{{ $stats['products_in_stock'] }}</div>
             <div class="stat-label">Products in Stock</div>
         </div>
