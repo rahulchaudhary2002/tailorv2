@@ -151,7 +151,7 @@
                     </div>
 
                     <div class="outlet-form-group">
-                        <label for="unit_cost">Unit Cost</label>
+                        <label for="unit_cost">Actual Price</label>
                         <input id="unit_cost" name="unit_cost" type="number" min="0" step="0.01" class="outlet-input @if($inventoryErrorBag->has('unit_cost')) is-invalid @endif" value="{{ old('unit_cost', number_format((float) $product->amount, 2, '.', '')) }}" required>
                         @if ($inventoryErrorBag->has('unit_cost'))
                             <div class="form-error">{{ $inventoryErrorBag->first('unit_cost') }}</div>
