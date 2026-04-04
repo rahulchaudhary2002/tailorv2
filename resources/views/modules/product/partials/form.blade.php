@@ -67,7 +67,7 @@
         </div>
 
         <div class="outlet-form-group">
-            <label for="amount">Amount</label>
+            <label for="amount">Selling Price</label>
             <input
                 id="amount"
                 name="amount"
@@ -127,7 +127,7 @@
             </div>
 
             <div class="outlet-form-group">
-                <label for="opening_unit_cost">Unit Cost</label>
+                <label for="opening_unit_cost">Actual Price</label>
                 <input
                     id="opening_unit_cost"
                     name="opening_unit_cost"
