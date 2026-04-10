@@ -86,7 +86,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
     <input type="hidden" id="status" name="status" value="{{ old('status', $editingOrder?->status ?: \App\Models\Order::STATUS_CONFIRMED) }}">
     <input type="hidden" id="notes" name="notes" value="{{ old('notes', $editingOrder?->notes) }}">
     <input type="hidden" id="payment_status" name="payment_status" value="{{ old('payment_status', $editingOrder?->payment_status ?: \App\Models\Order::PAYMENT_STATUS_UNPAID) }}">
-    <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method', $editingOrder?->payment_method) }}">
+    <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method', $editingOrder?->payment_method ?: 'cash') }}">
     <input type="hidden" id="advance_payment_amount" name="advance_payment_amount" value="{{ old('advance_payment_amount', (string) ($editingOrder?->advance_payment_amount ?? '0')) }}">
     <input type="hidden" id="discount_amount" name="discount_amount" value="{{ old('discount_amount', (string) ($editingOrder?->discount_amount ?? '0')) }}">
 
@@ -258,6 +258,14 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <div class="summary-row" id="vatRow" style="display:none;">
                         <span>VAT (13%):</span>
                         <span id="vatAmount">0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Advance Payment:</span>
+                        <input type="number" id="advancePayment" class="tp-input tp-input-sm" value="{{ old('advance_payment_amount', (string) ($initialOrderState['advancePaymentAmount'] ?? 0)) }}" min="0" step="0.01">
+                    </div>
+                    <div class="summary-row">
+                        <span>Balance:</span>
+                        <span id="balanceDue">0.00</span>
                     </div>
                     <div class="summary-row total-row">
                         <span>Grand Total:</span>
@@ -585,6 +593,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .bill-summary{border-top:1px solid #dbe5f1;padding-top:16px;margin-top:18px;display:grid;gap:4px;}
 .summary-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:#34506b;}
 .summary-row span:last-child{font-weight:700;color:#17324d;}
+.tp-input-sm{width:120px;padding:8px 10px;font-size:.95rem;text-align:right;}
 .total-row{font-weight:700;font-size:1.15rem;color:var(--primary);border-top:1px solid #dbe5f1;margin-top:8px;padding-top:14px;}
 .total-row span:last-child{font-size:1.4rem;color:#0f2942;}
 .bill-actions{margin-top:22px;display:flex;gap:12px;}
@@ -700,6 +709,10 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const discountTotalEl = document.getElementById('discountTotal');
     const grandTotalEl = document.getElementById('grandTotal');
     const discountAmountInputEl = document.getElementById('discount_amount');
+    const advancePaymentEl = document.getElementById('advancePayment');
+    const advancePaymentAmountInputEl = document.getElementById('advance_payment_amount');
+    const paymentStatusInputEl = document.getElementById('payment_status');
+    const balanceDueEl = document.getElementById('balanceDue');
 
     const clearBillBtn = document.getElementById('clearBill');
     const printBillBtn = document.getElementById('printBill');
@@ -797,10 +810,50 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         return String(value || '').replace(/\D+/g, '');
     }
 
-    function updatePaymentSummary(discountAmount) {
+    function updatePaymentSummary(grandTotal, discountAmount) {
         const safeDiscount = Math.max(Number(discountAmount || 0), 0);
         if (discountAmountInputEl) {
             discountAmountInputEl.value = money(safeDiscount);
+        }
+
+        const payableAmount = Math.max(Number(grandTotal || 0), 0);
+        if (advancePaymentEl) {
+            advancePaymentEl.max = money(payableAmount);
+        }
+        let advanceAmount = Math.max(Number(advancePaymentEl?.value || 0), 0);
+
+        if (advanceAmount > payableAmount) {
+            advanceAmount = payableAmount;
+            if (advancePaymentEl) {
+                advancePaymentEl.value = money(advanceAmount);
+            }
+        } else if (advancePaymentEl && typeof advancePaymentEl.setCustomValidity === 'function') {
+            advancePaymentEl.setCustomValidity('');
+        }
+
+        if (advancePaymentEl && typeof advancePaymentEl.setCustomValidity === 'function') {
+            advancePaymentEl.setCustomValidity('');
+        }
+
+        if (advancePaymentAmountInputEl) {
+            advancePaymentAmountInputEl.value = money(advanceAmount);
+        }
+
+        const balanceAmount = Math.max(payableAmount - advanceAmount, 0);
+        if (balanceDueEl) {
+            balanceDueEl.textContent = `NPR ${money(balanceAmount)}`;
+        }
+
+        if (paymentStatusInputEl) {
+            if (payableAmount <= 0.0001) {
+                paymentStatusInputEl.value = '{{ \App\Models\Order::PAYMENT_STATUS_PAID }}';
+            } else if (advanceAmount <= 0.0001) {
+                paymentStatusInputEl.value = '{{ \App\Models\Order::PAYMENT_STATUS_UNPAID }}';
+            } else if (advanceAmount + 0.0001 >= payableAmount) {
+                paymentStatusInputEl.value = '{{ \App\Models\Order::PAYMENT_STATUS_PAID }}';
+            } else {
+                paymentStatusInputEl.value = '{{ \App\Models\Order::PAYMENT_STATUS_PARTIAL }}';
+            }
         }
     }
 
@@ -1579,7 +1632,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         grandTotalEl.textContent = `NPR ${money(grandTotal)}`;
         vatRow.style.display = vatEnabled ? '' : 'none';
 
-        updatePaymentSummary(discountAmount);
+        updatePaymentSummary(grandTotal, discountAmount);
         buildHiddenInputs();
     }
 
@@ -1999,6 +2052,10 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         vatEnabled = vatToggle.checked;
         billTypeEl.textContent = vatEnabled ? 'VAT Bill' : 'Estimated Bill';
         renderBill();
+    });
+
+    advancePaymentEl?.addEventListener('input', () => {
+        updatePaymentSummary(Number(grandTotalEl?.textContent?.replace(/[^\d.]/g, '') || 0), Number(discountAmountInputEl?.value || 0));
     });
 
     clearBillBtn.addEventListener('click', () => {

@@ -239,9 +239,8 @@
                         type="text"
                         name="payment_method"
                         class="outlet-input"
-                        value="{{ old('payment_method', $order->payment_method) }}"
+                        value="{{ old('payment_method', $order->payment_method ?: 'cash') }}"
                         placeholder="Payment method"
-                        required
                     >
                 </div>
             </div>

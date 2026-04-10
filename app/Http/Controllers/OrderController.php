@@ -1534,6 +1534,7 @@ class OrderController extends Controller
                     ->filter()
                     ->values()
                     ->all(),
+                'advancePaymentAmount' => (float) $request->old('advance_payment_amount', 0),
                 'discount' => [
                     'type' => (float) $request->old('discount_amount', 0) > 0 ? 'flat' : 'none',
                     'value' => (float) $request->old('discount_amount', 0),
@@ -1545,6 +1546,7 @@ class OrderController extends Controller
         if (!$editingOrder) {
             return [
                 'items' => [],
+                'advancePaymentAmount' => 0,
                 'discount' => ['type' => 'none', 'value' => 0],
                 'vatEnabled' => false,
             ];
@@ -1624,6 +1626,7 @@ class OrderController extends Controller
                     ];
                 })
                 ->all(),
+            'advancePaymentAmount' => (float) ($editingOrder->advance_payment_amount ?? 0),
             'discount' => [
                 'type' => (float) ($editingOrder->discount_amount ?? 0) > 0 ? 'flat' : 'none',
                 'value' => (float) ($editingOrder->discount_amount ?? 0),

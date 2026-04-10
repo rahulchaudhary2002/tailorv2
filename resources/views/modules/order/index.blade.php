@@ -266,8 +266,7 @@
                                         name="payment_method"
                                         class="outlet-input"
                                         placeholder="Payment method"
-                                        value="{{ old('payment_method', $order->payment_method) }}"
-                                        required
+                                        value="{{ old('payment_method', $order->payment_method ?: 'cash') }}"
                                     >
                                     <div class="order-payment-hint">
                                         Due: {{ number_format($remainingDue, 2) }} | Paid: {{ number_format($paidAmount, 2) }}
