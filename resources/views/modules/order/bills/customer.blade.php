@@ -153,7 +153,7 @@
             </div>
             <div class="bill-rule bill-rule-tight"></div>
             <div class="bill-meta-row">
-                <span>Tender</span>
+                <span>Advance Payment</span>
                 <span>{{ number_format($paidAmount, 2) }}</span>
             </div>
             <div class="bill-meta-row">
