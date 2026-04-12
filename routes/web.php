@@ -1,18 +1,18 @@
 <?php
 
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\OutletController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\RawMaterialPurchaseController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GarmentTypeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManufactureUnitController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OutletController;
 use App\Http\Controllers\PaymentManagementController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RawMaterialPurchaseController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TaskManagementController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
@@ -24,7 +24,7 @@ Route::get('/', function () {
     return redirect('/login');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -100,6 +100,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::group(['prefix' => 'product', 'as' => 'product.'], function () {
         Route::get('/', [ProductController::class, 'index'])->name('index')->middleware('can:view-products,manage-products');
+        Route::get('/barcodes/pdf', [ProductController::class, 'barcodesPdf'])->name('barcodes.pdf')->middleware('can:view-products,manage-products');
         Route::get('/create', [ProductController::class, 'create'])->name('create')->middleware('can:create-products,manage-products');
         Route::post('/', [ProductController::class, 'store'])->name('store')->middleware('can:create-products,manage-products');
         Route::get('/edit/{product}', [ProductController::class, 'edit'])->name('edit')->middleware('can:edit-products,manage-products');

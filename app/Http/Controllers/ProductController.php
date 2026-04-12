@@ -25,30 +25,11 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
-        $qLower = mb_strtolower($q);
         $categoryId = (int) $request->query('category_id', 0);
 
-        $productsQuery = Product::query()
+        $productsQuery = $this->filteredProductsQuery($request)
             ->with(['category:id,name,slug'])
             ->withSum('inventoryStocks as inventory_total_quantity', 'on_hand_qty');
-
-        if ($q !== '') {
-            $barcodeQuery = preg_replace('/\D+/', '', $q) ?? '';
-
-            $productsQuery->where(function ($query) use ($q, $qLower, $barcodeQuery): void {
-                $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                    ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%'])
-                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%' . $q . '%']);
-
-                if ($barcodeQuery !== '') {
-                    $query->orWhere('barcode', 'like', '%' . $barcodeQuery . '%');
-                }
-            });
-        }
-
-        if ($categoryId > 0) {
-            $productsQuery->where('product_category_id', $categoryId);
-        }
 
         $products = $productsQuery
             ->latest()
@@ -61,6 +42,19 @@ class ProductController extends Controller
             ->get(['id', 'name', 'slug']);
 
         return view('modules.product.index', compact('products', 'categories'));
+    }
+
+    public function barcodesPdf(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $categoryId = (int) $request->query('category_id', 0);
+
+        $products = $this->filteredProductsQuery($request)
+            ->with(['category:id,name,slug'])
+            ->latest()
+            ->get();
+
+        return view('modules.product.barcodes_pdf', compact('products', 'q', 'categoryId'));
     }
 
     /**
@@ -129,7 +123,7 @@ class ProductController extends Controller
             $stock->save();
 
             $inventoryTypeId = $this->resolveInventoryTypeIdForLocation($locationId);
-            if (!$inventoryTypeId) {
+            if (! $inventoryTypeId) {
                 throw new \RuntimeException('Unable to resolve inventory type for selected location.');
             }
 
@@ -155,7 +149,7 @@ class ProductController extends Controller
         if ($savedProduct) {
             $this->notifyProductRecipients(
                 'Product created',
-                'Product ' . $savedProduct->name . ' was created.',
+                'Product '.$savedProduct->name.' was created.',
                 route('product.index', ['q' => $savedProduct->code ?: $savedProduct->name])
             );
         }
@@ -231,7 +225,7 @@ class ProductController extends Controller
 
         $this->notifyProductRecipients(
             'Product updated',
-            'Product ' . $product->name . ' was updated.',
+            'Product '.$product->name.' was updated.',
             route('product.index', ['q' => $product->code ?: $product->name])
         );
 
@@ -242,7 +236,7 @@ class ProductController extends Controller
 
     public function adjustInventory(AdjustInventoryRequest $request, Product $product)
     {
-        if (!(bool) auth()->user()?->hasPermission('manage-inventory')) {
+        if (! (bool) auth()->user()?->hasPermission('manage-inventory')) {
             abort(403);
         }
 
@@ -260,34 +254,34 @@ class ProductController extends Controller
 
         $isTransfer = $trxType === InventoryTransaction::TYPE_TRANSFER;
         if (
-            (!$isTransfer && !$this->isValidSingleLocationForUser($locationId, $outletId)) ||
-            ($isTransfer && !$this->isValidActiveLocation($fromLocationId)) ||
-            ($isTransfer && !$this->isValidActiveLocation($toLocationId))
+            (! $isTransfer && ! $this->isValidSingleLocationForUser($locationId, $outletId)) ||
+            ($isTransfer && ! $this->isValidActiveLocation($fromLocationId)) ||
+            ($isTransfer && ! $this->isValidActiveLocation($toLocationId))
         ) {
             return redirect()
-                ->to(route('product.edit', $product) . '#inventory')
+                ->to(route('product.edit', $product).'#inventory')
                 ->withInput()
                 ->with('inventory_error', 'Selected location is not valid for this transaction.');
         }
 
-        if (in_array($trxType, [InventoryTransaction::TYPE_IN, InventoryTransaction::TYPE_OUT, InventoryTransaction::TYPE_ADJUSTMENT], true) && !$locationId) {
+        if (in_array($trxType, [InventoryTransaction::TYPE_IN, InventoryTransaction::TYPE_OUT, InventoryTransaction::TYPE_ADJUSTMENT], true) && ! $locationId) {
             return redirect()
-                ->to(route('product.edit', $product) . '#inventory')
+                ->to(route('product.edit', $product).'#inventory')
                 ->withInput()
                 ->with('inventory_error', 'Location is required for selected transaction type.');
         }
 
-        if ($trxType === InventoryTransaction::TYPE_TRANSFER && (!$fromLocationId || !$toLocationId || $fromLocationId === $toLocationId)) {
+        if ($trxType === InventoryTransaction::TYPE_TRANSFER && (! $fromLocationId || ! $toLocationId || $fromLocationId === $toLocationId)) {
             return redirect()
-                ->to(route('product.edit', $product) . '#inventory')
+                ->to(route('product.edit', $product).'#inventory')
                 ->withInput()
                 ->with('inventory_error', 'Valid source and destination locations are required for transfer.');
         }
 
         $inventoryTypeId = $this->resolveInventoryTypeId($trxType, $locationId, $fromLocationId);
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return redirect()
-                ->to(route('product.edit', $product) . '#inventory')
+                ->to(route('product.edit', $product).'#inventory')
                 ->withInput()
                 ->with('inventory_error', 'Unable to resolve inventory type from selected location.');
         }
@@ -340,6 +334,7 @@ class ProductController extends Controller
                     foreach ($updatedTargetStocks as $targetStock) {
                         $this->syncLowStockAlert($targetStock);
                     }
+
                     return;
                 }
 
@@ -360,6 +355,7 @@ class ProductController extends Controller
                     );
 
                     $this->syncLowStockAlert($stock);
+
                     return;
                 }
 
@@ -382,7 +378,7 @@ class ProductController extends Controller
             });
         } catch (\RuntimeException $exception) {
             return redirect()
-                ->to(route('product.edit', $product) . '#inventory')
+                ->to(route('product.edit', $product).'#inventory')
                 ->withInput()
                 ->with('inventory_error', $exception->getMessage());
         }
@@ -392,11 +388,11 @@ class ProductController extends Controller
             $trxType,
             $quantity,
             $outletId,
-            route('product.edit', $product) . '#inventory'
+            route('product.edit', $product).'#inventory'
         );
 
         return redirect()
-            ->to(route('product.edit', $product) . '#inventory')
+            ->to(route('product.edit', $product).'#inventory')
             ->with('inventory_success', 'Inventory transaction recorded successfully.');
     }
 
@@ -407,7 +403,7 @@ class ProductController extends Controller
             $outletId,
             [
                 'title' => 'Inventory updated',
-                'message' => ucfirst($trxType) . ' transaction of ' . number_format($quantity, 2) . ' ' . $product->defaultUnitLabel() . ' recorded for ' . $product->name . '.',
+                'message' => ucfirst($trxType).' transaction of '.number_format($quantity, 2).' '.$product->defaultUnitLabel().' recorded for '.$product->name.'.',
                 'url' => $url,
                 'module' => 'Inventory',
             ],
@@ -425,7 +421,7 @@ class ProductController extends Controller
 
         $this->notifyProductRecipients(
             'Product deleted',
-            'Product ' . $productName . ' was deleted.',
+            'Product '.$productName.' was deleted.',
             route('product.index')
         );
 
@@ -443,12 +439,41 @@ class ProductController extends Controller
             (int) (auth()->user()?->current_outlet_id ?? 0),
             [
                 'title' => $title,
-                'message' => $actorName . ': ' . $message,
+                'message' => $actorName.': '.$message,
                 'url' => $url,
                 'module' => 'Product',
             ],
             array_filter([(int) auth()->id()])
         );
+    }
+
+    private function filteredProductsQuery(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $qLower = mb_strtolower($q);
+        $categoryId = (int) $request->query('category_id', 0);
+
+        $productsQuery = Product::query();
+
+        if ($q !== '') {
+            $barcodeQuery = preg_replace('/\D+/', '', $q) ?? '';
+
+            $productsQuery->where(function ($query) use ($q, $qLower, $barcodeQuery): void {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%'.$q.'%']);
+
+                if ($barcodeQuery !== '') {
+                    $query->orWhere('barcode', 'like', '%'.$barcodeQuery.'%');
+                }
+            });
+        }
+
+        if ($categoryId > 0) {
+            $productsQuery->where('product_category_id', $categoryId);
+        }
+
+        return $productsQuery;
     }
 
     private function availableInventoryLocations()
@@ -492,7 +517,7 @@ class ProductController extends Controller
 
     private function isValidSingleLocationForUser(?int $locationId, int $outletId): bool
     {
-        if (!$locationId) {
+        if (! $locationId) {
             return true;
         }
 
@@ -513,7 +538,7 @@ class ProductController extends Controller
 
     private function isValidActiveLocation(?int $locationId): bool
     {
-        if (!$locationId) {
+        if (! $locationId) {
             return false;
         }
 
@@ -736,7 +761,7 @@ class ProductController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$reorder) {
+        if (! $reorder) {
             return;
         }
 

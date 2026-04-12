@@ -9,13 +9,21 @@
         <h1 class="text-dark">Product Management</h1>
         <p>Manage ready made, accessories, and fabrics products.</p>
     </div>
-    @canany(['manage-products', 'create-products'])
-        <div class="page-actions">
+    <div class="page-actions">
+        <a
+            href="{{ route('product.barcodes.pdf', request()->only(['q', 'category_id'])) }}"
+            class="btn btn-secondary"
+            target="_blank"
+            rel="noopener"
+        >
+            <i class="fas fa-file-pdf"></i> Download Barcodes PDF
+        </a>
+        @canany(['manage-products', 'create-products'])
             <a href="{{ route('product.create') }}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add Product
             </a>
-        </div>
-    @endcanany
+        @endcanany
+    </div>
 </div>
 
 @php
@@ -74,7 +82,6 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Code</th>
                     <th>Barcode</th>
                     <th>Amount</th>
                     <th>Category</th>
@@ -87,8 +94,13 @@
                 @forelse ($products as $product)
                     <tr>
                         <td>{{ $product->name }}</td>
-                        <td>{{ $product->code }}</td>
-                        <td><span class="barcode-inline">{{ $product->barcode ?: '-' }}</span></td>
+                        <td>
+                            @if ($product->barcode_svg !== '')
+                                <div class="barcode-preview">{!! $product->barcode_svg !!}</div>
+                            @else
+                                <span class="barcode-inline">{{ $product->barcode ?: $product->code ?: '-' }}</span>
+                            @endif
+                        </td>
                         <td>Rs {{ number_format((float) $product->amount, 2) }}</td>
                         <td>{{ $product->category?->name ?? '-' }}</td>
                         <td>{{ number_format((float) ($product->inventory_total_quantity ?? 0), 2) }}</td>
@@ -116,7 +128,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="empty">No products found.</td>
+                        <td colspan="7" class="empty">No products found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -163,6 +175,22 @@
         font-family: monospace;
         font-size: 0.92rem;
         letter-spacing: 0.06em;
+    }
+
+    .barcode-preview {
+        display: inline-flex;
+        align-items: center;
+        max-width: 180px;
+        padding: 4px 6px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
+
+    .barcode-preview svg {
+        display: block;
+        width: 100%;
+        height: auto;
     }
 
     @media (max-width: 768px) {
