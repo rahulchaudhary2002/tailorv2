@@ -156,10 +156,10 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 <div class="form-group">
                     <label>Product Category *</label>
                     <select id="productCategory" class="tp-input">
-                        <option value="fabric">Fabric</option>
+                        <option value="custom" selected>Custom</option>
                         <option value="readymade">Ready-Made</option>
                         <option value="accessories">Accessories</option>
-                        <option value="custom">Custom</option>
+                        <option value="fabric">Fabric</option>
                     </select>
                 </div>
 
@@ -333,11 +333,11 @@ $customerLookupPayload = $customers->map(function ($customer) {
                         <label>Fabric Source</label>
                         <div style="display:flex; gap:16px; flex-wrap:wrap;">
                             <label style="display:flex; gap:8px; align-items:center;">
-                                <input type="radio" name="customFabricSource" id="customFabricOwn" value="own" checked>
+                                <input type="radio" name="customFabricSource" id="customFabricOwn" value="own">
                                 Customer Fabric
                             </label>
                             <label style="display:flex; gap:8px; align-items:center;">
-                                <input type="radio" name="customFabricSource" id="customFabricStock" value="stock">
+                                <input type="radio" name="customFabricSource" id="customFabricStock" value="stock" checked>
                                 Stock Fabric (from current outlet)
                             </label>
                         </div>
@@ -1256,7 +1256,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     }
 
     function resetOrderEntryFields() {
-        categorySelect.value = 'fabric';
+        categorySelect.value = 'custom';
         selectedCustomProductIds = [];
         qtyInput.value = '1';
         sizeRadios.forEach((radio) => {
@@ -1498,8 +1498,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     function resetCustomModalState() {
         modal.dataset.itemState = JSON.stringify({ garments: [] });
-        customFabricOwnRadio.checked = true;
-        customFabricStockRadio.checked = false;
+        customFabricOwnRadio.checked = false;
+        customFabricStockRadio.checked = true;
         if (customOwnFabricQty) customOwnFabricQty.value = '1.00';
         customStockFabricQty.value = '1.00';
         Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
@@ -1562,7 +1562,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             input.checked = selectedIds.includes(String(input.value || ''));
         });
 
-        const fabricSource = String(existingItem?.fabricSource || 'own');
+        const fabricSource = String(existingItem?.fabricSource || 'stock');
         customFabricOwnRadio.checked = fabricSource !== 'stock';
         customFabricStockRadio.checked = fabricSource === 'stock';
         customStockFabricQty.value = money(existingItem?.fabricQuantity || pending.qty || 1);
@@ -1737,7 +1737,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 return;
             }
 
-            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_source]`, String(item.fabricSource || 'own')));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_source]`, String(item.fabricSource || 'stock')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || item.qty || 0)));
 
