@@ -12,6 +12,7 @@ $productPayload = $products->map(function ($product) use ($productAvailableQty) 
         'id' => $product->id,
         'name' => $product->name,
         'code' => $product->code,
+        'barcode' => $product->barcode,
         'category' => $product->category?->slug, // expect 'fabrics' for fabric
         'unitLabel' => $isFabric ? 'm' : 'pcs',
         'availableQty' => array_key_exists($product->id, $productAvailableQty)
@@ -781,6 +782,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         filterProductsByCategory('custom').forEach((product) => {
             const option = document.createElement('option');
             option.value = String(product.id);
+            option.dataset.barcode = String(product.barcode || '');
             option.textContent = `${product.name} (${product.code}) | Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim();
             modalProductSelect.appendChild(option);
         });
@@ -863,6 +865,50 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         const $select = window.jQuery(selectEl);
+        const defaultMatcher = (params, data) => {
+            const term = String(params.term || '').trim().toLowerCase();
+            if (!term) {
+                return data;
+            }
+
+            const text = String(data.text || '').toLowerCase();
+            const barcode = String(data.element?.dataset?.barcode || '').trim().toLowerCase();
+
+            if (text.includes(term) || (barcode && barcode.includes(term))) {
+                return data;
+            }
+
+            return null;
+        };
+
+        const selectExactBarcodeMatch = () => {
+            const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+            const scannedValue = String(searchInput?.value || '').replace(/\D+/g, '');
+
+            if (!scannedValue) {
+                return;
+            }
+
+            const matchedOption = Array.from(selectEl.options || []).find((option) => {
+                const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
+                return barcode !== '' && barcode === scannedValue;
+            });
+
+            if (!matchedOption) {
+                return;
+            }
+
+            const nextValue = String(matchedOption.value || '');
+            if (selectEl.multiple) {
+                const currentValues = new Set(($select.val() || []).map((value) => String(value || '')));
+                currentValues.add(nextValue);
+                $select.val(Array.from(currentValues)).trigger('change');
+            } else {
+                $select.val(nextValue).trigger('change');
+                $select.select2('close');
+            }
+        };
+
         if ($select.hasClass('select2-hidden-accessible')) {
             $select.off('.orderSelect2');
             $select.select2('destroy');
@@ -875,7 +921,20 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             allowClear: hasEmptyOption && !selectEl.multiple,
             closeOnSelect: !selectEl.multiple,
             dropdownParent: window.jQuery(selectEl.closest('.tp-modal') || document.body),
+            matcher: defaultMatcher,
             ...extraOptions,
+        });
+
+        $select.on('select2:open.orderSelect2', () => {
+            window.setTimeout(() => {
+                const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+                if (!searchInput) {
+                    return;
+                }
+
+                searchInput.addEventListener('input', selectExactBarcodeMatch);
+                searchInput.addEventListener('change', selectExactBarcodeMatch);
+            }, 0);
         });
     }
 
@@ -1101,6 +1160,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         list.forEach((product) => {
             const option = document.createElement('option');
             option.value = String(product.id);
+            option.dataset.barcode = String(product.barcode || '');
             option.textContent = `${product.name} (${product.code}) | Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim();
             if (selectedValues.includes(String(product.id))) {
                 option.selected = true;

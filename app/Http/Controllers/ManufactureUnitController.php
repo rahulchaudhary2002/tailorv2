@@ -91,7 +91,7 @@ class ManufactureUnitController extends Controller
                 $query->whereIn('slug', ['ready-made', 'accessories']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'barcode', 'product_category_id']);
 
         $productionLogs = InventoryTransaction::query()
             ->whereHas('inventoryType', function ($query) {

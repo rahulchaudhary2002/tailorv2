@@ -75,6 +75,7 @@
                 <tr>
                     <th>Name</th>
                     <th>Code</th>
+                    <th>Barcode</th>
                     <th>Amount</th>
                     <th>Category</th>
                     <th>Inventory Qty</th>
@@ -87,6 +88,7 @@
                     <tr>
                         <td>{{ $product->name }}</td>
                         <td>{{ $product->code }}</td>
+                        <td><span class="barcode-inline">{{ $product->barcode ?: '-' }}</span></td>
                         <td>Rs {{ number_format((float) $product->amount, 2) }}</td>
                         <td>{{ $product->category?->name ?? '-' }}</td>
                         <td>{{ number_format((float) ($product->inventory_total_quantity ?? 0), 2) }}</td>
@@ -114,7 +116,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="empty">No products found.</td>
+                        <td colspan="8" class="empty">No products found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -155,6 +157,12 @@
         display: flex;
         justify-content: flex-end;
         gap: 10px;
+    }
+
+    .barcode-inline {
+        font-family: monospace;
+        font-size: 0.92rem;
+        letter-spacing: 0.06em;
     }
 
     @media (max-width: 768px) {

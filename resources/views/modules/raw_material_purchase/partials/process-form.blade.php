@@ -40,7 +40,7 @@
             <select id="product_id" name="product_id" class="outlet-input" required>
                 <option value="">Select Raw Material</option>
                 @foreach ($products as $product)
-                    <option value="{{ $product->id }}" @selected((string) old('product_id', $purchase->product_id) === (string) $product->id)>
+                    <option value="{{ $product->id }}" data-barcode="{{ $product->barcode }}" @selected((string) old('product_id', $purchase->product_id) === (string) $product->id)>
                         {{ $product->name }} ({{ $product->code }})
                     </option>
                 @endforeach

@@ -42,10 +42,10 @@
 
                 <div class="outlet-form-group listing-filter-form__field">
                     <label for="product_filter">Product</label>
-                    <select id="product_filter" name="product_id" class="outlet-input">
+                    <select id="product_filter" name="product_id" class="outlet-input js-product-filter-select">
                         <option value="">All Products</option>
                         @foreach ($products as $product)
-                            <option value="{{ $product->id }}" @selected($selectedProductId === (int) $product->id)>
+                            <option value="{{ $product->id }}" data-barcode="{{ $product->barcode }}" @selected($selectedProductId === (int) $product->id)>
                                 {{ $product->name }}@if($product->code) ({{ $product->code }})@endif
                             </option>
                         @endforeach
@@ -149,6 +149,66 @@
 @endsection
 
 @section('page-specific-script')
+<script>
+    (function () {
+        const productFilter = document.querySelector('.js-product-filter-select');
+
+        if (!productFilter || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+            return;
+        }
+
+        const $select = window.jQuery(productFilter);
+        const matcher = (params, data) => {
+            const term = String(params.term || '').trim().toLowerCase();
+            if (!term) {
+                return data;
+            }
+
+            const text = String(data.text || '').toLowerCase();
+            const barcode = String(data.element?.dataset?.barcode || '').trim().toLowerCase();
+
+            return text.includes(term) || (barcode && barcode.includes(term)) ? data : null;
+        };
+        const selectExactBarcodeMatch = () => {
+            const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+            const scannedValue = String(searchInput?.value || '').replace(/\D+/g, '');
+            if (!scannedValue) {
+                return;
+            }
+
+            const matchedOption = Array.from(productFilter.options || []).find((option) => {
+                const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
+                return barcode !== '' && barcode === scannedValue;
+            });
+
+            if (!matchedOption) {
+                return;
+            }
+
+            $select.val(String(matchedOption.value || '')).trigger('change');
+            $select.select2('close');
+        };
+
+        $select.select2({
+            width: '100%',
+            placeholder: productFilter.options[0]?.textContent?.trim() || 'All Products',
+            allowClear: true,
+            matcher,
+        });
+
+        $select.on('select2:open.barcodeSelect', () => {
+            window.setTimeout(() => {
+                const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+                if (!searchInput) {
+                    return;
+                }
+
+                searchInput.addEventListener('input', selectExactBarcodeMatch);
+                searchInput.addEventListener('change', selectExactBarcodeMatch);
+            }, 0);
+        });
+    })();
+</script>
 <style>
     .listing-filter-form {
         display: grid;

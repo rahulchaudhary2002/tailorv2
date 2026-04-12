@@ -94,7 +94,7 @@ class InventoryController extends Controller
 
         $products = Product::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'name', 'code', 'barcode']);
 
         $vendors = Vendor::query()
             ->where('is_active', true)

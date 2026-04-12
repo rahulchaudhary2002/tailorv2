@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ProductBarcodeService;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
@@ -13,6 +14,7 @@ class Product extends Model
         'product_category_id',
         'name',
         'code',
+        'barcode',
         'amount',
     ];
 
@@ -83,6 +85,26 @@ class Product extends Model
     public function getSkuAttribute(): ?string
     {
         return $this->attributes['code'] ?? null;
+    }
+
+    public function ensureBarcode(): void
+    {
+        if (!blank($this->barcode) || !$this->exists) {
+            return;
+        }
+
+        $this->forceFill([
+            'barcode' => app(ProductBarcodeService::class)->generateForProductId((int) $this->id),
+        ])->saveQuietly();
+    }
+
+    public function getBarcodeSvgAttribute(): string
+    {
+        if (blank($this->barcode)) {
+            return '';
+        }
+
+        return app(ProductBarcodeService::class)->renderSvg((string) $this->barcode);
     }
 
     public function getUnitIdAttribute(): ?int

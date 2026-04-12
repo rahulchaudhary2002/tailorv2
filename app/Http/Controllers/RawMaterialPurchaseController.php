@@ -71,7 +71,7 @@ class RawMaterialPurchaseController extends Controller
                 $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'barcode', 'product_category_id']);
 
         $vendors = Vendor::query()
             ->where('is_active', true)
@@ -103,7 +103,7 @@ class RawMaterialPurchaseController extends Controller
                 $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'amount', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'barcode', 'amount', 'product_category_id']);
 
         $selectedVendorId = (int) ($request->query('vendor_id') ?? 0);
 
@@ -193,7 +193,7 @@ class RawMaterialPurchaseController extends Controller
                 $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'amount', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'barcode', 'amount', 'product_category_id']);
 
         return view('modules.raw_material_purchase.edit', compact('purchase', 'vendors', 'products'));
     }

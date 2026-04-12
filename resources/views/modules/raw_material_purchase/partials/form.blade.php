@@ -118,6 +118,7 @@
                                 @foreach ($products as $product)
                                     <option
                                         value="existing:{{ $product->id }}"
+                                        data-barcode="{{ $product->barcode }}"
                                         data-product-type="{{ $product->category?->slug }}"
                                         data-product-code="{{ $product->code }}"
                                         data-product-amount="{{ number_format((float) $product->amount, 2, '.', '') }}"
@@ -199,6 +200,7 @@
                         @foreach ($products as $product)
                             <option
                                 value="existing:{{ $product->id }}"
+                                data-barcode="{{ $product->barcode }}"
                                 data-product-type="{{ $product->category?->slug }}"
                                 data-product-code="{{ $product->code }}"
                                 data-product-amount="{{ number_format((float) $product->amount, 2, '.', '') }}"

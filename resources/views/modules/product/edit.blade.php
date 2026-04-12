@@ -23,6 +23,23 @@
 </div>
 
 <div class="js-product-tab-panel" data-tab-panel="details" hidden>
+    <div class="table-card outlet-form-card product-barcode-card">
+        <div class="table-header">
+            <div class="table-title">Product Barcode</div>
+        </div>
+
+        <div class="outlet-form-grid">
+            <div class="outlet-form-group">
+                <label>Barcode Number</label>
+                <input type="text" class="outlet-input" value="{{ $product->barcode }}" readonly>
+            </div>
+            <div class="outlet-form-group outlet-form-group-full">
+                <label>Barcode Preview</label>
+                <div class="product-barcode-svg">{!! $product->barcode_svg !!}</div>
+            </div>
+        </div>
+    </div>
+
     <form action="{{ route('product.update', $product) }}" method="POST">
         @csrf
         @method('PUT')
