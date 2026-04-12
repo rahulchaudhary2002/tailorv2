@@ -55,13 +55,13 @@ class OrderController extends Controller
 
         if ($q !== '') {
             $ordersQuery->where(function ($query) use ($qLower): void {
-                $query->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
-                    ->orWhereRaw('LOWER(status) LIKE ?', ['%' . $qLower . '%'])
-                    ->orWhereRaw('LOWER(payment_status) LIKE ?', ['%' . $qLower . '%'])
+                $query->whereRaw('LOWER(order_number) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(status) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(payment_status) LIKE ?', ['%'.$qLower.'%'])
                     ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
-                        $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
-                });
+                        $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$qLower.'%']);
+                    });
             });
         }
 
@@ -135,14 +135,14 @@ class OrderController extends Controller
 
         if ($q !== '') {
             $tasksQuery->where(function ($query) use ($qLower): void {
-                $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
-                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                $query->whereRaw('LOWER(task_number) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%'.$qLower.'%'])
                     ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
-                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(status) LIKE ?', ['%' . $qLower . '%'])
+                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(status) LIKE ?', ['%'.$qLower.'%'])
                             ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
-                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$qLower.'%']);
                             });
                     });
             });
@@ -190,7 +190,7 @@ class OrderController extends Controller
             ->where('worker_id', (int) ($user?->id ?? 0))
             ->exists();
 
-        if (!$canManageOrders && !$isOwnAssignedOrder) {
+        if (! $canManageOrders && ! $isOwnAssignedOrder) {
             abort(403);
         }
 
@@ -317,7 +317,7 @@ class OrderController extends Controller
                 $productId = (int) $row->product_id;
                 $qty = max(0, (float) $row->on_hand_qty - (float) $row->reserved_qty);
 
-                if (!array_key_exists($productId, $productAvailableQty)) {
+                if (! array_key_exists($productId, $productAvailableQty)) {
                     $productAvailableQty[$productId] = 0.0;
                 }
                 $productAvailableQty[$productId] += $qty;
@@ -436,7 +436,7 @@ class OrderController extends Controller
         $this->notifyOrderRecipients(
             $order,
             'Order delivery date updated',
-            'Delivery date for order ' . $order->order_number . ' was updated to ' . ($order->delivery_due_at?->format('M d, Y h:i A') ?: '-')
+            'Delivery date for order '.$order->order_number.' was updated to '.($order->delivery_due_at?->format('M d, Y h:i A') ?: '-')
         );
 
         return back()
@@ -463,7 +463,7 @@ class OrderController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$outletLocation) {
+        if (! $outletLocation) {
             return redirect()
                 ->route('order.index')
                 ->with('error', 'No active inventory location found for your current outlet.');
@@ -473,7 +473,7 @@ class OrderController extends Controller
             ->where('code', InventoryType::OUTLET)
             ->value('id');
 
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return redirect()
                 ->route('order.index')
                 ->with('error', 'Inventory type outlet is missing. Run inventory type seeder.');
@@ -502,7 +502,7 @@ class OrderController extends Controller
 
                 return array_filter([$normalProductId, $customFabricProductId]);
             })
-            ->map(fn($id) => (int) $id)
+            ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
 
@@ -522,7 +522,7 @@ class OrderController extends Controller
             }
 
             $product = $products->get($productId);
-            if (!$product) {
+            if (! $product) {
                 return back()
                     ->withInput()
                     ->with('error', 'One or more selected products is invalid.');
@@ -560,7 +560,7 @@ class OrderController extends Controller
             }
 
             $stockKey = (string) $productId;
-            if (!array_key_exists($stockKey, $requiredBySku)) {
+            if (! array_key_exists($stockKey, $requiredBySku)) {
                 $requiredBySku[$stockKey] = [
                     'product_id' => $productId,
                     'required_qty' => 0.0,
@@ -570,7 +570,7 @@ class OrderController extends Controller
             $requiredBySku[$stockKey]['required_qty'] += $requiredQty;
         }
 
-        if (!empty($requiredBySku)) {
+        if (! empty($requiredBySku)) {
             $requiredCollection = collect(array_values($requiredBySku));
             $requiredProductIds = $requiredCollection
                 ->pluck('product_id')
@@ -585,7 +585,7 @@ class OrderController extends Controller
             $availableMap = [];
             foreach ($availableStockRows as $row) {
                 $stockKey = (string) ((int) $row->product_id);
-                if (!array_key_exists($stockKey, $availableMap)) {
+                if (! array_key_exists($stockKey, $availableMap)) {
                     $availableMap[$stockKey] = 0.0;
                 }
                 $availableMap[$stockKey] += max(0, (float) $row->on_hand_qty - (float) $row->reserved_qty);
@@ -665,7 +665,7 @@ class OrderController extends Controller
                     $existingOrder->items()->delete();
                 }
 
-                $order = $existingOrder ?: new Order();
+                $order = $existingOrder ?: new Order;
 
                 $order->fill([
                     'order_number' => $order->exists ? $order->order_number : $this->generateOrderNumber(),
@@ -702,7 +702,8 @@ class OrderController extends Controller
                     if ($itemCategory === 'custom') {
                         $custom = (array) ($item['custom'] ?? []);
                         $fabricSource = (string) ($custom['fabric_source'] ?? 'own');
-                        $fabricProductId = !empty($custom['fabric_product_id']) ? (int) $custom['fabric_product_id'] : null;
+                        $customDesignNote = trim((string) ($custom['design_note'] ?? ''));
+                        $fabricProductId = ! empty($custom['fabric_product_id']) ? (int) $custom['fabric_product_id'] : null;
                         $fabricQuantity = (float) ($custom['fabric_quantity'] ?? $quantity);
                         $fabricUnitPrice = 0.0;
 
@@ -737,7 +738,7 @@ class OrderController extends Controller
                                 $garmentDesignImages = (array) $request->file("items.{$itemIndex}.custom.garments.{$garmentIndex}.design_images", []);
 
                                 foreach ($garmentDesignImages as $garmentDesignImage) {
-                                    if (!$garmentDesignImage || !$garmentDesignImage->isValid()) {
+                                    if (! $garmentDesignImage || ! $garmentDesignImage->isValid()) {
                                         continue;
                                     }
 
@@ -759,7 +760,7 @@ class OrderController extends Controller
                                         ->all(),
                                     'design_images' => array_values(array_unique($garmentDesignImagePaths)),
                                     'design_image' => $garmentDesignImagePaths[0] ?? null,
-                                    'tailoring_package_id' => !empty($garment['tailoring_package_id'])
+                                    'tailoring_package_id' => ! empty($garment['tailoring_package_id'])
                                         ? (int) $garment['tailoring_package_id']
                                         : null,
                                     'tailoring_package' => filled($garment['tailoring_package'] ?? null)
@@ -808,7 +809,8 @@ class OrderController extends Controller
                                 'fabric_total_price' => $fabricSource === 'stock' ? ($fabricQuantity * $fabricUnitPrice) : null,
                                 'quantity_unit' => $fabricQuantityUnit,
                                 'tailoring_total_price' => $itemTailoringTotal,
-                                'design_note' => $designNoteSummary !== '' ? $designNoteSummary : null,
+                                'design_note' => $customDesignNote !== '' ? $customDesignNote : null,
+                                'garment_design_note_summary' => $designNoteSummary !== '' ? $designNoteSummary : null,
                                 'design_images' => $designImagePaths,
                                 'design_image' => $designImagePaths[0] ?? null,
                             ],
@@ -900,7 +902,7 @@ class OrderController extends Controller
             $this->notifyOrderRecipients(
                 $savedOrder,
                 $existingOrder ? 'Order updated' : 'Order created',
-                ($existingOrder ? 'Order ' : 'New order ') . $savedOrder->order_number . ' for ' . ($savedOrder->customer?->name ?: 'Walk-in') . ' was ' . ($existingOrder ? 'updated.' : 'created.')
+                ($existingOrder ? 'Order ' : 'New order ').$savedOrder->order_number.' for '.($savedOrder->customer?->name ?: 'Walk-in').' was '.($existingOrder ? 'updated.' : 'created.')
             );
         }
 
@@ -929,8 +931,8 @@ class OrderController extends Controller
             ->exists();
         $redirectRoute = $canManageOrders ? 'order.index' : 'order.assignedJobs';
 
-        if (!$canManageOrders) {
-            if (!$canViewAssignedJobs || !$isOwnAssignedOrder) {
+        if (! $canManageOrders) {
+            if (! $canViewAssignedJobs || ! $isOwnAssignedOrder) {
                 return redirect()
                     ->route($redirectRoute)
                     ->with('error', 'You can only update statuses for jobs assigned to you.');
@@ -959,14 +961,14 @@ class OrderController extends Controller
             }
         }
 
-        if (!$canManageOrders) {
+        if (! $canManageOrders) {
             $allowedWorkerStatuses = [
                 Order::STATUS_IN_PROGRESS,
                 Order::STATUS_NEAR_COMPLETION,
                 Order::STATUS_COMPLETED,
             ];
 
-            if (!in_array($targetStatus, $allowedWorkerStatuses, true)) {
+            if (! in_array($targetStatus, $allowedWorkerStatuses, true)) {
                 return redirect()
                     ->route($redirectRoute)
                     ->with('error', 'You can only move your assigned jobs through progress statuses.');
@@ -1018,7 +1020,7 @@ class OrderController extends Controller
         $this->notifyOrderRecipients(
             $order,
             'Order status updated',
-            'Order ' . $order->order_number . ' status changed to ' . Order::statusLabel((string) $order->status) . '.'
+            'Order '.$order->order_number.' status changed to '.Order::statusLabel((string) $order->status).'.'
         );
 
         return redirect()
@@ -1064,7 +1066,7 @@ class OrderController extends Controller
         $this->notifyOrderRecipients(
             $order,
             'Order payment recorded',
-            'Payment of NPR ' . number_format($paymentAmount, 2) . ' was recorded for order ' . $order->order_number . '.'
+            'Payment of NPR '.number_format($paymentAmount, 2).' was recorded for order '.$order->order_number.'.'
         );
 
         return back()
@@ -1080,7 +1082,7 @@ class OrderController extends Controller
             (int) ($order->outlet_id ?? 0),
             [
                 'title' => $title,
-                'message' => $actorName . ': ' . $message,
+                'message' => $actorName.': '.$message,
                 'url' => route('order.show', $order),
                 'module' => 'Order',
             ],
@@ -1090,14 +1092,14 @@ class OrderController extends Controller
 
     private function generateOrderNumber(): string
     {
-        $prefix = 'ORD-' . now()->format('Ymd');
+        $prefix = 'ORD-'.now()->format('Ymd');
         $count = Order::query()
             ->whereDate('created_at', now()->toDateString())
             ->lockForUpdate()
             ->get(['id'])
             ->count();
 
-        return $prefix . '-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
+        return $prefix.'-'.str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -1280,7 +1282,7 @@ class OrderController extends Controller
                 'to_location_id' => null,
                 'vendor_id' => null,
                 'trx_date' => $trxDate,
-                'notes' => 'Order ' . $order->order_number . ' stock deduction',
+                'notes' => 'Order '.$order->order_number.' stock deduction',
                 'created_by' => $createdBy,
             ]);
 
@@ -1378,6 +1380,7 @@ class OrderController extends Controller
             if ($locationId < 1) {
                 $transaction->items()->delete();
                 $transaction->delete();
+
                 continue;
             }
 
@@ -1398,7 +1401,7 @@ class OrderController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if (!$stock) {
+                if (! $stock) {
                     $stock = InventoryStock::query()->create([
                         'location_id' => $locationId,
                         'product_id' => $productId,
@@ -1454,7 +1457,7 @@ class OrderController extends Controller
             }
 
             $stockKey = (string) $productId;
-            if (!array_key_exists($stockKey, $requirements)) {
+            if (! array_key_exists($stockKey, $requirements)) {
                 $requirements[$stockKey] = 0.0;
             }
 
@@ -1543,7 +1546,7 @@ class OrderController extends Controller
             ];
         }
 
-        if (!$editingOrder) {
+        if (! $editingOrder) {
             return [
                 'items' => [],
                 'advancePaymentAmount' => 0,
@@ -1572,11 +1575,11 @@ class OrderController extends Controller
                         $itemCategory = (string) $item->item_category;
 
                         return [
-                            'id' => 'existing-' . $item->id,
+                            'id' => 'existing-'.$item->id,
                             'category' => $itemCategory,
                             'productId' => (int) $item->product_id,
                             'name' => $item->product
-                                ? trim($item->product->name . ' (' . $item->product->code . ')')
+                                ? trim($item->product->name.' ('.$item->product->code.')')
                                 : 'Product',
                             'unitLabel' => $itemCategory === 'fabric' ? 'm' : 'pcs',
                             'qty' => (float) $item->quantity,
@@ -1591,11 +1594,11 @@ class OrderController extends Controller
                     $fabricQuantity = (float) data_get($item->custom_details, 'fabric_quantity', $item->quantity);
 
                     return [
-                        'id' => 'existing-' . $item->id,
+                        'id' => 'existing-'.$item->id,
                         'category' => 'custom',
                         'productId' => $fabricProductId,
                         'name' => $fabricProduct
-                            ? trim($fabricProduct->name . ' (' . $fabricProduct->code . ')')
+                            ? trim($fabricProduct->name.' ('.$fabricProduct->code.')')
                             : 'Custom Product',
                         'unitLabel' => 'm',
                         'qty' => $fabricQuantity,
@@ -1638,7 +1641,7 @@ class OrderController extends Controller
     private function mapBillItemFromInput(array $item, int $index, Collection $productLookup, Collection $garmentLookup): ?array
     {
         $category = (string) ($item['item_category'] ?? '');
-        if (!in_array($category, ['custom', 'fabric', 'readymade', 'accessories'], true)) {
+        if (! in_array($category, ['custom', 'fabric', 'readymade', 'accessories'], true)) {
             return null;
         }
 
@@ -1647,11 +1650,11 @@ class OrderController extends Controller
             $product = $productLookup->get($productId);
 
             return [
-                'id' => 'old-' . $index,
+                'id' => 'old-'.$index,
                 'category' => $category,
                 'productId' => $productId,
                 'name' => $product
-                    ? trim($product->name . ' (' . $product->code . ')')
+                    ? trim($product->name.' ('.$product->code.')')
                     : 'Product',
                 'unitLabel' => $category === 'fabric' ? 'm' : 'pcs',
                 'qty' => (float) ($item['quantity'] ?? 0),
@@ -1668,11 +1671,11 @@ class OrderController extends Controller
         $unitPrice = $fabricSource === 'stock' ? $submittedUnitPrice : 0;
 
         return [
-            'id' => 'old-' . $index,
+            'id' => 'old-'.$index,
             'category' => 'custom',
             'productId' => $productId,
             'name' => $product
-                ? trim($product->name . ' (' . $product->code . ')')
+                ? trim($product->name.' ('.$product->code.')')
                 : 'Custom Product',
             'unitLabel' => 'm',
             'qty' => (float) ($custom['fabric_quantity'] ?? ($item['quantity'] ?? 0)),
@@ -1750,7 +1753,7 @@ class OrderController extends Controller
         }
 
         $customer = Customer::query()->find($customerId);
-        if (!$customer) {
+        if (! $customer) {
             return;
         }
 

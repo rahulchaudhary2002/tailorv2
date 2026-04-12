@@ -69,9 +69,10 @@
                 ->map(fn ($note) => trim((string) $note))
                 ->filter()
                 ->values();
-            $designNoteText = $garmentDesignNotes->isNotEmpty()
+            $designNoteText = data_get($customDetails, 'design_note', '-') ?: '-';
+            $garmentDesignNoteText = $garmentDesignNotes->isNotEmpty()
                 ? $garmentDesignNotes->implode(', ')
-                : (data_get($customDetails, 'design_note', '-') ?: '-');
+                : '-';
             $designImages = collect((array) ($garment['design_images'] ?? []))
                 ->push($garment['design_image'] ?? null)
                 ->when(function ($collection) {
@@ -87,6 +88,7 @@
         @endphp
         <div class="bill-muted">Tailoring Package: {{ $garment['tailoring_package'] ?? '-' }}</div>
         <div class="bill-muted">Design Note: {{ $designNoteText }}</div>
+        <div class="bill-muted">Garment Design Note: {{ $garmentDesignNoteText }}</div>
         <div class="bill-muted">Slip Required For Payment: Yes</div>
     </div>
 

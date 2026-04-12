@@ -363,6 +363,14 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <h4>Measurement Details</h4>
                     <div id="measurementFields" class="tp-garment-sections"></div>
                     <small class="tp-hint">Each selected garment keeps its own quantity, measurements, tailoring package, optional design notes, and optional design samples.</small>
+                    <div id="customDesignNoteWrap" class="tp-form-group" style="margin-top: 16px;">
+                        <label for="customDesignNote">Design Note</label>
+                        <textarea
+                            id="customDesignNote"
+                            class="tp-input"
+                            rows="3"
+                            placeholder="Add any extra design instructions for this custom item..."></textarea>
+                    </div>
                 </div>
             </div>
 
@@ -618,6 +626,13 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-garment-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;}
 .tp-garment-title{font-weight:700;color:#7b1fa2;}
 .tp-garment-summary{font-size:12px;color:#6a7785;}
+.tp-design-preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;margin-top:10px;}
+.tp-design-preview-card{position:relative;border:1px solid #d9e3f0;border-radius:10px;overflow:hidden;background:#fff;}
+.tp-design-preview-card img{display:block;width:100%;height:88px;object-fit:cover;background:#f8fafc;}
+.tp-design-preview-remove{position:absolute;top:6px;right:6px;width:24px;height:24px;border:none;border-radius:999px;background:rgba(15,23,42,.78);color:#fff;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.tp-design-preview-remove:hover{background:#dc2626;}
+.tp-design-preview-badge{display:block;padding:6px 8px;font-size:11px;font-weight:600;color:#475569;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;}
+.tp-design-preview-empty{margin-top:10px;font-size:12px;color:#6a7785;}
 .tp-product-quantity-list{display:grid;gap:10px;padding:12px;border:1px solid #d7e0ec;border-radius:10px;background:#fff;}
 .tp-product-quantity-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #eef1f5;border-radius:10px;}
 .tp-product-quantity-item strong{color:var(--primary);}
@@ -733,6 +748,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const modalProductPrice = document.getElementById('modalProductPrice');
     const modalProductQuantity = document.getElementById('modalProductQuantity');
     const modalProductCounter = document.getElementById('modalProductCounter');
+    const customDesignNoteWrap = document.getElementById('customDesignNoteWrap');
+    const customDesignNoteEl = document.getElementById('customDesignNote');
     const garmentTypeCheckboxes = document.getElementById('garmentTypeCheckboxes');
     const measurementFieldsEl = document.getElementById('measurementFields');
     const customFabricOwnRadio = document.getElementById('customFabricOwn');
@@ -773,6 +790,126 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
     function formatFabricPrice(value, unitLabel = 'meter') {
         return `NPR ${money(value)} per ${normalizeUnitLabel(unitLabel)}`;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderDesignPreview(container, existingImages = [], selectedFiles = []) {
+        if (!container) return;
+
+        const existingCards = (Array.isArray(existingImages) ? existingImages : [])
+            .map((path) => String(path || '').trim())
+            .filter(Boolean)
+            .map((path, index) => {
+                const imageUrl = path.startsWith('http://') || path.startsWith('https://')
+                    ? path
+                    : `{{ Storage::url('') }}${String(path).replace(/^\/+/, '')}`;
+
+                return `
+                    <div class="tp-design-preview-card">
+                        <button type="button" class="tp-design-preview-remove" data-remove-existing="${index}" aria-label="Remove saved image">&times;</button>
+                        <img src="${escapeHtml(imageUrl)}" alt="Existing design sample preview">
+                        <span class="tp-design-preview-badge">Saved</span>
+                    </div>
+                `;
+            });
+
+        const selectedCards = (Array.isArray(selectedFiles) ? selectedFiles : [])
+            .filter((file) => file instanceof File)
+            .map((file, index) => `
+                <div class="tp-design-preview-card">
+                    <button type="button" class="tp-design-preview-remove" data-remove-selected="${index}" aria-label="Remove new image">&times;</button>
+                    <img src="${escapeHtml(URL.createObjectURL(file))}" alt="Selected design sample preview">
+                    <span class="tp-design-preview-badge">New</span>
+                </div>
+            `);
+
+        const cards = [...existingCards, ...selectedCards];
+
+        container.innerHTML = cards.length
+            ? `<div class="tp-design-preview-grid">${cards.join('')}</div>`
+            : '<div class="tp-design-preview-empty">No design sample selected yet.</div>';
+    }
+
+    function syncDesignUploadInput(fileInput, files) {
+        if (!fileInput) return;
+
+        try {
+            const transfer = new DataTransfer();
+            (Array.isArray(files) ? files : []).forEach((file) => {
+                if (file instanceof File) {
+                    transfer.items.add(file);
+                }
+            });
+            fileInput.files = transfer.files;
+        } catch (error) {}
+    }
+
+    function updateDesignUploadMeta(section, existingImages, selectedFiles) {
+        const existingNote = section.querySelector('[data-existing-image-note]');
+        const selectedNote = section.querySelector('[data-selected-image-note]');
+        const existingCount = Array.isArray(existingImages) ? existingImages.length : 0;
+        const selectedCount = Array.isArray(selectedFiles) ? selectedFiles.length : 0;
+
+        if (existingNote) {
+            existingNote.textContent = existingCount
+                ? `${existingCount} existing design sample${existingCount > 1 ? 's' : ''} will be kept.`
+                : '';
+            existingNote.style.display = existingCount ? '' : 'none';
+        }
+
+        if (selectedNote) {
+            selectedNote.textContent = selectedCount
+                ? `${selectedCount} newly selected file${selectedCount > 1 ? 's are' : ' is'} queued.`
+                : '';
+            selectedNote.style.display = selectedCount ? '' : 'none';
+        }
+    }
+
+    function bindDesignPreviewActions(section, fileInput, previewHost, existingImages) {
+        if (!previewHost) return;
+
+        const refreshPreview = () => {
+            const selectedFiles = Array.isArray(section._designFiles) ? section._designFiles : [];
+            section.dataset.existingDesignImages = JSON.stringify(existingImages);
+            renderDesignPreview(previewHost, existingImages, selectedFiles);
+            updateDesignUploadMeta(section, existingImages, selectedFiles);
+
+            previewHost.querySelectorAll('[data-remove-existing]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const index = Number(button.dataset.removeExisting);
+                    if (Number.isNaN(index) || index < 0) return;
+                    existingImages.splice(index, 1);
+                    refreshPreview();
+                });
+            });
+
+            previewHost.querySelectorAll('[data-remove-selected]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const index = Number(button.dataset.removeSelected);
+                    if (Number.isNaN(index) || index < 0) return;
+                    const nextFiles = Array.isArray(section._designFiles) ? [...section._designFiles] : [];
+                    nextFiles.splice(index, 1);
+                    section._designFiles = nextFiles;
+                    syncDesignUploadInput(fileInput, nextFiles);
+                    refreshPreview();
+                });
+            });
+        };
+
+        refreshPreview();
+
+        fileInput?.addEventListener('change', () => {
+            section._designFiles = Array.from(fileInput.files || []);
+            refreshPreview();
+        });
     }
 
     function buildModalProductSelect() {
@@ -1413,14 +1550,13 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             }
             designNoteHtml += '</div>';
 
-            const existingImageCount = Array.isArray(existingDesignImages) ? existingDesignImages.length : 0;
-            const selectedFileCount = Array.isArray(draftDesignFiles) ? draftDesignFiles.length : 0;
             const designImageHtml = `
                 <div class="tp-design-upload-panel">
                     <div class="tp-design-upload-heading"><i class="fas fa-cloud-upload-alt"></i> Upload design sample (optional)</div>
                     <input type="file" class="tp-input tp-design-upload-input" data-design-images accept="image/*" multiple>
-                    ${existingImageCount ? `<div class="tp-existing-image-note">${existingImageCount} existing design sample${existingImageCount > 1 ? 's' : ''} will be kept.</div>` : ''}
-                    ${selectedFileCount ? `<div class="tp-existing-image-note">${selectedFileCount} newly selected file${selectedFileCount > 1 ? 's are' : ' is'} queued.</div>` : ''}
+                    <div class="tp-existing-image-note" data-existing-image-note style="display:none;"></div>
+                    <div class="tp-existing-image-note" data-selected-image-note style="display:none;"></div>
+                    <div class="tp-design-preview-host" data-design-preview></div>
                 </div>
             `;
 
@@ -1460,7 +1596,19 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             `;
 
             measurementFieldsEl.appendChild(section);
+
+            const fileInput = section.querySelector('input[data-design-images]');
+            const previewHost = section.querySelector('[data-design-preview]');
+            bindDesignPreviewActions(section, fileInput, previewHost, existingDesignImages);
         });
+
+        const firstSection = measurementFieldsEl.querySelector('.tp-garment-section');
+        const firstDesignNotePanel = firstSection?.querySelector('.tp-design-note-panel');
+        if (customDesignNoteWrap && firstDesignNotePanel) {
+            firstDesignNotePanel.insertAdjacentElement('afterend', customDesignNoteWrap);
+        } else if (customDesignNoteWrap) {
+            measurementFieldsEl.insertAdjacentElement('afterend', customDesignNoteWrap);
+        }
     }
 
     function updateCustomFabricSourceUI() {
@@ -1500,6 +1648,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         modal.dataset.itemState = JSON.stringify({ garments: [] });
         customFabricOwnRadio.checked = false;
         customFabricStockRadio.checked = true;
+        if (customDesignNoteEl) customDesignNoteEl.value = '';
         if (customOwnFabricQty) customOwnFabricQty.value = '1.00';
         customStockFabricQty.value = '1.00';
         Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
@@ -1554,6 +1703,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             garments: existingItem?.garments || [],
         };
         modal.dataset.itemState = JSON.stringify(itemState);
+        if (customDesignNoteEl) {
+            customDesignNoteEl.value = String(existingItem?.designNote || '');
+        }
 
         const selectedIds = itemState.garments.length
             ? itemState.garments.map((garment) => String(garment.garmentTypeId))
@@ -1622,7 +1774,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
             let customSummary = '';
             if (item.category === 'custom' && item.garments?.length) {
-                customSummary = item.garments.map((garment) => {
+                const garmentSummary = item.garments.map((garment) => {
                     return `
                         <div class="stitching-detail">
                             <div>
@@ -1633,6 +1785,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                         </div>
                     `;
                 }).join('');
+                customSummary = `${garmentSummary}`;
             }
 
             const sizeSummary = item.category === 'readymade' && item.size
@@ -1740,6 +1893,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_source]`, String(item.fabricSource || 'stock')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_product_id]`, String(item.productId || '')));
             hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][fabric_quantity]`, String(item.fabricQuantity || item.qty || 0)));
+            hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][design_note]`, String(item.designNote || '')));
 
             (item.garments || []).forEach((garment, garmentIndex) => {
                 hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][garment_type_id]`, String(garment.garmentTypeId || '')));
@@ -2024,6 +2178,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             baseUnitPrice: stockUnitPrice,
             fabricSource,
             fabricQuantity,
+            designNote: String(customDesignNoteEl?.value || '').trim(),
             garments,
         };
 

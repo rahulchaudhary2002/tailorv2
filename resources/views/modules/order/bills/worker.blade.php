@@ -111,6 +111,9 @@
             <div class="bill-muted" style="margin-top:10px;">
                 {{ $displayName }}
             </div>
+            @if (filled(data_get($customItem->custom_details, 'design_note')))
+                <div class="bill-muted">Design Note: {{ data_get($customItem->custom_details, 'design_note') }}</div>
+            @endif
 
             @if ($garments->isNotEmpty())
                 @foreach ($garments as $garment)
@@ -193,6 +196,9 @@
                 {{ data_get($customItem->custom_details, 'garment_title')
                     ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment') }}
             </div>
+            @if (filled(data_get($customItem->custom_details, 'design_note')))
+                <div class="bill-muted">Design Note: {{ data_get($customItem->custom_details, 'design_note') }}</div>
+            @endif
             @if ($garments->isNotEmpty())
                 @foreach ($garments as $garment)
                     @php

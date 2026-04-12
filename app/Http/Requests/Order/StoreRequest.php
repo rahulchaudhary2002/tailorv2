@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests\Order;
 
+use App\Models\GarmentTypeTailoringPackage;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\GarmentTypeTailoringPackage;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -47,6 +47,7 @@ class StoreRequest extends FormRequest
             'items.*.custom.fabric_source' => ['nullable', 'string', Rule::in(['own', 'stock'])],
             'items.*.custom.fabric_product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.custom.fabric_quantity' => ['nullable', 'numeric', 'min:0.01'],
+            'items.*.custom.design_note' => ['nullable', 'string', 'max:1000'],
             'items.*.custom.garments' => ['nullable', 'array'],
             'items.*.custom.garments.*.garment_type_id' => ['nullable', 'integer', 'exists:garment_types,id'],
             'items.*.custom.garments.*.garment_title' => ['nullable', 'string', 'max:100'],
@@ -125,7 +126,7 @@ class StoreRequest extends FormRequest
                     $fabricSource = (string) data_get($item, 'custom.fabric_source', '');
                     $garments = collect((array) data_get($item, 'custom.garments', []))->values();
 
-                    if (!in_array($fabricSource, ['own', 'stock'], true)) {
+                    if (! in_array($fabricSource, ['own', 'stock'], true)) {
                         $validator->errors()->add("items.{$index}.custom.fabric_source", 'Fabric source is required for custom item.');
                     }
 
@@ -182,7 +183,7 @@ class StoreRequest extends FormRequest
                                 ->where('garment_type_id', $garmentTypeId)
                                 ->exists();
 
-                            if (!$validPackage) {
+                            if (! $validPackage) {
                                 $validator->errors()->add(
                                     "items.{$index}.custom.garments.{$garmentIndex}.tailoring_package_id",
                                     'Selected tailoring package does not belong to selected garment type.'
@@ -209,7 +210,7 @@ class StoreRequest extends FormRequest
                         $fabricQty = (float) data_get($item, 'custom.fabric_quantity', 0);
                         $fabricProduct = $products->get($fabricProductId);
 
-                        if ($fabricProductId < 1 || !$fabricProduct) {
+                        if ($fabricProductId < 1 || ! $fabricProduct) {
                             $validator->errors()->add("items.{$index}.custom.fabric_product_id", 'Select a fabric product from stock.');
                         } elseif ($fabricCategoryId > 0 && (int) $fabricProduct->product_category_id !== $fabricCategoryId) {
                             $validator->errors()->add("items.{$index}.custom.fabric_product_id", 'Selected stock product must be in Fabrics category.');
@@ -225,12 +226,14 @@ class StoreRequest extends FormRequest
 
                 if ($productId < 1) {
                     $validator->errors()->add("items.{$index}.product_id", 'Product is required.');
+
                     continue;
                 }
 
                 $product = $products->get($productId);
-                if (!$product || !$allowedProductCategoryIds->contains((int) $product->product_category_id)) {
+                if (! $product || ! $allowedProductCategoryIds->contains((int) $product->product_category_id)) {
                     $validator->errors()->add("items.{$index}.product_id", 'Selected product is not allowed for order items.');
+
                     continue;
                 }
 
@@ -242,7 +245,7 @@ class StoreRequest extends FormRequest
                     $validator->errors()->add("items.{$index}.product_id", 'Readymade category item cannot use a fabric product.');
                 }
 
-                if ($itemCategory === 'readymade' && !in_array((string) ($item['size'] ?? ''), ['S', 'M', 'L', 'XL', 'XXL'], true)) {
+                if ($itemCategory === 'readymade' && ! in_array((string) ($item['size'] ?? ''), ['S', 'M', 'L', 'XL', 'XXL'], true)) {
                     $validator->errors()->add("items.{$index}.size", 'Size is required for ready-made item.');
                 }
 
@@ -291,5 +294,4 @@ class StoreRequest extends FormRequest
             }
         });
     }
-
 }
