@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\Outlet;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -19,7 +19,10 @@ return new class extends Migration
             $table->primary(['outlet_id', 'user_id']);
         });
 
-        Outlet::first()->users()->sync([1]);
+        DB::table('outlet_user')->insert([
+            'outlet_id' => 1,
+            'user_id' => 1,
+        ]);
     }
 
     /**
