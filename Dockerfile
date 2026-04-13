@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
-    libpq-dev \
     zip \
     unzip \
     && apt-get clean \
@@ -20,8 +19,7 @@ RUN apt-get update && apt-get install -y \
 # PHP extensions
 RUN docker-php-ext-install \
     pdo \
-    pdo_pgsql \
-    pgsql \
+    pdo_mysql \
     mbstring \
     exif \
     pcntl \

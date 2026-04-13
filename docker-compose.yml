@@ -1,18 +1,18 @@
 services:
-  tailor-postgres:
-    image: postgres:16.2-alpine
-    container_name: tailor-postgres
+  tailor-mysql:
+    image: mysql:8.4
+    container_name: tailor-mysql
     restart: on-failure
     env_file: .env
     environment:
-      PGDATA: /var/lib/postgresql/data/pgdata
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
     ports:
-      - "5433:5432"
+      - "3307:3306"
     volumes:
-      - tailor-postgres-data:/var/lib/postgresql/data
+      - tailor-mysql-data:/var/lib/mysql
     networks:
       - tailor-services
 
@@ -20,9 +20,9 @@ services:
     image: adminer:latest
     container_name: tailor-adminer
     depends_on:
-      - tailor-postgres
+      - tailor-mysql
     environment:
-      ADMINER_DEFAULT_SERVER: tailor-postgres
+      ADMINER_DEFAULT_SERVER: tailor-mysql
     ports:
       - "8888:8080"
     networks:
@@ -43,7 +43,7 @@ services:
       - .:/var/www
       - ./.dockerfile/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     depends_on:
-      - tailor-postgres
+      - tailor-mysql
     networks:
       - tailor-services
 
@@ -67,4 +67,4 @@ networks:
     driver: bridge
 
 volumes:
-  tailor-postgres-data:
+  tailor-mysql-data:
