@@ -52,12 +52,12 @@ class InventoryTransaction extends Model
 
     public function vendor()
     {
-        return $this->belongsTo(Vendor::class);
+        return $this->belongsTo(Vendor::class)->withTrashed();
     }
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')->withTrashed();
     }
 
     public function items()
@@ -67,7 +67,7 @@ class InventoryTransaction extends Model
 
     public function targetProduct()
     {
-        return $this->belongsTo(Product::class, 'target_product_id');
+        return $this->belongsTo(Product::class, 'target_product_id')->withTrashed();
     }
 
     public static function statusLabel(?string $status): string

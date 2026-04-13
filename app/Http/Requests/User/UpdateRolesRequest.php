@@ -3,6 +3,7 @@
 namespace App\Http\Requests\User;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateRolesRequest extends FormRequest
 {
@@ -22,9 +23,9 @@ class UpdateRolesRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'assignment_outlet_id' => ['required', 'integer', 'exists:outlets,id'],
+            'assignment_outlet_id' => ['required', 'integer', Rule::exists('outlets', 'id')->whereNull('deleted_at')],
             'role_ids' => ['nullable', 'array'],
-            'role_ids.*' => ['integer', 'exists:roles,id'],
+            'role_ids.*' => ['integer', Rule::exists('roles', 'id')->whereNull('deleted_at')],
         ];
     }
 }

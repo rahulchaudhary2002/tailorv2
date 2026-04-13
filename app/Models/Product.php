@@ -4,9 +4,12 @@ namespace App\Models;
 
 use App\Services\ProductBarcodeService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+    use SoftDeletes;
+
     public const DEFAULT_UNIT_CODE_METER = 'METER';
     public const DEFAULT_UNIT_CODE_PIECE = 'PIECE';
 

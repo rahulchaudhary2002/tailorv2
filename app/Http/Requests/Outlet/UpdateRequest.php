@@ -29,7 +29,7 @@ class UpdateRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('outlets', 'code')->ignore($this->route('outlet')),
+                Rule::unique('outlets', 'code')->whereNull('deleted_at')->ignore($this->route('outlet')),
             ],
             'address' => ['required', 'string', 'max:255'],
         ];

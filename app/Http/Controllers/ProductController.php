@@ -10,15 +10,12 @@ use App\Models\InventoryLocation;
 use App\Models\InventoryReorderLevel;
 use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
-use App\Models\InventoryTransactionItem;
 use App\Models\InventoryType;
-use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\QueryException;
 
 class ProductController extends Controller
 {
@@ -419,21 +416,8 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        if ($this->productHasDeletionDependencies($product)) {
-            return redirect()
-                ->route('product.index')
-                ->with('error', 'Product cannot be deleted because it is already used in inventory or order records.');
-        }
-
         $productName = $product->name;
-
-        try {
-            $product->delete();
-        } catch (QueryException $exception) {
-            return redirect()
-                ->route('product.index')
-                ->with('error', 'Product cannot be deleted because it is already used in inventory or order records.');
-        }
+        $product->delete();
 
         $this->notifyProductRecipients(
             'Product deleted',
@@ -461,16 +445,6 @@ class ProductController extends Controller
             ],
             array_filter([(int) auth()->id()])
         );
-    }
-
-    private function productHasDeletionDependencies(Product $product): bool
-    {
-        return InventoryTransactionItem::query()
-            ->where('product_id', $product->id)
-            ->exists()
-            || OrderItem::query()
-                ->where('product_id', $product->id)
-                ->exists();
     }
 
     private function filteredProductsQuery(Request $request)

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\GarmentTypeMeasurement;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateRequest extends FormRequest
 {
@@ -23,7 +24,7 @@ class UpdateRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:100'],
-            'unit_id' => ['required', 'exists:units,id'],
+            'unit_id' => ['required', Rule::exists('units', 'id')->whereNull('deleted_at')],
             'order' => ['required', 'integer', 'min:1'],
         ];
     }

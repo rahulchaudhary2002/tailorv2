@@ -30,7 +30,7 @@ class UpdateRequest extends FormRequest
                 'nullable',
                 'email',
                 'max:150',
-                Rule::unique('vendors', 'email')->ignore($this->route('vendor')),
+                Rule::unique('vendors', 'email')->whereNull('deleted_at')->ignore($this->route('vendor')),
             ],
             'phone' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string', 'max:255'],

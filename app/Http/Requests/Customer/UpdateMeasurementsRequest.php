@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Customer;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateMeasurementsRequest extends FormRequest
 {
@@ -23,9 +24,9 @@ class UpdateMeasurementsRequest extends FormRequest
     {
         return [
             'garment_type_ids' => ['nullable', 'array'],
-            'garment_type_ids.*' => ['integer', 'distinct', 'exists:garment_types,id'],
+            'garment_type_ids.*' => ['integer', 'distinct', Rule::exists('garment_types', 'id')->whereNull('deleted_at')],
             'measurements' => ['nullable', 'array'],
-            'measurements.*.garment_type_id' => ['required', 'integer', 'exists:garment_types,id'],
+            'measurements.*.garment_type_id' => ['required', 'integer', Rule::exists('garment_types', 'id')->whereNull('deleted_at')],
             'measurements.*.type' => ['required', 'string', 'max:100'],
             'measurements.*.measurement' => ['required', 'string', 'max:50'],
             'measurements.*.unit' => ['required', 'string', 'max:20'],

@@ -56,17 +56,17 @@ class OrderTask extends Model
 
     public function worker()
     {
-        return $this->belongsTo(User::class, 'worker_id');
+        return $this->belongsTo(User::class, 'worker_id')->withTrashed();
     }
 
     public function garmentType()
     {
-        return $this->belongsTo(GarmentType::class);
+        return $this->belongsTo(GarmentType::class)->withTrashed();
     }
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by')->withTrashed();
     }
 
     public static function statusLabels(): array

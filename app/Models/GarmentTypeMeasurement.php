@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GarmentTypeMeasurement extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'garment_type_id',
         'title',
@@ -15,11 +18,11 @@ class GarmentTypeMeasurement extends Model
 
     public function garmentType()
     {
-        return $this->belongsTo(GarmentType::class);
+        return $this->belongsTo(GarmentType::class)->withTrashed();
     }
 
     public function unit()
     {
-        return $this->belongsTo(Unit::class);
+        return $this->belongsTo(Unit::class)->withTrashed();
     }
 }

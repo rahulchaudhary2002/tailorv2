@@ -25,7 +25,7 @@ class StoreRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:150'],
-            'code' => ['required', 'string', 'max:80', 'alpha_dash', 'unique:products,code'],
+            'code' => ['required', 'string', 'max:80', 'alpha_dash', Rule::unique('products', 'code')->whereNull('deleted_at')],
             'product_category_id' => [
                 'required',
                 'integer',

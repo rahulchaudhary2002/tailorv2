@@ -13,12 +13,12 @@ class CustomerGarmentType extends Model
 
     public function customer()
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Customer::class)->withTrashed();
     }
 
     public function garmentType()
     {
-        return $this->belongsTo(GarmentType::class);
+        return $this->belongsTo(GarmentType::class)->withTrashed();
     }
 
     public function measurements()

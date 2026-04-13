@@ -3,6 +3,7 @@
 namespace App\Http\Requests\User;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdatePermissionsRequest extends FormRequest
 {
@@ -22,7 +23,7 @@ class UpdatePermissionsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'assignment_outlet_id' => ['required', 'integer', 'exists:outlets,id'],
+            'assignment_outlet_id' => ['required', 'integer', Rule::exists('outlets', 'id')->whereNull('deleted_at')],
             'permission_overrides' => ['nullable', 'array'],
             'permission_overrides.*' => ['nullable', 'in:allow,deny'],
         ];

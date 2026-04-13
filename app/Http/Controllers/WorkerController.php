@@ -453,10 +453,6 @@ class WorkerController extends Controller
                 ->with('error', 'You cannot delete your own worker account.');
         }
 
-        if (!empty($worker->avatar)) {
-            Storage::disk('public')->delete($worker->avatar);
-        }
-
         $workerName = $worker->name;
         $worker->delete();
 

@@ -27,7 +27,7 @@ class UpdateRequest extends FormRequest
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('roles', 'name')->ignore($this->route('role')),
+                Rule::unique('roles', 'name')->whereNull('deleted_at')->ignore($this->route('role')),
             ],
             'description' => ['nullable', 'string', 'max:255'],
         ];

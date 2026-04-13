@@ -3,6 +3,7 @@
 namespace App\Http\Requests\ManufactureUnit;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTransferRequest extends FormRequest
 {
@@ -23,7 +24,7 @@ class StoreTransferRequest extends FormRequest
     {
         return [
             'quantity' => ['required', 'numeric', 'gt:0'],
-            'target_product_id' => ['required', 'integer', 'exists:products,id'],
+            'target_product_id' => ['required', 'integer', Rule::exists('products', 'id')->whereNull('deleted_at')],
             'notes' => ['nullable', 'string', 'max:500'],
         ];
     }

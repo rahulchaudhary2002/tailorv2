@@ -28,7 +28,7 @@ class StoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer_id' => ['required', 'integer', 'exists:customers,id'],
+            'customer_id' => ['required', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
             'ordered_at' => ['required', 'date'],
             'delivery_due_at' => ['nullable', 'date', 'after_or_equal:ordered_at'],
             'status' => ['required', 'string', Rule::in(Order::creatableStatuses())],
@@ -40,16 +40,16 @@ class StoreRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_category' => ['required', 'string', Rule::in(['custom', 'fabric', 'readymade', 'accessories'])],
-            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.product_id' => ['nullable', 'integer', Rule::exists('products', 'id')->whereNull('deleted_at')],
             'items.*.size' => ['nullable', 'string', Rule::in(['S', 'M', 'L', 'XL', 'XXL'])],
             'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.custom.fabric_source' => ['nullable', 'string', Rule::in(['own', 'stock'])],
-            'items.*.custom.fabric_product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.custom.fabric_product_id' => ['nullable', 'integer', Rule::exists('products', 'id')->whereNull('deleted_at')],
             'items.*.custom.fabric_quantity' => ['nullable', 'numeric', 'min:0.01'],
             'items.*.custom.design_note' => ['nullable', 'string', 'max:1000'],
             'items.*.custom.garments' => ['nullable', 'array'],
-            'items.*.custom.garments.*.garment_type_id' => ['nullable', 'integer', 'exists:garment_types,id'],
+            'items.*.custom.garments.*.garment_type_id' => ['nullable', 'integer', Rule::exists('garment_types', 'id')->whereNull('deleted_at')],
             'items.*.custom.garments.*.garment_title' => ['nullable', 'string', 'max:100'],
             'items.*.custom.garments.*.quantity' => ['nullable', 'numeric', 'min:1'],
             'items.*.custom.garments.*.measurements' => ['nullable', 'array'],
@@ -62,7 +62,7 @@ class StoreRequest extends FormRequest
             'items.*.custom.garments.*.existing_design_images.*' => ['nullable', 'string', 'max:255'],
             'items.*.custom.garments.*.design_images' => ['nullable', 'array'],
             'items.*.custom.garments.*.design_images.*' => ['nullable', 'image', 'max:5120'],
-            'items.*.custom.garments.*.tailoring_package_id' => ['nullable', 'integer', 'exists:garment_type_tailoring_packages,id'],
+            'items.*.custom.garments.*.tailoring_package_id' => ['nullable', 'integer', Rule::exists('garment_type_tailoring_packages', 'id')->whereNull('deleted_at')],
             'items.*.custom.garments.*.tailoring_package' => ['nullable', 'string', 'max:100'],
             'items.*.custom.garments.*.tailoring_amount' => ['nullable', 'numeric', 'min:0'],
         ];

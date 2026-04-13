@@ -30,13 +30,13 @@ class UpdateRequest extends FormRequest
                 'required',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore($targetUser),
+                Rule::unique('users', 'email')->whereNull('deleted_at')->ignore($targetUser),
             ],
             'avatar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'is_super_admin' => ['nullable', 'boolean'],
             'outlet_ids' => ['required', 'array', 'min:1'],
-            'outlet_ids.*' => ['integer', 'exists:outlets,id'],
+            'outlet_ids.*' => ['integer', Rule::exists('outlets', 'id')->whereNull('deleted_at')],
         ];
     }
 

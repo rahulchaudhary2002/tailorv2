@@ -375,10 +375,6 @@ class UserController extends Controller
                 ->with('error', 'You cannot delete your own user account.');
         }
 
-        if (!empty($user->avatar)) {
-            Storage::disk('public')->delete($user->avatar);
-        }
-
         $userName = $user->name;
         $user->delete();
 

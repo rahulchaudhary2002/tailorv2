@@ -154,7 +154,8 @@ class TaskManagementController extends Controller
                 'nullable',
                 'integer',
                 Rule::exists('users', 'id')->where(function ($query) use ($outletId, $workerRoleId) {
-                    $query->where('is_super_admin', false)
+                    $query->whereNull('deleted_at')
+                        ->where('is_super_admin', false)
                         ->whereExists(function ($subQuery) use ($workerRoleId): void {
                             $subQuery->selectRaw('1')
                                 ->from('user_role')

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Outlet;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SwitchRequest extends FormRequest
 {
@@ -24,7 +25,7 @@ class SwitchRequest extends FormRequest
         return [
             'outlet_id' => [
                 'required',
-                'exists:outlets,id',
+                Rule::exists('outlets', 'id')->whereNull('deleted_at'),
                 'exists:outlet_user,outlet_id,user_id,' . auth()->id(),
             ],
         ];

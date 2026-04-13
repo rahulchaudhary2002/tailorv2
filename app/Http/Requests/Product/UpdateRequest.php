@@ -34,7 +34,7 @@ class UpdateRequest extends FormRequest
                 'string',
                 'max:80',
                 'alpha_dash',
-                Rule::unique('products', 'code')->ignore($product),
+                Rule::unique('products', 'code')->whereNull('deleted_at')->ignore($product),
             ],
             'product_category_id' => [
                 'required',

@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class Role extends Model
 {
+    use SoftDeletes;
+
     public const FIXED_ROLE_NAMES = [
         'Worker',
     ];

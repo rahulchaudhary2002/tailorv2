@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Vendor;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRequest extends FormRequest
 {
@@ -25,7 +26,7 @@ class StoreRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'vendor_type' => ['required', 'string', 'max:100'],
             'contact_person' => ['nullable', 'string', 'max:150'],
-            'email' => ['nullable', 'email', 'max:150', 'unique:vendors,email'],
+            'email' => ['nullable', 'email', 'max:150', Rule::unique('vendors', 'email')->whereNull('deleted_at')],
             'phone' => ['nullable', 'string', 'max:30'],
             'address' => ['nullable', 'string', 'max:255'],
         ];

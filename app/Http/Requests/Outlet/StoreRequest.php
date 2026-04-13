@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Outlet;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRequest extends FormRequest
 {
@@ -23,7 +24,7 @@ class StoreRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:100'],
-            'code' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:outlets,code'],
+            'code' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique('outlets', 'code')->whereNull('deleted_at')],
             'address' => ['required', 'string', 'max:255'],
         ];
     }

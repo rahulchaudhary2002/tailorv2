@@ -29,7 +29,7 @@ class UpdateRequest extends FormRequest
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('units', 'code')->ignore($this->route('unit')),
+                Rule::unique('units', 'code')->whereNull('deleted_at')->ignore($this->route('unit')),
             ],
             'symbol' => ['nullable', 'string', 'max:20'],
             'description' => ['nullable', 'string', 'max:255'],

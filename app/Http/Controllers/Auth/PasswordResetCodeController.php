@@ -7,6 +7,7 @@ use App\Mail\PasswordResetCodeMail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PasswordResetCodeController extends Controller
@@ -27,7 +28,7 @@ class PasswordResetCodeController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'email' => ['required', 'email', 'exists:users,email'],
+            'email' => ['required', 'email', Rule::exists('users', 'email')->whereNull('deleted_at')],
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -47,7 +48,7 @@ class PasswordResetCodeController extends Controller
     public function verifyCode(Request $request)
     {
         $request->validate([
-            'email' => ['required', 'email', 'exists:users,email'],
+            'email' => ['required', 'email', Rule::exists('users', 'email')->whereNull('deleted_at')],
             'code' => ['required', 'digits:6'],
         ]);
 
