@@ -11,6 +11,7 @@ use App\Models\GarmentTypeMeasurement;
 use App\Models\GarmentTypeTailoringPackage;
 use App\Models\Unit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GarmentTypeController extends Controller
 {
@@ -31,7 +32,7 @@ class GarmentTypeController extends Controller
             ])
             ->withCount('measurements')
             ->withCount('tailoringPackages')
-            ->latest();
+            ->ordered();
 
         if ($q !== '') {
             $garmentTypesQuery->where(function ($query) use ($qLower): void {
@@ -59,7 +60,9 @@ class GarmentTypeController extends Controller
      */
     public function store(StoreRequest $request)
     {
-        $garmentType = GarmentType::create($request->validated());
+        $garmentType = GarmentType::create($request->validated() + [
+            'sort_order' => ((int) (GarmentType::query()->max('sort_order') ?? 0)) + 1,
+        ]);
 
         return redirect()
             ->route('garmentType.edit', ['garmentType' => $garmentType, 'tab' => 'measurements'])
@@ -221,5 +224,39 @@ class GarmentTypeController extends Controller
         return redirect()
             ->route('garmentType.edit', ['garmentType' => $garmentType, 'tab' => 'tailoring'])
             ->with('success', 'Tailoring package deleted successfully.');
+    }
+
+    public function reorder(Request $request)
+    {
+        $orderedIds = collect($request->validate([
+            'ordered_ids' => ['required', 'array', 'min:1'],
+            'ordered_ids.*' => ['required', 'integer', 'distinct'],
+        ])['ordered_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $existingIds = GarmentType::query()
+            ->whereIn('id', $orderedIds)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($existingIds->count() !== $orderedIds->count()) {
+            return response()->json([
+                'message' => 'One or more garment types could not be reordered.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($orderedIds): void {
+            foreach ($orderedIds as $index => $id) {
+                GarmentType::query()
+                    ->whereKey($id)
+                    ->update(['sort_order' => $index + 1]);
+            }
+        });
+
+        return response()->json([
+            'message' => 'Garment type order updated successfully.',
+        ]);
     }
 }

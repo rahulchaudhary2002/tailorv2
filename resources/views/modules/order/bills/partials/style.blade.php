@@ -267,6 +267,23 @@
             display: none !important;
         }
 
+        .bill-wrap,
+        .bill-wrap * {
+            color: #000 !important;
+            text-shadow: none !important;
+            box-shadow: none !important;
+        }
+
+        .bill-card,
+        .bill-table th,
+        .bill-table td,
+        .bill-kpi-card,
+        .bill-detail-box,
+        .bill-receipt,
+        .bill-design-thumb {
+            background: #fff !important;
+        }
+
         .table-card {
             border: 0;
             box-shadow: none;
@@ -275,8 +292,44 @@
         }
 
         .bill-card {
-            border-color: #bbb;
+            border: 0;
+            box-shadow: none;
             page-break-inside: avoid;
+        }
+
+        .bill-title,
+        .bill-kpi-value,
+        .bill-detail-name,
+        .bill-detail-price,
+        .bill-grid-item,
+        .bill-grid-label,
+        .bill-muted,
+        .bill-meta-row,
+        .bill-total-row,
+        .bill-item-subline,
+        .bill-sub-row td {
+            color: #000 !important;
+        }
+
+        .bill-table th,
+        .bill-table td {
+            border-color: #000 !important;
+        }
+
+        .bill-table th {
+            background: #fff !important;
+            font-weight: 700;
+        }
+
+        .bill-kpi-card,
+        .bill-detail-box {
+            border-color: #000 !important;
+        }
+
+        .bill-detail-row,
+        .bill-rule,
+        .bill-receipt-table thead th {
+            border-color: #000 !important;
         }
 
         .bill-receipt {

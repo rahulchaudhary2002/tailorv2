@@ -86,6 +86,7 @@
             <thead>
                 <tr>
                     <th>Name</th>
+                    <th>Code</th>
                     <th>Barcode</th>
                     <th>Amount</th>
                     <th>Category</th>
@@ -98,11 +99,12 @@
                 @forelse ($products as $product)
                     <tr>
                         <td>{{ $product->name }}</td>
+                        <td>{{ $product->code ?: '-' }}</td>
                         <td>
                             @if ($product->barcode_svg !== '')
                                 <div class="barcode-preview">{!! $product->barcode_svg !!}</div>
                             @else
-                                <span class="barcode-inline">{{ $product->barcode ?: $product->code ?: '-' }}</span>
+                                <span class="barcode-inline">{{ $product->barcode ?: '-' }}</span>
                             @endif
                         </td>
                         <td>Rs {{ number_format((float) $product->amount, 2) }}</td>

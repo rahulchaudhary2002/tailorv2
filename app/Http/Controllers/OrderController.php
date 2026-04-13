@@ -339,8 +339,8 @@ class OrderController extends Controller
                     $query->where('is_active', true)->orderBy('order')->orderBy('id');
                 },
             ])
-            ->orderBy('title')
-            ->get(['id', 'title', 'design_note']);
+            ->ordered()
+            ->get(['id', 'title', 'sort_order', 'design_note']);
 
         $selectedCustomerId = $request->query('customer_id');
 

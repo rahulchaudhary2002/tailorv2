@@ -11,12 +11,19 @@ class GarmentType extends Model
 
     protected $fillable = [
         'title',
+        'sort_order',
         'design_note',
     ];
 
     protected $casts = [
+        'sort_order' => 'integer',
         'design_note' => 'array',
     ];
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('sort_order')->orderBy('title');
+    }
 
     public function measurements()
     {

@@ -18,7 +18,7 @@
     <div class="bill-card">
         <div class="bill-head">
             <div>
-                <h2 class="bill-title">Task Slip</h2>
+                <h2 class="bill-title">{{ env('APP_NAME') }}</h2>
                 <div class="bill-muted">Task No: {{ $task->task_number }}</div>
             </div>
             <div class="bill-muted">
@@ -28,13 +28,10 @@
         </div>
 
         <div class="bill-grid">
-            <div class="bill-grid-item"><span class="bill-grid-label">Customer:</span> {{ $task->order?->customer?->name ?: '-' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Phone:</span> {{ $task->order?->customer?->phone ?: '-' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Worker:</span> {{ $task->worker?->name ?: 'Unassigned' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Deadline:</span> {{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: ($task->order?->delivery_due_at?->format('M d, Y h:i A') ?: '-') }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Garment:</span> {{ $task->task_title }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Fabric:</span> {{ $fabricProduct?->name ?: '-' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Payable:</span> {{ number_format((float) $task->payable_amount, 2) }}</div>
         </div>
     </div>
 
@@ -45,7 +42,6 @@
                 <tr>
                     <th>Type</th>
                     <th>Measurement</th>
-                    <th>Unit</th>
                 </tr>
             </thead>
             <tbody>
@@ -53,7 +49,6 @@
                     <tr>
                         <td>{{ $measurement['type'] ?? '-' }}</td>
                         <td>{{ $measurement['measurement'] ?? '-' }}</td>
-                        <td>{{ $measurement['unit'] ?? '-' }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="3">No measurements captured.</td></tr>
@@ -89,6 +84,7 @@
         <div class="bill-muted">Tailoring Package: {{ $garment['tailoring_package'] ?? '-' }}</div>
         <div class="bill-muted">Design Note: {{ $designNoteText }}</div>
         <div class="bill-muted">Garment Design Note: {{ $garmentDesignNoteText }}</div>
+        <div class="bill-muted">Task Note: {{ $task->notes ?: '-' }}</div>
         <div class="bill-muted">Slip Required For Payment: Yes</div>
     </div>
 

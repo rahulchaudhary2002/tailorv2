@@ -190,8 +190,8 @@ class CustomerController extends Controller
 
         $garmentTypes = GarmentType::query()
             ->with(['measurements.unit:id,name,symbol'])
-            ->orderBy('title')
-            ->get(['id', 'title']);
+            ->ordered()
+            ->get(['id', 'title', 'sort_order']);
 
         return view('modules.customer.edit', compact('customer', 'garmentTypes'));
     }

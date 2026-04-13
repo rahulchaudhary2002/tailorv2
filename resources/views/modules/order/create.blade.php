@@ -27,6 +27,7 @@ $garmentPayload = $garmentTypes->map(function ($garmentType) {
     return [
         'id' => $garmentType->id,
         'title' => $garmentType->title,
+        'sortOrder' => (int) ($garmentType->sort_order ?? 0),
         'designNotes' => array_values((array) ($garmentType->design_note ?? [])),
         'tailoringPackages' => $garmentType->tailoringPackages->map(function ($package) {
             return [
@@ -619,9 +620,15 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-modal-section h4{margin:0 0 10px;color:var(--primary);}
 .tp-measurement-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
 .tp-garment-sections{display:grid;gap:14px;}
-.tp-garment-check-group{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
-.tp-garment-check-item{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;background:#eef3f9;border:1px solid #d7e0ec;color:var(--primary);font-weight:600;cursor:pointer;}
-.tp-garment-check-item input[type="checkbox"]{width:auto;margin:0;}
+.tp-garment-check-group{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;align-items:flex-start;}
+.tp-garment-check-item{display:inline-flex;align-items:center;gap:10px;padding:11px 14px;border-radius:999px;background:#eef3f9;border:1px solid #d7e0ec;color:var(--primary);font-weight:600;cursor:grab;transition:border-color .2s ease,background-color .2s ease,transform .2s ease,box-shadow .2s ease;flex:0 0 auto;max-width:100%;}
+.tp-garment-check-item:hover{border-color:#b9cadf;background:#f6f9fd;}
+.tp-garment-check-item.is-dragging{opacity:.55;transform:scale(.99);}
+.tp-garment-check-item.is-drop-target{border-color:#c9a96e;box-shadow:0 0 0 2px rgba(201,169,110,.18);}
+.tp-garment-check-item input[type="checkbox"]{width:auto;margin:0;cursor:pointer;}
+.tp-garment-check-label{flex:0 1 auto;min-width:0;white-space:nowrap;}
+.tp-garment-check-handle{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:10px;background:#dfe8f3;color:#4c6280;flex-shrink:0;font-size:.95rem;}
+.tp-garment-check-handle i{pointer-events:none;}
 .tp-garment-section{border:1px solid #e2d7ef;border-radius:12px;padding:14px;background:#fff;}
 .tp-garment-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;}
 .tp-garment-title{font-weight:700;color:#7b1fa2;}
@@ -675,16 +682,17 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 <script>
 (function() {
     const products = @json($productPayload);
-    const garmentTypes = @json($garmentPayload);
+    let garmentTypes = @json($garmentPayload);
     const customerMeasurements = @json($customerMeasurementPayload);
     const customerDirectory = @json($customerLookupPayload);
     const initialOrderState = @json($resolvedInitialOrderState);
     const initialVatEnabled = Boolean(initialOrderState?.vatEnabled);
     const resolveCustomerUrl = @json(route('order.customer.resolve'));
+    const garmentReorderUrl = @json(route('garmentType.reorder'));
     const csrfToken = @json(csrf_token());
 
     const productMap = new Map(products.map((product) => [String(product.id), product]));
-    const garmentMap = new Map(garmentTypes.map((garment) => [String(garment.id), garment]));
+    let garmentMap = new Map(garmentTypes.map((garment) => [String(garment.id), garment]));
 
     const categorySelect = document.getElementById('productCategory');
     const productSelect = document.getElementById('productSelect');
@@ -769,6 +777,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     let pendingCustomQueue = [];
     let pendingCustomIndex = 0;
     let editingCustomIndex = -1;
+    let garmentDragId = '';
+    let garmentReorderRequestId = 0;
     let selectedCustomProductIds = [];
     let customerSubmitInProgress = false;
 
@@ -1421,14 +1431,72 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             .filter(Boolean);
     }
 
+    function syncGarmentLookup() {
+        garmentMap = new Map(garmentTypes.map((garment) => [String(garment.id), garment]));
+    }
+
+    function setGarmentOrder(orderedIds) {
+        const orderLookup = new Map(orderedIds.map((id, index) => [String(id), index]));
+        garmentTypes = garmentTypes
+            .slice()
+            .sort((a, b) => {
+                const aIndex = orderLookup.has(String(a.id)) ? orderLookup.get(String(a.id)) : Number.MAX_SAFE_INTEGER;
+                const bIndex = orderLookup.has(String(b.id)) ? orderLookup.get(String(b.id)) : Number.MAX_SAFE_INTEGER;
+
+                if (aIndex !== bIndex) {
+                    return aIndex - bIndex;
+                }
+
+                return String(a.title || '').localeCompare(String(b.title || ''));
+            })
+            .map((garment, index) => ({
+                ...garment,
+                sortOrder: index + 1,
+            }));
+
+        syncGarmentLookup();
+    }
+
+    async function persistGarmentOrder() {
+        const currentRequestId = ++garmentReorderRequestId;
+
+        try {
+            const response = await fetch(garmentReorderUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    ordered_ids: garmentTypes.map((garment) => garment.id),
+                }),
+            });
+
+            if (currentRequestId !== garmentReorderRequestId) {
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error('Unable to save garment order.');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
     function fillGarmentTypeOptions() {
+        const checkedIds = new Set(getSelectedGarmentIds());
         garmentTypeCheckboxes.innerHTML = '';
         garmentTypes.forEach((garment) => {
             const label = document.createElement('label');
             label.className = 'tp-garment-check-item';
+            label.draggable = true;
+            label.dataset.garmentTypeId = String(garment.id);
             label.innerHTML = `
-                <input type="checkbox" value="${garment.id}">
-                <span>${garment.title}</span>
+                <span class="tp-garment-check-handle" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>
+                <input type="checkbox" value="${garment.id}" ${checkedIds.has(String(garment.id)) ? 'checked' : ''}>
+                <span class="tp-garment-check-label">${garment.title}</span>
             `;
             garmentTypeCheckboxes.appendChild(label);
         });
@@ -1710,6 +1778,15 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const selectedIds = itemState.garments.length
             ? itemState.garments.map((garment) => String(garment.garmentTypeId))
             : (garmentTypes[0] ? [String(garmentTypes[0].id)] : []);
+        if (selectedIds.length) {
+            setGarmentOrder([
+                ...selectedIds,
+                ...garmentTypes
+                    .map((garment) => String(garment.id))
+                    .filter((id) => !selectedIds.includes(id)),
+            ]);
+            fillGarmentTypeOptions();
+        }
         Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
             input.checked = selectedIds.includes(String(input.value || ''));
         });
@@ -2072,6 +2149,71 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         if (event.target instanceof HTMLInputElement && event.target.type === 'checkbox') {
             renderGarmentSections();
         }
+    });
+    garmentTypeCheckboxes.addEventListener('dragstart', (event) => {
+        const item = event.target.closest('.tp-garment-check-item');
+        if (!(item instanceof HTMLElement)) {
+            return;
+        }
+
+        garmentDragId = String(item.dataset.garmentTypeId || '');
+        item.classList.add('is-dragging');
+        event.dataTransfer?.setData('text/plain', garmentDragId);
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+        }
+    });
+    garmentTypeCheckboxes.addEventListener('dragend', (event) => {
+        const item = event.target.closest('.tp-garment-check-item');
+        if (item instanceof HTMLElement) {
+            item.classList.remove('is-dragging');
+        }
+        garmentTypeCheckboxes.querySelectorAll('.tp-garment-check-item').forEach((node) => node.classList.remove('is-drop-target'));
+        garmentDragId = '';
+    });
+    garmentTypeCheckboxes.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        const item = event.target.closest('.tp-garment-check-item');
+        garmentTypeCheckboxes.querySelectorAll('.tp-garment-check-item').forEach((node) => node.classList.remove('is-drop-target'));
+        if (item instanceof HTMLElement) {
+            item.classList.add('is-drop-target');
+        }
+    });
+    garmentTypeCheckboxes.addEventListener('dragleave', (event) => {
+        const item = event.target.closest('.tp-garment-check-item');
+        if (item instanceof HTMLElement) {
+            item.classList.remove('is-drop-target');
+        }
+    });
+    garmentTypeCheckboxes.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const target = event.target.closest('.tp-garment-check-item');
+        if (!(target instanceof HTMLElement) || !garmentDragId) {
+            return;
+        }
+
+        const targetId = String(target.dataset.garmentTypeId || '');
+        if (!targetId || targetId === garmentDragId) {
+            target.classList.remove('is-drop-target');
+            return;
+        }
+
+        const orderedIds = garmentTypes.map((garment) => String(garment.id));
+        const draggedIndex = orderedIds.indexOf(garmentDragId);
+        const targetIndex = orderedIds.indexOf(targetId);
+
+        if (draggedIndex === -1 || targetIndex === -1) {
+            target.classList.remove('is-drop-target');
+            return;
+        }
+
+        const [movedId] = orderedIds.splice(draggedIndex, 1);
+        orderedIds.splice(targetIndex, 0, movedId);
+
+        setGarmentOrder(orderedIds);
+        fillGarmentTypeOptions();
+        renderGarmentSections();
+        persistGarmentOrder();
     });
     customFabricOwnRadio?.addEventListener('change', updateCustomFabricSourceUI);
     customFabricStockRadio?.addEventListener('change', updateCustomFabricSourceUI);

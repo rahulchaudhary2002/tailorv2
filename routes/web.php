@@ -174,6 +174,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [GarmentTypeController::class, 'index'])->name('index')->middleware('can:view-garment-types,manage-garment-types');
         Route::get('/create', [GarmentTypeController::class, 'create'])->name('create')->middleware('can:create-garment-types,manage-garment-types');
         Route::post('/', [GarmentTypeController::class, 'store'])->name('store')->middleware('can:create-garment-types,manage-garment-types');
+        Route::post('/reorder', [GarmentTypeController::class, 'reorder'])->name('reorder')->middleware('can:create-orders,manage-orders,edit-garment-types,manage-garment-types');
         Route::get('/edit/{garmentType}', [GarmentTypeController::class, 'edit'])->name('edit')->middleware('can:edit-garment-types,manage-garment-types');
         Route::put('/update/{garmentType}', [GarmentTypeController::class, 'update'])->name('update')->middleware('can:edit-garment-types,manage-garment-types');
         Route::delete('/delete/{garmentType}', [GarmentTypeController::class, 'destroy'])->name('destroy')->middleware('can:delete-garment-types,manage-garment-types');
