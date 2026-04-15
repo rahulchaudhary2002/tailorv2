@@ -20,6 +20,7 @@ use App\Services\NotificationService;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -672,7 +673,7 @@ class OrderController extends Controller
                     'outlet_id' => $outletId,
                     'customer_id' => (int) $validated['customer_id'],
                     'ordered_at' => $validated['ordered_at'],
-                    'delivery_due_at' => $validated['delivery_due_at'] ?? null,
+                    'delivery_due_at' => $validated['delivery_due_at'] ?? Date::now()->addDays(5),
                     'status' => $status,
                     'fabric_issued_at' => $hasFabricIssuedOrLaterStatus
                         ? ($order->fabric_issued_at ?? now())
