@@ -99,6 +99,7 @@
                                     {{ $garments->pluck('tailoring_package')->filter()->implode(', ') ?: 'TAILORING' }}
                                 </div>
                             @endif
+                            <div class="bill-print-rate">RATE: {{ number_format((float) $item->unit_price, 2) }}</div>
                         </td>
                         <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }} {{ $quantityUnit }}</td>
                         <td class="bill-right">{{ number_format((float) $item->unit_price, 2) }}</td>
@@ -112,7 +113,10 @@
                             @endphp
                             <tr class="bill-sub-row">
                                 <td></td>
-                                <td>{{ strtoupper((string) ($garment['garment_title'] ?? 'Tailoring')) }}</td>
+                                <td>
+                                    {{ strtoupper((string) ($garment['garment_title'] ?? 'Tailoring')) }}
+                                    <div class="bill-print-rate">RATE: {{ number_format($tailoringAmount, 2) }}</div>
+                                </td>
                                 <td class="bill-right">{{ rtrim(rtrim(number_format($garmentQty, 2), '0'), '.') }}</td>
                                 <td class="bill-right">{{ number_format($tailoringAmount, 2) }}</td>
                                 <td class="bill-right">{{ number_format($garmentQty * $tailoringAmount, 2) }}</td>

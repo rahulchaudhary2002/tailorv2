@@ -263,6 +263,10 @@
         margin-top: 2px;
     }
 
+    .bill-print-rate {
+        display: none;
+    }
+
     @media print {
         .bill-actions,
         .page-header {
@@ -335,7 +339,7 @@
         }
 
         .bill-receipt {
-            width: 80mm;
+            width: 100%;
             max-width: 80mm;
             border: 0;
             box-shadow: none;
@@ -345,6 +349,7 @@
             overflow: hidden;
             color: #000 !important;
             font-weight: 700;
+            letter-spacing: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -361,6 +366,39 @@
             font-weight: 900 !important;
         }
 
+        .bill-receipt-header,
+        .bill-receipt-footer {
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .bill-receipt-brand {
+            font-size: 16px;
+        }
+
+        .bill-receipt-meta,
+        .bill-receipt-totals {
+            gap: 5px;
+            font-size: 11px;
+            line-height: 1.25;
+        }
+
+        .bill-meta-row {
+            gap: 6px;
+        }
+
+        .bill-meta-row span:first-child {
+            max-width: 43%;
+        }
+
+        .bill-meta-row span:last-child {
+            max-width: 57%;
+        }
+
+        .bill-total-row {
+            font-size: 14px;
+        }
+
         .bill-receipt-table {
             width: 100%;
             max-width: 100%;
@@ -369,11 +407,13 @@
 
         .bill-receipt-table th,
         .bill-receipt-table td {
-            padding-left: 2px;
-            padding-right: 2px;
-            font-size: 12px;
-            line-height: 1.25;
+            box-sizing: border-box;
+            padding-left: 1px;
+            padding-right: 1px;
+            font-size: 10px;
+            line-height: 1.2;
             overflow-wrap: break-word;
+            letter-spacing: 0;
         }
 
         .bill-receipt-table th.bill-right,
@@ -381,31 +421,39 @@
             white-space: nowrap;
             word-break: normal;
             overflow-wrap: normal;
+            font-size: 9px;
         }
 
         .bill-receipt-table th:nth-child(1),
         .bill-receipt-table td:nth-child(1) {
-            width: 7%;
+            width: 9%;
         }
 
         .bill-receipt-table th:nth-child(2),
         .bill-receipt-table td:nth-child(2) {
-            width: 34%;
+            width: 46%;
         }
 
         .bill-receipt-table th:nth-child(3),
         .bill-receipt-table td:nth-child(3) {
-            width: 11%;
+            width: 15%;
         }
 
         .bill-receipt-table th:nth-child(4),
         .bill-receipt-table td:nth-child(4) {
-            width: 22%;
+            display: none;
         }
 
         .bill-receipt-table th:nth-child(5),
         .bill-receipt-table td:nth-child(5) {
-            width: 26%;
+            width: 30%;
+        }
+
+        .bill-print-rate {
+            display: block;
+            margin-top: 2px;
+            font-size: 9px;
+            line-height: 1.15;
         }
     }
 
