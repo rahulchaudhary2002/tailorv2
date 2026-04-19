@@ -167,13 +167,14 @@
     .bill-receipt {
         width: min(100%, 420px);
         margin: 0 auto 16px;
-        border: 1px solid #cfcfcf;
+        border: 1px solid #000;
         border-radius: 0;
         padding: 18px 16px;
         box-shadow: 0 10px 24px rgba(20, 20, 20, 0.08);
-        color: #202020;
+        color: #000;
         font-family: "Courier New", Courier, monospace;
         letter-spacing: 0.02em;
+        font-weight: 600;
     }
 
     .bill-receipt-header,
@@ -186,12 +187,12 @@
 
     .bill-receipt-brand {
         font-size: 20px;
-        font-weight: 700;
+        font-weight: 900;
         line-height: 1.3;
     }
 
     .bill-rule {
-        border-top: 2px dashed #444;
+        border-top: 2px dashed #000;
         margin: 14px 0;
     }
 
@@ -225,7 +226,7 @@
 
     .bill-total-row {
         font-size: 18px;
-        font-weight: 700;
+        font-weight: 900;
     }
 
     .bill-receipt-table {
@@ -241,8 +242,9 @@
     }
 
     .bill-receipt-table thead th {
-        border-bottom: 2px dashed #444;
+        border-bottom: 2px dashed #000;
         padding-bottom: 10px;
+        font-weight: 900;
     }
 
     .bill-receipt-table tbody tr:not(.bill-sub-row) td {
@@ -251,12 +253,12 @@
 
     .bill-sub-row td {
         padding-top: 2px;
-        color: #4e4e4e;
+        color: #000;
         font-size: 13px;
     }
 
     .bill-item-subline {
-        color: #616161;
+        color: #000;
         font-size: 12px;
         margin-top: 2px;
     }
@@ -339,6 +341,71 @@
             box-shadow: none;
             margin: 0 auto;
             padding: 8px 6px;
+            box-sizing: border-box;
+            overflow: hidden;
+            color: #000 !important;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .bill-receipt,
+        .bill-receipt * {
+            color: #000 !important;
+            font-weight: 700;
+        }
+
+        .bill-receipt-brand,
+        .bill-receipt-table thead th,
+        .bill-total-row {
+            font-weight: 900 !important;
+        }
+
+        .bill-receipt-table {
+            width: 100%;
+            max-width: 100%;
+            table-layout: fixed;
+        }
+
+        .bill-receipt-table th,
+        .bill-receipt-table td {
+            padding-left: 2px;
+            padding-right: 2px;
+            font-size: 12px;
+            line-height: 1.25;
+            overflow-wrap: break-word;
+        }
+
+        .bill-receipt-table th.bill-right,
+        .bill-receipt-table td.bill-right {
+            white-space: nowrap;
+            word-break: normal;
+            overflow-wrap: normal;
+        }
+
+        .bill-receipt-table th:nth-child(1),
+        .bill-receipt-table td:nth-child(1) {
+            width: 7%;
+        }
+
+        .bill-receipt-table th:nth-child(2),
+        .bill-receipt-table td:nth-child(2) {
+            width: 34%;
+        }
+
+        .bill-receipt-table th:nth-child(3),
+        .bill-receipt-table td:nth-child(3) {
+            width: 11%;
+        }
+
+        .bill-receipt-table th:nth-child(4),
+        .bill-receipt-table td:nth-child(4) {
+            width: 22%;
+        }
+
+        .bill-receipt-table th:nth-child(5),
+        .bill-receipt-table td:nth-child(5) {
+            width: 26%;
         }
     }
 

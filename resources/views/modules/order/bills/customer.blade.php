@@ -190,6 +190,9 @@
 @if (request()->boolean('autoprint'))
 <script>
 window.addEventListener('load', function () {
+    var url = new URL(window.location.href);
+    url.searchParams.delete('autoprint');
+    window.history.replaceState({}, '', url.toString());
     window.print();
 });
 </script>
