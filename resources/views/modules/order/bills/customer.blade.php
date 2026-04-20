@@ -10,7 +10,7 @@
     </div>
 </div>
 
-<div class="bill-wrap">
+<div class="bill-wrap pos-receipt-print">
     <div class="bill-actions">
         <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
     </div>
@@ -21,9 +21,8 @@
 
     <div class="bill-card bill-receipt">
         <div class="bill-receipt-header">
-            <div class="bill-receipt-brand">{{ strtoupper($order->outlet?->name ?: config('app.name', 'Tailor Shop')) }}</div>
-            <div>{{ strtoupper((string) config('app.name', 'Tailor Management System')) }}</div>
-            <div>CUSTOMER INVOICE</div>
+            <div class="bill-receipt-brand">{{ config('app.name', 'SUIT LAND') }}</div>
+            <div>ESTIMATED BILL</div>
         </div>
 
         <div class="bill-rule"></div>
@@ -62,13 +61,20 @@
         <div class="bill-rule"></div>
 
         <table class="bill-table bill-receipt-table">
+            <colgroup>
+                <col class="bill-col-sn">
+                <col class="bill-col-item">
+                <col class="bill-col-qty">
+                <col class="bill-col-rate">
+                <col class="bill-col-amount">
+            </colgroup>
             <thead>
                 <tr>
-                    <th>Sn</th>
-                    <th>Particulars</th>
+                    <th class="bill-center">Sn</th>
+                    <th class="bill-left">Item</th>
                     <th class="bill-right">Qty</th>
                     <th class="bill-right">Rate</th>
-                    <th class="bill-right">Amount</th>
+                    <th class="bill-right">Amt</th>
                 </tr>
             </thead>
             <tbody>
@@ -91,14 +97,9 @@
                         $lineAmount = (float) $item->line_total;
                     @endphp
                     <tr>
-                        <td>{{ $index + 1 }}</td>
-                        <td>
+                        <td class="bill-center">{{ $index + 1 }}</td>
+                        <td class="bill-left">
                             <div>{{ strtoupper($itemName) }}</div>
-                            @if ($isCustom && $garments->isNotEmpty())
-                                <div class="bill-item-subline">
-                                    {{ $garments->pluck('tailoring_package')->filter()->implode(', ') ?: 'TAILORING' }}
-                                </div>
-                            @endif
                             <div class="bill-print-rate">RATE: {{ number_format((float) $item->unit_price, 2) }}</div>
                         </td>
                         <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }} {{ $quantityUnit }}</td>
@@ -112,12 +113,15 @@
                                 $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
                             @endphp
                             <tr class="bill-sub-row">
-                                <td></td>
-                                <td>
+                                <td class="bill-center"></td>
+                                <td class="bill-left">
                                     {{ strtoupper((string) ($garment['garment_title'] ?? 'Tailoring')) }}
+                                    @if (filled($garment['tailoring_package'] ?? null))
+                                        ({{ $garment['tailoring_package'] }})
+                                    @endif
                                     <div class="bill-print-rate">RATE: {{ number_format($tailoringAmount, 2) }}</div>
                                 </td>
-                                <td class="bill-right">{{ rtrim(rtrim(number_format($garmentQty, 2), '0'), '.') }}</td>
+                                <td class="bill-right">{{ rtrim(rtrim(number_format($garmentQty, 2), '0'), '.') }} pcs</td>
                                 <td class="bill-right">{{ number_format($tailoringAmount, 2) }}</td>
                                 <td class="bill-right">{{ number_format($garmentQty * $tailoringAmount, 2) }}</td>
                             </tr>
@@ -179,7 +183,7 @@
             @if (filled($order->customer?->address))
                 <div>{{ strtoupper($order->customer?->address) }}</div>
             @endif
-            <div>{{ strtoupper((string) config('app.name', 'Tailor Management System')) }}</div>
+            <div>{{ strtoupper((string) config('app.name', 'SUIT LAND')) }}</div>
         </div>
     </div>
 
@@ -188,6 +192,59 @@
 
 @section('page-specific-style')
 @include('modules.order.bills.partials.style')
+<style>
+    @page {
+        size: 80mm auto;
+        margin: 0;
+    }
+
+    @media print {
+        html,
+        body {
+            width: 80mm;
+            min-width: 80mm;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        body {
+            overflow: visible !important;
+        }
+
+        body::before,
+        body::after,
+        .main-content::before,
+        .main-content::after {
+            display: none !important;
+            content: none !important;
+        }
+
+        .main-content,
+        .bill-wrap {
+            width: 80mm !important;
+            min-width: 80mm !important;
+            max-width: 80mm !important;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+        }
+
+        .pos-receipt-print,
+        .pos-receipt-print .bill-receipt {
+            page-break-before: avoid !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-before: avoid !important;
+            break-after: avoid !important;
+            break-inside: avoid !important;
+        }
+    }
+</style>
 @endsection
 
 @section('page-specific-script')

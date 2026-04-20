@@ -70,6 +70,14 @@
         text-align: right;
     }
 
+    .bill-left {
+        text-align: left;
+    }
+
+    .bill-center {
+        text-align: center;
+    }
+
     .bill-kpi {
         display: grid;
         grid-template-columns: repeat(4, minmax(140px, 1fr));
@@ -231,14 +239,91 @@
 
     .bill-receipt-table {
         margin-top: 0;
+        width: 100%;
+        max-width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+        border-spacing: 0;
     }
 
     .bill-receipt-table th,
     .bill-receipt-table td {
         border: 0;
-        padding: 6px 4px;
-        font-size: 14px;
+        box-sizing: border-box;
+        padding: 6px 2px;
+        font-size: 12px;
+        line-height: 1.25;
         background: transparent;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        vertical-align: top;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .bill-receipt-table th {
+        white-space: nowrap;
+    }
+
+    .bill-receipt-table col.bill-col-sn {
+        width: 8%;
+    }
+
+    .bill-receipt-table col.bill-col-item {
+        width: 38%;
+    }
+
+    .bill-receipt-table col.bill-col-qty {
+        width: 14%;
+    }
+
+    .bill-receipt-table col.bill-col-rate {
+        width: 18%;
+    }
+
+    .bill-receipt-table col.bill-col-amount {
+        width: 22%;
+    }
+
+    .bill-receipt-table th:nth-child(1),
+    .bill-receipt-table td:nth-child(1) {
+        padding-left: 0;
+        padding-right: 4px;
+        text-align: center;
+    }
+
+    .bill-receipt-table th:nth-child(2),
+    .bill-receipt-table td:nth-child(2) {
+        padding-left: 0;
+        padding-right: 4px;
+        text-align: left;
+    }
+
+    .bill-receipt-table th:nth-child(3),
+    .bill-receipt-table td:nth-child(3),
+    .bill-receipt-table th:nth-child(4),
+    .bill-receipt-table td:nth-child(4) {
+        padding-left: 0;
+        padding-right: 4px;
+        text-align: right;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
+    .bill-receipt-table th:nth-child(4),
+    .bill-receipt-table td:nth-child(4) {
+        padding-left: 6px;
+    }
+
+    .bill-receipt-table th:nth-child(5),
+    .bill-receipt-table td:nth-child(5) {
+        padding-left: 0;
+        padding-right: 0;
+        text-align: right;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
     }
 
     .bill-receipt-table thead th {
@@ -268,6 +353,11 @@
     }
 
     @media print {
+        .dashboard-header,
+        .dashboard-footer,
+        .sidebar,
+        header,
+        footer,
         .bill-actions,
         .page-header {
             display: none !important;
@@ -301,6 +391,7 @@
             border: 0;
             box-shadow: none;
             page-break-inside: avoid;
+            break-inside: avoid;
         }
 
         .bill-title,
@@ -339,19 +430,22 @@
         }
 
         .bill-receipt {
-            width: 100%;
+            width: 80mm;
+            min-width: 80mm;
             max-width: 80mm;
             border: 0;
             box-shadow: none;
-            margin: 0 auto;
-            padding: 8px 6px;
+            margin: 0;
+            padding: 3mm 2mm;
             box-sizing: border-box;
-            overflow: hidden;
+            overflow: visible;
             color: #000 !important;
             font-weight: 700;
             letter-spacing: 0;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            -webkit-print-color-adjust: economy;
+            print-color-adjust: economy;
         }
 
         .bill-receipt,
@@ -400,20 +494,63 @@
         }
 
         .bill-receipt-table {
-            width: 100%;
-            max-width: 100%;
+            width: 76mm;
+            min-width: 76mm;
+            max-width: 76mm;
             table-layout: fixed;
+            border-collapse: collapse;
+            border-spacing: 0;
+            page-break-inside: auto;
+        }
+
+        .bill-receipt-table col.bill-col-sn {
+            width: 5mm;
+        }
+
+        .bill-receipt-table col.bill-col-item {
+            width: 30mm;
+        }
+
+        .bill-receipt-table col.bill-col-qty {
+            width: 10mm;
+        }
+
+        .bill-receipt-table col.bill-col-rate {
+            width: 15mm;
+        }
+
+        .bill-receipt-table col.bill-col-amount {
+            width: 16mm;
         }
 
         .bill-receipt-table th,
         .bill-receipt-table td {
             box-sizing: border-box;
-            padding-left: 1px;
-            padding-right: 1px;
-            font-size: 10px;
-            line-height: 1.2;
-            overflow-wrap: break-word;
+            max-width: 100%;
+            padding: 2px 0;
+            font-size: 9px;
+            line-height: 1.25;
+            vertical-align: top;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+            word-break: break-word;
             letter-spacing: 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .bill-receipt-table thead {
+            display: table-header-group;
+        }
+
+        .bill-receipt-table tr,
+        .bill-receipt-table th,
+        .bill-receipt-table td,
+        .bill-rule,
+        .bill-meta-row,
+        .bill-receipt-header,
+        .bill-receipt-footer {
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
 
         .bill-receipt-table th.bill-right,
@@ -421,39 +558,47 @@
             white-space: nowrap;
             word-break: normal;
             overflow-wrap: normal;
-            font-size: 9px;
+            text-overflow: clip;
+            font-size: 8px;
         }
 
         .bill-receipt-table th:nth-child(1),
         .bill-receipt-table td:nth-child(1) {
-            width: 9%;
+            padding-left: 0;
+            padding-right: 1mm;
+            text-align: center;
         }
 
         .bill-receipt-table th:nth-child(2),
         .bill-receipt-table td:nth-child(2) {
-            width: 46%;
+            padding-left: 0;
+            padding-right: 1mm;
+            text-align: left;
         }
 
         .bill-receipt-table th:nth-child(3),
         .bill-receipt-table td:nth-child(3) {
-            width: 15%;
+            padding-left: 0;
+            padding-right: 1mm;
+            text-align: right;
         }
 
         .bill-receipt-table th:nth-child(4),
         .bill-receipt-table td:nth-child(4) {
-            display: none;
+            padding-left: 1mm;
+            padding-right: 1mm;
+            text-align: right;
         }
 
         .bill-receipt-table th:nth-child(5),
         .bill-receipt-table td:nth-child(5) {
-            width: 30%;
+            padding-left: 0;
+            padding-right: 0;
+            text-align: right;
         }
 
         .bill-print-rate {
-            display: block;
-            margin-top: 2px;
-            font-size: 9px;
-            line-height: 1.15;
+            display: none;
         }
     }
 
