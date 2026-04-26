@@ -186,6 +186,14 @@
                     </a>
                 </li>
             @endcanany
+            @canany(['view-settings', 'manage-settings'])
+                <li class="nav-item">
+                    <a href="{{ route('setting.index') }}" class="nav-link {{ request()->routeIs('setting.*') ? 'active' : '' }}">
+                        <i class="fas fa-gear nav-icon"></i>
+                        <span class="nav-text">Settings</span>
+                    </a>
+                </li>
+            @endcanany
         </ul>
     </nav>
 </aside>

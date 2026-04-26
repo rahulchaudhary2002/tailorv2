@@ -13,6 +13,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RawMaterialPurchaseController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TaskManagementController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UserController;
@@ -85,6 +86,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/edit/{unit}', [UnitController::class, 'edit'])->name('edit')->middleware('can:edit-units,manage-units');
         Route::put('/update/{unit}', [UnitController::class, 'update'])->name('update')->middleware('can:edit-units,manage-units');
         Route::delete('/delete/{unit}', [UnitController::class, 'destroy'])->name('destroy')->middleware('can:delete-units,manage-units');
+    });
+
+    Route::group(['prefix' => 'settings', 'as' => 'setting.'], function () {
+        Route::get('/', [SettingController::class, 'index'])->name('index')->middleware('can:view-settings,manage-settings');
+        Route::put('/', [SettingController::class, 'update'])->name('update')->middleware('can:manage-settings');
     });
 
     Route::group(['prefix' => 'customer', 'as' => 'customer.'], function () {

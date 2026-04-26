@@ -462,18 +462,18 @@
 
         .bill-receipt-header,
         .bill-receipt-footer {
-            font-size: 12px;
+            font-size: 13px;
             line-height: 1.35;
         }
 
         .bill-receipt-brand {
-            font-size: 16px;
+            font-size: 17px;
         }
 
         .bill-receipt-meta,
         .bill-receipt-totals {
             gap: 5px;
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1.25;
         }
 
@@ -490,7 +490,7 @@
         }
 
         .bill-total-row {
-            font-size: 14px;
+            font-size: 15px;
         }
 
         .bill-receipt-table {
@@ -528,7 +528,7 @@
             box-sizing: border-box;
             max-width: 100%;
             padding: 2px 0;
-            font-size: 9px;
+            font-size: 10px;
             line-height: 1.25;
             vertical-align: top;
             overflow: hidden;
@@ -555,11 +555,19 @@
 
         .bill-receipt-table th.bill-right,
         .bill-receipt-table td.bill-right {
-            white-space: nowrap;
-            word-break: normal;
-            overflow-wrap: normal;
+            white-space: normal;
+            word-break: break-all;
+            overflow-wrap: anywhere;
             text-overflow: clip;
-            font-size: 8px;
+            font-size: 10px;
+        }
+
+        .bill-receipt-table tbody td {
+            font-size: 12px;
+        }
+
+        .bill-receipt-table tbody td.bill-right {
+            font-size: 12px;
         }
 
         .bill-receipt-table th:nth-child(1),
@@ -595,6 +603,9 @@
             padding-left: 0;
             padding-right: 0;
             text-align: right;
+            white-space: normal;
+            word-break: break-all;
+            overflow-wrap: anywhere;
         }
 
         .bill-print-rate {

@@ -17,11 +17,22 @@
 
     @php
         $totalQty = (float) $items->sum('quantity');
+        $printerPhoneNumber = \App\Models\Setting::valueFor('printer_phone_number', '');
+        $formatMoney = function ($amount): string {
+            $amount = (float) $amount;
+
+            return abs($amount - round($amount)) < 0.005
+                ? number_format($amount, 0)
+                : number_format($amount, 2);
+        };
     @endphp
 
     <div class="bill-card bill-receipt">
         <div class="bill-receipt-header">
             <div class="bill-receipt-brand">{{ config('app.name', 'SUIT LAND') }}</div>
+            @if (filled($printerPhoneNumber))
+                <div>{{ strtoupper($printerPhoneNumber) }}</div>
+            @endif
             <div>ESTIMATED BILL</div>
         </div>
 
@@ -100,11 +111,11 @@
                         <td class="bill-center">{{ $index + 1 }}</td>
                         <td class="bill-left">
                             <div>{{ strtoupper($itemName) }}</div>
-                            <div class="bill-print-rate">RATE: {{ number_format((float) $item->unit_price, 2) }}</div>
+                            <div class="bill-print-rate">RATE: {{ $formatMoney($item->unit_price) }}</div>
                         </td>
-                        <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }} {{ $quantityUnit }}</td>
-                        <td class="bill-right">{{ number_format((float) $item->unit_price, 2) }}</td>
-                        <td class="bill-right">{{ number_format($lineAmount, 2) }}</td>
+                        <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }}</td>
+                        <td class="bill-right">{{ $formatMoney($item->unit_price) }}</td>
+                        <td class="bill-right">{{ $formatMoney($lineAmount) }}</td>
                     </tr>
                     @if ($isCustom && $garments->isNotEmpty())
                         @foreach ($garments as $garment)
@@ -119,11 +130,11 @@
                                     @if (filled($garment['tailoring_package'] ?? null))
                                         ({{ $garment['tailoring_package'] }})
                                     @endif
-                                    <div class="bill-print-rate">RATE: {{ number_format($tailoringAmount, 2) }}</div>
+                                    <div class="bill-print-rate">RATE: {{ $formatMoney($tailoringAmount) }}</div>
                                 </td>
-                                <td class="bill-right">{{ rtrim(rtrim(number_format($garmentQty, 2), '0'), '.') }} pcs</td>
-                                <td class="bill-right">{{ number_format($tailoringAmount, 2) }}</td>
-                                <td class="bill-right">{{ number_format($garmentQty * $tailoringAmount, 2) }}</td>
+                                <td class="bill-right">{{ rtrim(rtrim(number_format($garmentQty, 2), '0'), '.') }}</td>
+                                <td class="bill-right">{{ $formatMoney($tailoringAmount) }}</td>
+                                <td class="bill-right">{{ $formatMoney($garmentQty * $tailoringAmount) }}</td>
                             </tr>
                         @endforeach
                     @endif
@@ -136,37 +147,37 @@
         <div class="bill-receipt-totals">
             <div class="bill-meta-row">
                 <span>Subtotal</span>
-                <span>{{ number_format($subtotal, 2) }}</span>
+                <span>{{ $formatMoney($subtotal) }}</span>
             </div>
             <div class="bill-meta-row">
                 <span>Tailoring</span>
-                <span>{{ number_format($stitchingCharges, 2) }}</span>
+                <span>{{ $formatMoney($stitchingCharges) }}</span>
             </div>
             @if ($discount > 0)
                 <div class="bill-meta-row">
                     <span>Discount</span>
-                    <span>-{{ number_format($discount, 2) }}</span>
+                    <span>-{{ $formatMoney($discount) }}</span>
                 </div>
             @endif
             @if ($taxAmount > 0)
                 <div class="bill-meta-row">
                     <span>VAT</span>
-                    <span>{{ number_format($taxAmount, 2) }}</span>
+                    <span>{{ $formatMoney($taxAmount) }}</span>
                 </div>
             @endif
             <div class="bill-rule bill-rule-tight"></div>
             <div class="bill-meta-row bill-total-row">
                 <span>Net Amount</span>
-                <span>{{ number_format($netPayable, 2) }}</span>
+                <span>{{ $formatMoney($netPayable) }}</span>
             </div>
             <div class="bill-rule bill-rule-tight"></div>
             <div class="bill-meta-row">
                 <span>Advance Payment</span>
-                <span>{{ number_format($paidAmount, 2) }}</span>
+                <span>{{ $formatMoney($paidAmount) }}</span>
             </div>
             <div class="bill-meta-row">
                 <span>Balance</span>
-                <span>{{ number_format($dueAmount, 2) }}</span>
+                <span>{{ $formatMoney($dueAmount) }}</span>
             </div>
             <div class="bill-rule bill-rule-tight"></div>
             <div class="bill-meta-row">
