@@ -36,7 +36,7 @@
 
         <div class="outlet-form-grid">
             <div class="outlet-form-group">
-                <label for="printer_phone_number">Printer Phone Number</label>
+                <label for="printer_phone_number">Bill Phone Number</label>
                 <input
                     id="printer_phone_number"
                     name="printer_phone_number"
