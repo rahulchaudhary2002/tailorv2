@@ -4503,3 +4503,15 @@ button {
         flex-direction: column;
     }
 }
+
+.flex {
+    display: flex;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+.gap-6 {
+    gap: 1.5rem;
+}
