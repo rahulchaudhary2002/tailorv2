@@ -224,7 +224,7 @@ class OrderController extends Controller
             'outlet:id,name',
             'customer:id,name,phone,email,address',
             'creator:id,name',
-            'tasks:id,order_id,order_item_id,source_garment_index,worker_id,task_number,worker_deadline_at,status,notes,slip_received_at',
+            'tasks:id,order_id,order_item_id,source_garment_index,worker_id,task_number,worker_deadline_at,status,notes,slip_received_at,paid_at',
             'tasks.worker:id,name',
             'items.product:id,name,code',
             'items.unit:id,name,symbol',

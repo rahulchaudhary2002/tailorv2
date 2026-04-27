@@ -77,6 +77,7 @@
     <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value">{{ number_format((int) $reporting['completed']) }}</div></div>
     <div class="stat-card"><div class="stat-label">Cancelled</div><div class="stat-value">{{ number_format((int) $reporting['cancelled']) }}</div></div>
     <div class="stat-card"><div class="stat-label">Total Payable</div><div class="stat-value">{{ number_format((float) $reporting['total_payable'], 2) }}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Paid</div><div class="stat-value">{{ number_format((float) $reporting['total_paid'], 2) }}</div></div>
 </div>
 
 <div class="directory-reporting" style="margin-bottom: 16px;">
@@ -151,6 +152,7 @@
                     <th>Qty</th>
                     <th>Payable</th>
                     <th>Status</th>
+                    <th>Paid</th>
                     <th>Deadline</th>
                     <th>Slip</th>
                 </tr>
@@ -198,6 +200,7 @@
                                 {{ $task->statusLabel() }}
                             </span>
                         </td>
+                        <td>{{ $task->is_paid ? 'Yes' : 'No' }}</td>
                         <td>
                             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                 <span>{{ $task->worker_deadline_at?->format('M d, Y h:i A') ?: '-' }}</span>
@@ -221,6 +224,12 @@
                                     <input type="hidden" name="worker_id" value="{{ (int) ($task->worker_id ?? 0) }}">
                                     <input type="hidden" name="notes" value="{{ $task->notes }}">
                                     <input type="hidden" name="slip_received" value="{{ $task->slip_received_at ? '1' : '0' }}">
+                                    <input type="hidden" name="is_paid" value="{{ $task->is_paid ? '1' : '0' }}">
+                                    <select name="status" class="outlet-input" style="min-width:180px;">
+                                        @foreach ($statusLabels as $statusKey => $statusLabel)
+                                            <option value="{{ $statusKey }}" @selected((string) $task->status === (string) $statusKey)>{{ $statusLabel }}</option>
+                                        @endforeach
+                                    </select>
                                     <input
                                         type="datetime-local"
                                         name="worker_deadline_at"
@@ -242,7 +251,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="empty">No tasks found for this worker.</td>
+                        <td colspan="10" class="empty">No tasks found for this worker.</td>
                     </tr>
                 @endforelse
             </tbody>

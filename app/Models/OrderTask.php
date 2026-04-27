@@ -44,6 +44,11 @@ class OrderTask extends Model
         'worker_deadline_at' => 'datetime',
     ];
 
+    public function getIsPaidAttribute(): bool
+    {
+        return $this->paid_at !== null;
+    }
+
     public function order()
     {
         return $this->belongsTo(Order::class);

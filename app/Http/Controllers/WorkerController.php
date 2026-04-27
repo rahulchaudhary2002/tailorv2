@@ -209,6 +209,9 @@ class WorkerController extends Controller
             'completed' => (clone $tasksQuery)->where('status', OrderTask::STATUS_COMPLETED)->count(),
             'cancelled' => (clone $tasksQuery)->where('status', OrderTask::STATUS_CANCELLED)->count(),
             'total_payable' => (float) ((clone $tasksQuery)->sum('payable_amount') ?: 0),
+            'total_paid' => (float) ((clone $tasksQuery)
+                ->whereNotNull('paid_at')
+                ->sum('payable_amount') ?: 0),
         ];
 
         $tasks = $tasksQuery

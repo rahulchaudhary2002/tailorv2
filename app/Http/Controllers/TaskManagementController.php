@@ -125,6 +125,9 @@ class TaskManagementController extends Controller
                 ->where('status', OrderTask::STATUS_COMPLETED)
                 ->count(),
             'total_payable' => (float) ((clone $tasksQuery)->sum('payable_amount') ?: 0),
+            'total_paid' => (float) ((clone $tasksQuery)
+                ->whereNotNull('paid_at')
+                ->sum('payable_amount') ?: 0),
         ];
 
         $tasks = $tasksQuery->paginate(15)->withQueryString();
@@ -176,9 +179,30 @@ class TaskManagementController extends Controller
             'worker_deadline_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
             'slip_received' => ['nullable', 'boolean'],
+            'status' => ['nullable', 'string', Rule::in(array_keys(OrderTask::statusLabels()))],
+            'is_paid' => ['nullable', 'boolean'],
         ]);
 
         $workerId = (int) ($validated['worker_id'] ?? 0);
+        $targetStatus = (string) ($validated['status'] ?? '');
+        $hasStatusInput = $targetStatus !== '';
+        $hasPaidInput = $request->has('is_paid');
+
+        if ($workerId < 1 && in_array($targetStatus, [
+            OrderTask::STATUS_ASSIGNED,
+            OrderTask::STATUS_IN_PROGRESS,
+            OrderTask::STATUS_COMPLETED,
+        ], true)) {
+            return back()->with('error', 'Assign a worker before setting an active task status.');
+        }
+
+        if ($hasPaidInput && $request->boolean('is_paid') && $workerId < 1) {
+            return back()->with('error', 'Assign a worker before marking task as paid.');
+        }
+
+        if ($hasPaidInput && $request->boolean('is_paid') && ! $request->boolean('slip_received')) {
+            return back()->with('error', 'Receive the printed task slip before marking task as paid.');
+        }
 
         $task->worker_id = $workerId > 0 ? $workerId : null;
         $task->worker_deadline_at = $validated['worker_deadline_at'] ?? null;
@@ -200,9 +224,31 @@ class TaskManagementController extends Controller
             }
         }
 
+        if ($hasStatusInput) {
+            $task->status = $targetStatus;
+            $task->completed_at = $targetStatus === OrderTask::STATUS_COMPLETED
+                ? ($task->completed_at ?? now())
+                : null;
+
+            if ($task->worker_id && in_array($targetStatus, [
+                OrderTask::STATUS_ASSIGNED,
+                OrderTask::STATUS_IN_PROGRESS,
+                OrderTask::STATUS_COMPLETED,
+            ], true)) {
+                $task->assigned_at = $task->assigned_at ?? now();
+            }
+        }
+
         $task->slip_received_at = $request->boolean('slip_received')
             ? ($task->slip_received_at ?? now())
             : null;
+
+        if ($hasPaidInput) {
+            $task->paid_at = $request->boolean('is_paid')
+                ? ($task->paid_at ?? now())
+                : null;
+        }
+
         $task->save();
         $order = $task->order()->firstOrFail();
         $this->taskService->syncOrderStatus($order);

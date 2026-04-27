@@ -202,6 +202,7 @@
     <div class="stat-card"><div class="stat-label">Active Tasks</div><div class="stat-value">{{ number_format((int) $reporting['active_tasks']) }}</div></div>
     <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value">{{ number_format((int) $reporting['completed_tasks']) }}</div></div>
     <div class="stat-card"><div class="stat-label">Total Payable</div><div class="stat-value">{{ number_format((float) $reporting['total_payable'], 2) }}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Paid</div><div class="stat-value">{{ number_format((float) $reporting['total_paid'], 2) }}</div></div>
 </div>
 
 <div class="directory-reporting" style="margin-bottom: 16px;">
@@ -286,6 +287,7 @@
                     <th>Qty</th>
                     <th>Rate</th>
                     <th>Payable</th>
+                    <th>Paid</th>
                     <th>Status</th>
                     <th>Assignment</th>
                     <th>Slip</th>
@@ -329,6 +331,11 @@
                         <td>{{ number_format((float) $task->rate_amount, 2) }}</td>
                         <td>{{ number_format((float) $task->payable_amount, 2) }}</td>
                         <td>
+                            <span class="app-badge {{ $task->is_paid ? 'app-badge--success' : 'app-badge--danger' }}">
+                                {{ $task->is_paid ? 'Paid' : 'Unpaid' }}
+                            </span>
+                        </td>
+                        <td>
                             <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $task->status) }}">
                                 {{ $task->statusLabel() }}
                             </span>
@@ -358,7 +365,9 @@
                                     data-worker-id="{{ (int) ($task->worker_id ?? 0) }}"
                                     data-worker-deadline="{{ $task->worker_deadline_at?->format('Y-m-d\\TH:i') }}"
                                     data-notes="{{ $task->notes }}"
+                                    data-status="{{ $task->status }}"
                                     data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
+                                    data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
                                     aria-label="Edit task assignment"
                                     title="Edit task assignment"
                                     style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center;"
@@ -385,15 +394,17 @@
                                 data-worker-id="{{ (int) ($task->worker_id ?? 0) }}"
                                 data-worker-deadline="{{ $task->worker_deadline_at?->format('Y-m-d\TH:i') }}"
                                 data-notes="{{ $task->notes }}"
+                                data-status="{{ $task->status }}"
                                 data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
+                                data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
                             >
-                                Assign
+                                Edit
                             </button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="empty">No custom task assignments found.</td>
+                        <td colspan="12" class="empty">No custom task assignments found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -441,6 +452,15 @@
                 </div>
 
                 <div class="outlet-form-group outlet-form-group-full">
+                    <label for="taskAssignStatus">Status</label>
+                    <select id="taskAssignStatus" name="status" class="outlet-input">
+                        @foreach ($statusLabels as $statusKey => $statusLabel)
+                            <option value="{{ $statusKey }}">{{ $statusLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="outlet-form-group outlet-form-group-full">
                     <label for="taskAssignNotes">Notes</label>
                     <input id="taskAssignNotes" type="text" name="notes" class="outlet-input" placeholder="Notes">
                 </div>
@@ -449,6 +469,14 @@
                     <label class="task-assign-check">
                         <input id="taskAssignSlip" type="checkbox" name="slip_received" value="1">
                         <span>Slip Received</span>
+                    </label>
+                </div>
+
+                <div class="outlet-form-group outlet-form-group-full">
+                    <input type="hidden" name="is_paid" value="0">
+                    <label class="task-assign-check">
+                        <input id="taskAssignPaid" type="checkbox" name="is_paid" value="1">
+                        <span>Paid</span>
                     </label>
                 </div>
             </div>
@@ -474,13 +502,15 @@
         const workerInput = document.getElementById('taskAssignWorker');
         const deadlineInput = document.getElementById('taskAssignDeadline');
         const notesInput = document.getElementById('taskAssignNotes');
+        const statusInput = document.getElementById('taskAssignStatus');
         const slipInput = document.getElementById('taskAssignSlip');
+        const paidInput = document.getElementById('taskAssignPaid');
         const modalPanel = modal.querySelector('.task-assign-modal__panel');
         const rangeInput = document.getElementById('deadline_range_filter');
         const fromInput = document.getElementById('deadline_from_filter');
         const toInput = document.getElementById('deadline_to_filter');
 
-        if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !slipInput) {
+        if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !statusInput || !slipInput || !paidInput) {
             return;
         }
 
@@ -559,7 +589,9 @@
                 workerInput.value = button.dataset.workerId || '';
                 deadlineInput.value = button.dataset.workerDeadline || '';
                 notesInput.value = button.dataset.notes || '';
+                statusInput.value = button.dataset.status || 'pending';
                 slipInput.checked = button.dataset.slipReceived === '1';
+                paidInput.checked = button.dataset.isPaid === '1';
 
                 if (meta) {
                     meta.textContent = `${button.dataset.taskNumber} | Order ${button.dataset.orderNumber} | ${button.dataset.customerName} | ${button.dataset.taskTitle}`;

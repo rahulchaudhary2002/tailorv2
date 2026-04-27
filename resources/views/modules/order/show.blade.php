@@ -548,6 +548,7 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                 <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $itemTask->status) }}" style="margin-left: 6px; min-width: 0;">
                                     {{ $itemTask->statusLabel() }}
                                 </span>
+                                <span style="margin-left: 6px;">Paid: {{ $itemTask->is_paid ? 'Yes' : 'No' }}</span>
                                 @if ($itemTask->task_number)
                                 @canany(['view-task-management', 'manage-task-management', 'manage-orders'])
                                 <a href="{{ route('taskManagement.order', ['order' => $order, 'q' => $itemTask->task_number]) }}" style="margin-left: 6px; text-decoration: underline;">
@@ -577,7 +578,9 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                 data-worker-id="{{ (int) ($itemTask->worker_id ?? 0) }}"
                                 data-worker-deadline="{{ $itemTask->worker_deadline_at?->format('Y-m-d\\TH:i') }}"
                                 data-notes="{{ $itemTask->notes }}"
-                                data-slip-received="{{ $itemTask->slip_received_at ? '1' : '0' }}">
+                                data-status="{{ $itemTask->status }}"
+                                data-slip-received="{{ $itemTask->slip_received_at ? '1' : '0' }}"
+                                data-is-paid="{{ $itemTask->is_paid ? '1' : '0' }}">
                                 <i class="fas fa-pen"></i>
                             </button>
                             @endforeach
@@ -675,6 +678,7 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                             <span class="app-badge {{ \App\Models\OrderTask::statusBadgeClass((string) $garmentTask->status) }}" style="min-width: 0; margin-left: 6px;">
                                                 {{ $garmentTask->statusLabel() }}
                                             </span>
+                                            <span style="margin-left: 8px;">Paid: {{ $garmentTask->is_paid ? 'Yes' : 'No' }}</span>
                                             @canany(['manage-task-management', 'manage-orders'])
                                             <button
                                                 type="button"
@@ -689,7 +693,9 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                                 data-worker-id="{{ (int) ($garmentTask->worker_id ?? 0) }}"
                                                 data-worker-deadline="{{ $garmentTask->worker_deadline_at?->format('Y-m-d\\TH:i') }}"
                                                 data-notes="{{ $garmentTask->notes }}"
-                                                data-slip-received="{{ $garmentTask->slip_received_at ? '1' : '0' }}">
+                                                data-status="{{ $garmentTask->status }}"
+                                                data-slip-received="{{ $garmentTask->slip_received_at ? '1' : '0' }}"
+                                                data-is-paid="{{ $garmentTask->is_paid ? '1' : '0' }}">
                                                 <i class="fas fa-pen"></i>
                                             </button>
                                             @endcanany
@@ -824,6 +830,15 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                 </div>
 
                 <div class="outlet-form-group order-task-assign-full">
+                    <label for="orderTaskAssignStatus">Status</label>
+                    <select id="orderTaskAssignStatus" name="status" class="outlet-input">
+                        @foreach (\App\Models\OrderTask::statusLabels() as $statusKey => $statusLabel)
+                        <option value="{{ $statusKey }}">{{ $statusLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="outlet-form-group order-task-assign-full">
                     <label for="orderTaskAssignNotes">Notes</label>
                     <textarea id="orderTaskAssignNotes" name="notes" class="outlet-input" rows="3" placeholder="Assignment note"></textarea>
                 </div>
@@ -832,6 +847,14 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                     <label style="display:inline-flex;align-items:center;gap:10px;font-weight:500;">
                         <input id="orderTaskAssignSlip" type="checkbox" name="slip_received" value="1">
                         <span>Slip Received</span>
+                    </label>
+                </div>
+
+                <div class="outlet-form-group order-task-assign-full">
+                    <input type="hidden" name="is_paid" value="0">
+                    <label style="display:inline-flex;align-items:center;gap:10px;font-weight:500;">
+                        <input id="orderTaskAssignPaid" type="checkbox" name="is_paid" value="1">
+                        <span>Paid</span>
                     </label>
                 </div>
             </div>
@@ -855,12 +878,14 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
         const workerInput = document.getElementById('orderTaskAssignWorker');
         const deadlineInput = document.getElementById('orderTaskAssignDeadline');
         const notesInput = document.getElementById('orderTaskAssignNotes');
+        const statusInput = document.getElementById('orderTaskAssignStatus');
         const slipInput = document.getElementById('orderTaskAssignSlip');
+        const paidInput = document.getElementById('orderTaskAssignPaid');
         const modalPanel = modal?.querySelector('.app-modal__panel');
         const tabButtons = document.querySelectorAll('.js-order-view-tab');
         const tabPanels = document.querySelectorAll('.js-order-view-panel');
 
-        if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !slipInput) {
+        if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !statusInput || !slipInput || !paidInput) {
             return;
         }
 
@@ -921,7 +946,9 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                 workerInput.value = button.dataset.workerId || '';
                 deadlineInput.value = button.dataset.workerDeadline || '';
                 notesInput.value = button.dataset.notes || '';
+                statusInput.value = button.dataset.status || 'pending';
                 slipInput.checked = button.dataset.slipReceived === '1';
+                paidInput.checked = button.dataset.isPaid === '1';
 
                 if (meta) {
                     meta.textContent = `${button.dataset.taskNumber} | Order ${button.dataset.orderNumber} | ${button.dataset.customerName} | ${button.dataset.taskTitle}`;
