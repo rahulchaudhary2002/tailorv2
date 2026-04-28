@@ -78,11 +78,6 @@
             <tbody>
                 @forelse ($tasks as $task)
                     @php
-                        $nextStatuses = match ((string) $task->status) {
-                            \App\Models\OrderTask::STATUS_ASSIGNED => [\App\Models\OrderTask::STATUS_IN_PROGRESS, \App\Models\OrderTask::STATUS_COMPLETED],
-                            \App\Models\OrderTask::STATUS_IN_PROGRESS => [\App\Models\OrderTask::STATUS_COMPLETED],
-                            default => [],
-                        };
                         $canSetDeadline = $task->worker_deadline_at === null;
                     @endphp
                     <tr>
@@ -139,21 +134,16 @@
                             <a href="{{ route('taskManagement.slip', $task) }}" class="btn btn-sm btn-light" target="_blank">Print Slip</a>
                         </td>
                         <td>
-                            @if ($nextStatuses !== [])
-                                <form action="{{ route('taskManagement.workerUpdate', $task) }}" method="POST" style="display:flex; gap:8px; align-items:center;">
-                                    @csrf
-                                    @method('PUT')
-                                    <select name="status" class="outlet-input" style="min-width: 180px;" required>
-                                        <option value="" disabled selected>Update Status</option>
-                                        @foreach ($nextStatuses as $status)
-                                            <option value="{{ $status }}">{{ $statusLabels[$status] ?? ucfirst($status) }}</option>
-                                        @endforeach
-                                    </select>
-                                    <button type="submit" class="btn btn-sm btn-secondary">Save</button>
-                                </form>
-                            @else
-                                <span class="empty">Locked</span>
-                            @endif
+                            <form action="{{ route('taskManagement.workerUpdate', $task) }}" method="POST" style="display:flex; gap:8px; align-items:center;">
+                                @csrf
+                                @method('PUT')
+                                <select name="status" class="outlet-input" style="min-width: 180px;" required>
+                                    @foreach ($statusLabels as $statusKey => $statusLabel)
+                                        <option value="{{ $statusKey }}" @selected((string) $task->status === (string) $statusKey)>{{ $statusLabel }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-secondary">Update Status</button>
+                            </form>
                         </td>
                     </tr>
                 @empty

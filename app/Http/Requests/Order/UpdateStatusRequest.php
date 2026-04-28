@@ -23,48 +23,10 @@ class UpdateStatusRequest extends FormRequest
      */
     public function rules(): array
     {
-        /** @var Order|null $order */
-        $order = $this->route('order');
-        $nextStatuses = $order
-            ? Order::nextStatusesFor((string) $order->status)
-            : [];
-
-        // Check if order has any fabric or custom with fabric
-        $hasFabricOrCustom = false;
-        if ($order) {
-            $order->loadMissing('items');
-            foreach ($order->items as $item) {
-                if ((string) $item->item_category === 'custom') {
-                    $fabricProductId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
-                    $fabricQty = (float) data_get($item->custom_details, 'fabric_quantity', 0);
-                    if ($fabricProductId > 0 && $fabricQty > 0) {
-                        $hasFabricOrCustom = true;
-                        break;
-                    }
-                } elseif ((string) $item->item_category === 'fabric') {
-                    $hasFabricOrCustom = true;
-                    break;
-                }
-            }
-        }
-
-        $customNextStatuses = $nextStatuses;
-        if (!$hasFabricOrCustom) {
-            // For non-fabric/non-custom, allow only in_progress after confirmed, delivered after in_progress
-            $customNextStatuses = [];
-            if ((string) $order->status === \App\Models\Order::STATUS_CONFIRMED) {
-                $customNextStatuses[] = \App\Models\Order::STATUS_IN_PROGRESS;
-            } elseif ((string) $order->status === \App\Models\Order::STATUS_IN_PROGRESS) {
-                $customNextStatuses[] = \App\Models\Order::STATUS_DELIVERED;
-            }
-        }
-
         return [
             'status' => [
                 'required',
-                Rule::in([
-                    ...$customNextStatuses,
-                ]),
+                Rule::in(array_keys(Order::statusLabels())),
             ],
             'remaining_payment_amount' => ['nullable', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:100'],

@@ -383,23 +383,38 @@
                             </div>
                         </td>
                         <td>
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-secondary js-open-assign-modal"
-                                data-task-id="{{ $task->id }}"
-                                data-task-number="{{ $task->task_number ?: '-' }}"
-                                data-order-number="{{ $task->order?->order_number ?: '-' }}"
-                                data-customer-name="{{ $task->order?->customer?->name ?: '-' }}"
-                                data-task-title="{{ $task->task_title }}"
-                                data-worker-id="{{ (int) ($task->worker_id ?? 0) }}"
-                                data-worker-deadline="{{ $task->worker_deadline_at?->format('Y-m-d\TH:i') }}"
-                                data-notes="{{ $task->notes }}"
-                                data-status="{{ $task->status }}"
-                                data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
-                                data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
-                            >
-                                Edit
-                            </button>
+                            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-secondary js-open-assign-modal"
+                                    data-task-id="{{ $task->id }}"
+                                    data-task-number="{{ $task->task_number ?: '-' }}"
+                                    data-order-number="{{ $task->order?->order_number ?: '-' }}"
+                                    data-customer-name="{{ $task->order?->customer?->name ?: '-' }}"
+                                    data-task-title="{{ $task->task_title }}"
+                                    data-worker-id="{{ (int) ($task->worker_id ?? 0) }}"
+                                    data-worker-deadline="{{ $task->worker_deadline_at?->format('Y-m-d\TH:i') }}"
+                                    data-notes="{{ $task->notes }}"
+                                    data-status="{{ $task->status }}"
+                                    data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
+                                    data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
+                                >
+                                    Edit
+                                </button>
+                                @if (! $task->is_paid)
+                                    <form action="{{ route('taskManagement.update', $task) }}" method="POST">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="worker_id" value="{{ (int) ($task->worker_id ?? 0) }}">
+                                        <input type="hidden" name="worker_deadline_at" value="{{ $task->worker_deadline_at?->format('Y-m-d H:i:s') }}">
+                                        <input type="hidden" name="notes" value="{{ $task->notes }}">
+                                        <input type="hidden" name="status" value="{{ $task->status }}">
+                                        <input type="hidden" name="slip_received" value="1">
+                                        <input type="hidden" name="is_paid" value="1">
+                                        <button type="submit" class="btn btn-sm btn-primary">Mark as Paid</button>
+                                    </form>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty

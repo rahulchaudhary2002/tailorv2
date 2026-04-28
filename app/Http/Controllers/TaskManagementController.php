@@ -269,11 +269,7 @@ class TaskManagementController extends Controller
         $this->ensureTaskAccessibleToWorker($task);
 
         $validated = $request->validate([
-            'status' => ['nullable', 'string', 'in:' . implode(',', [
-                OrderTask::STATUS_ASSIGNED,
-                OrderTask::STATUS_IN_PROGRESS,
-                OrderTask::STATUS_COMPLETED,
-            ])],
+            'status' => ['nullable', 'string', Rule::in(array_keys(OrderTask::statusLabels()))],
             'worker_deadline_at' => ['nullable', 'date'],
         ]);
 
@@ -288,24 +284,11 @@ class TaskManagementController extends Controller
             return back()->with('error', 'Task deadline is already set and cannot be changed by the worker.');
         }
 
-        $allowedTransitions = [
-            OrderTask::STATUS_ASSIGNED => [OrderTask::STATUS_IN_PROGRESS, OrderTask::STATUS_COMPLETED],
-            OrderTask::STATUS_IN_PROGRESS => [OrderTask::STATUS_COMPLETED],
-            OrderTask::STATUS_COMPLETED => [],
-        ];
-
-        $currentStatus = (string) $task->status;
-        $nextStatuses = $allowedTransitions[$currentStatus] ?? [];
-
-        if ($targetStatus !== '' && !in_array($targetStatus, $nextStatuses, true)) {
-            return back()->with('error', 'Invalid task status update.');
-        }
-
         if ($targetStatus !== '') {
             $task->status = $targetStatus;
-            if ($targetStatus === OrderTask::STATUS_COMPLETED) {
-                $task->completed_at = $task->completed_at ?? now();
-            }
+            $task->completed_at = $targetStatus === OrderTask::STATUS_COMPLETED
+                ? ($task->completed_at ?? now())
+                : null;
         }
 
         if (array_key_exists('worker_deadline_at', $validated)) {

@@ -14,45 +14,27 @@ class OrderWorkflowService
 
         $toStatus = (string) ($payload['status'] ?? '');
 
-        // Check if order has any fabric or custom with fabric
-        $hasFabricOrCustom = false;
-        $order->loadMissing('items');
-        foreach ($order->items as $item) {
-            if ((string) $item->item_category === 'custom') {
-                $fabricProductId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
-                $fabricQty = (float) data_get($item->custom_details, 'fabric_quantity', 0);
-                if ($fabricProductId > 0 && $fabricQty > 0) {
-                    $hasFabricOrCustom = true;
-                    break;
-                }
-            } elseif ((string) $item->item_category === 'fabric') {
-                $hasFabricOrCustom = true;
-                break;
-            }
-        }
-
-        $fromStatus = (string) $order->status;
-        $allowSimple = false;
-        if (!$hasFabricOrCustom) {
-            if (($fromStatus === Order::STATUS_CONFIRMED && $toStatus === Order::STATUS_IN_PROGRESS)
-                || ($fromStatus === Order::STATUS_IN_PROGRESS && $toStatus === Order::STATUS_DELIVERED)) {
-                $allowSimple = true;
-            }
-        }
-
-        if (!$allowSimple && !Order::canTransition($fromStatus, $toStatus)) {
+        if (!array_key_exists($toStatus, Order::statusLabels())) {
             throw new \RuntimeException('Invalid order status transition.');
         }
 
         $now = now();
+        $fabricIssuedOrLaterStatuses = [
+            Order::STATUS_FABRIC_ISSUED,
+            Order::STATUS_ASSIGNED,
+            Order::STATUS_IN_PROGRESS,
+            Order::STATUS_NEAR_COMPLETION,
+            Order::STATUS_COMPLETED,
+            Order::STATUS_DELIVERED,
+        ];
 
-        if ($toStatus === Order::STATUS_FABRIC_ISSUED && !$order->fabric_issued_at) {
+        if (in_array($toStatus, $fabricIssuedOrLaterStatuses, true) && !$order->fabric_issued_at) {
             $order->fabric_issued_at = $now;
         }
 
-        if ($toStatus === Order::STATUS_COMPLETED && !$order->completed_at) {
-            $order->completed_at = $now;
-        }
+        $order->completed_at = in_array($toStatus, [Order::STATUS_COMPLETED, Order::STATUS_DELIVERED], true)
+            ? ($order->completed_at ?? $now)
+            : null;
 
         if ($toStatus === Order::STATUS_DELIVERED) {
             $remainingDue = $order->dueAmount();
@@ -78,6 +60,17 @@ class OrderWorkflowService
 
         if ($toStatus === Order::STATUS_CANCELLED) {
             $order->closed_at = $payload['closed_at'] ?? $now;
+        }
+
+        if (!in_array($toStatus, $fabricIssuedOrLaterStatuses, true)) {
+            $order->fabric_issued_at = null;
+            $order->delivered_at = null;
+            $order->closed_at = null;
+        }
+
+        if ($toStatus !== Order::STATUS_DELIVERED && $toStatus !== Order::STATUS_CANCELLED) {
+            $order->delivered_at = null;
+            $order->closed_at = null;
         }
 
         $order->status = $toStatus;

@@ -82,16 +82,11 @@ class OrderController extends Controller
 
         $statusLabels = Order::statusLabels();
         $paymentStatusLabels = Order::paymentStatusLabels();
-        $nextStatusesByOrderId = $orders->getCollection()
-            ->mapWithKeys(function (Order $order) {
-                return [$order->id => Order::nextStatusesFor((string) $order->status)];
-            });
 
         return view('modules.order.index', compact(
             'orders',
             'statusLabels',
             'paymentStatusLabels',
-            'nextStatusesByOrderId',
             'status',
             'paymentStatus'
         ));
@@ -940,13 +935,6 @@ class OrderController extends Controller
             }
         }
 
-        $nextStatuses = Order::nextStatusesFor((string) $order->status);
-        if (empty($nextStatuses)) {
-            return redirect()
-                ->route($redirectRoute)
-                ->with('error', 'Finalized orders are locked and cannot be updated.');
-        }
-
         $validated = $request->validated();
         $targetStatus = (string) ($validated['status'] ?? '');
 
@@ -979,13 +967,22 @@ class OrderController extends Controller
         try {
             DB::transaction(function () use ($order, $validated): void {
                 $targetStatus = (string) ($validated['status'] ?? '');
+                $currentStatus = (string) $order->status;
                 $outletLocationId = $this->resolveOutletLocationId((int) $order->outlet_id);
+                $targetHasIssuedStock = in_array($targetStatus, [
+                    Order::STATUS_FABRIC_ISSUED,
+                    Order::STATUS_ASSIGNED,
+                    Order::STATUS_IN_PROGRESS,
+                    Order::STATUS_NEAR_COMPLETION,
+                    Order::STATUS_COMPLETED,
+                    Order::STATUS_DELIVERED,
+                ], true);
 
                 if ($outletLocationId < 1) {
                     throw new \RuntimeException('No active inventory location found for this order outlet.');
                 }
 
-                if ($targetStatus === Order::STATUS_FABRIC_ISSUED) {
+                if ($targetHasIssuedStock && ! $this->orderHasIssuedStock($order)) {
                     $inventoryTypeId = $this->resolveOutletInventoryTypeId();
 
                     if ($inventoryTypeId < 1) {
@@ -1007,6 +1004,11 @@ class OrderController extends Controller
                     } else {
                         $this->releaseReservedStockForOrder($order, $outletLocationId);
                     }
+                } elseif (! $targetHasIssuedStock && $this->orderHasIssuedStock($order)) {
+                    $this->restoreOrderInventory($order);
+                    $this->reserveStockForOrder($order, $outletLocationId);
+                } elseif ($currentStatus === Order::STATUS_CANCELLED && ! $targetHasIssuedStock) {
+                    $this->reserveStockForOrder($order, $outletLocationId);
                 }
 
                 app(OrderWorkflowService::class)->transition($order, $validated);

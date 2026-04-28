@@ -118,17 +118,15 @@
                         $canTakePayment = $canManageOrders
                             && (string) $order->status !== \App\Models\Order::STATUS_CANCELLED
                             && $remainingDue > 0;
-                        $nextStatuses = $nextStatusesByOrderId[$order->id] ?? [];
                         $workerVisibleStatuses = [
                             \App\Models\Order::STATUS_IN_PROGRESS,
                             \App\Models\Order::STATUS_NEAR_COMPLETION,
                             \App\Models\Order::STATUS_COMPLETED,
-                            \App\Models\Order::STATUS_DELIVERED,
                         ];
-                        $visibleNextStatuses = $canManageOrders
-                            ? $nextStatuses
+                        $visibleStatuses = $canManageOrders
+                            ? array_keys($statusLabels)
                             : (($canViewAssignedJobs && $isOwnAssignedOrder)
-                                ? collect($nextStatuses)->filter(fn ($s) => in_array($s, $workerVisibleStatuses, true))->values()->all()
+                                ? $workerVisibleStatuses
                                 : []);
                         $isEditable = !in_array((string) $order->status, [
                             \App\Models\Order::STATUS_ASSIGNED,
@@ -287,39 +285,15 @@
                                 </summary>
 
                                 <div class="order-actions-dropdown">
-                                    @if (!empty($visibleNextStatuses))
+                                    @if (!empty($visibleStatuses))
                                         <form action="{{ route('order.status.update', $order) }}" method="POST" class="order-status-update-form order-actions-form">
                                             @csrf
                                             @method('PUT')
 
                                             <div class="order-actions-section-title">Update Status</div>
-
-                                            @php
-                                                // Determine if order has any fabric or custom product
-                                                $hasFabricOrCustom = $order->items->contains(function ($item) {
-                                                    if ((string) $item->item_category === 'custom') {
-                                                        $fabricProductId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
-                                                        $fabricQty = (float) data_get($item->custom_details, 'fabric_quantity', 0);
-                                                        return $fabricProductId > 0 && $fabricQty > 0;
-                                                    }
-                                                    return (string) $item->item_category === 'fabric';
-                                                });
-                                                if ($hasFabricOrCustom) {
-                                                    $filteredNextStatuses = $visibleNextStatuses;
-                                                } else {
-                                                    // Always show 'in progress' if current is confirmed, and 'delivered' if current is in progress
-                                                    $filteredNextStatuses = collect();
-                                                    if ((string)$order->status === \App\Models\Order::STATUS_CONFIRMED) {
-                                                        $filteredNextStatuses->push(\App\Models\Order::STATUS_IN_PROGRESS);
-                                                    } elseif ((string)$order->status === \App\Models\Order::STATUS_IN_PROGRESS) {
-                                                        $filteredNextStatuses->push(\App\Models\Order::STATUS_DELIVERED);
-                                                    }
-                                                }
-                                            @endphp
                                             <select name="status" class="outlet-input order-status-select" required>
-                                                <option value="" disabled selected>Select Next Status</option>
-                                                @foreach ($filteredNextStatuses as $status)
-                                                    <option value="{{ $status }}">{{ $statusLabels[$status] ?? ucfirst($status) }}</option>
+                                                @foreach ($visibleStatuses as $status)
+                                                    <option value="{{ $status }}" @selected((string) $order->status === (string) $status)>{{ $statusLabels[$status] ?? ucfirst($status) }}</option>
                                                 @endforeach
                                             </select>
 

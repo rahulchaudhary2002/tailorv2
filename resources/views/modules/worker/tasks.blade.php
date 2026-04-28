@@ -69,6 +69,7 @@
     $authUser = auth()->user();
     $canManageOrders = (bool) $authUser?->hasPermission('manage-orders');
     $canManageTaskManagement = (bool) $authUser?->hasPermission('manage-task-management');
+    $canMarkTaskPaid = $canManageOrders || $canManageTaskManagement;
 @endphp
 
 <div class="stats-grid" style="margin-bottom: 16px;">
@@ -155,6 +156,7 @@
                     <th>Paid</th>
                     <th>Deadline</th>
                     <th>Slip</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -248,10 +250,27 @@
                                 <a href="{{ route('taskManagement.slip', $task) }}" class="btn btn-sm btn-light" target="_blank">Print Slip</a>
                             </div>
                         </td>
+                        <td>
+                            @if (! $task->is_paid && $canMarkTaskPaid)
+                                <form action="{{ route('taskManagement.update', $task) }}" method="POST">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="worker_id" value="{{ (int) ($task->worker_id ?? 0) }}">
+                                    <input type="hidden" name="notes" value="{{ $task->notes }}">
+                                    <input type="hidden" name="slip_received" value="1">
+                                    <input type="hidden" name="is_paid" value="1">
+                                    <input type="hidden" name="status" value="{{ $task->status }}">
+                                    <input type="hidden" name="worker_deadline_at" value="{{ $task->worker_deadline_at?->format('Y-m-d H:i:s') }}">
+                                    <button type="submit" class="btn btn-sm btn-primary">Mark as Paid</button>
+                                </form>
+                            @else
+                                -
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="empty">No tasks found for this worker.</td>
+                        <td colspan="11" class="empty">No tasks found for this worker.</td>
                     </tr>
                 @endforelse
             </tbody>
