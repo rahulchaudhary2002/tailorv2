@@ -413,6 +413,18 @@
                                         <input type="hidden" name="is_paid" value="1">
                                         <button type="submit" class="btn btn-sm btn-primary">Mark as Paid</button>
                                     </form>
+                                @else
+                                    <form action="{{ route('taskManagement.update', $task) }}" method="POST">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="worker_id" value="{{ (int) ($task->worker_id ?? 0) }}">
+                                        <input type="hidden" name="worker_deadline_at" value="{{ $task->worker_deadline_at?->format('Y-m-d H:i:s') }}">
+                                        <input type="hidden" name="notes" value="{{ $task->notes }}">
+                                        <input type="hidden" name="status" value="{{ $task->status }}">
+                                        <input type="hidden" name="slip_received" value="{{ $task->slip_received_at ? '1' : '0' }}">
+                                        <input type="hidden" name="is_paid" value="0">
+                                        <button type="submit" class="btn btn-sm btn-light">Mark as Unpaid</button>
+                                    </form>
                                 @endif
                             </div>
                         </td>
