@@ -16,7 +16,13 @@
     </div>
 
     @php
-        $totalQty = (float) $items->sum('quantity');
+        $totalItems = $items->sum(function ($item) {
+            if ((string) $item->item_category === 'custom') {
+                $count = count((array) data_get($item->custom_details, 'garments', []));
+                return $count > 0 ? $count : 1;
+            }
+            return 1;
+        });
         $printerPhoneNumber = \App\Models\Setting::valueFor('printer_phone_number', '');
         $formatMoney = function ($amount): string {
             $amount = (float) $amount;
@@ -113,7 +119,7 @@
                             <div>{{ strtoupper($itemName) }}</div>
                             <div class="bill-print-rate">RATE: {{ $formatMoney($item->unit_price) }}</div>
                         </td>
-                        <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }}</td>
+                        <td class="bill-right">{{ $isCustom ? '' : rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }}</td>
                         <td class="bill-right">{{ $formatMoney($item->unit_price) }}</td>
                         <td class="bill-right">{{ $formatMoney($lineAmount) }}</td>
                     </tr>
@@ -181,8 +187,8 @@
             </div>
             <div class="bill-rule bill-rule-tight"></div>
             <div class="bill-meta-row">
-                <span>Total Qty</span>
-                <span>{{ rtrim(rtrim(number_format($totalQty, 2), '0'), '.') }}</span>
+                <span>Total Items</span>
+                <span>{{ $totalItems }}</span>
             </div>
         </div>
 
