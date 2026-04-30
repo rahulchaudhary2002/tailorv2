@@ -81,7 +81,7 @@
                             <td>{{ $customName }}</td>
                             <td>{{ ucfirst((string) data_get($item->custom_details, 'fabric_source', 'own')) }}</td>
                             <td>{{ number_format((float) data_get($item->custom_details, 'fabric_quantity', 0), 2) }} {{ data_get($item->custom_details, 'fabric_quantity_unit', 'm') }}</td>
-                            <td>{{ data_get($item->custom_details, 'design_note', '-') ?: '-' }}</td>
+                            <td>{{ data_get($item->custom_details, 'garment_design_note_summary', '-') ?: '-' }}</td>
                         </tr>
                     @else
                         <tr>
@@ -111,12 +111,14 @@
             <div class="bill-muted" style="margin-top:10px;">
                 {{ $displayName }}
             </div>
-            @if (filled(data_get($customItem->custom_details, 'design_note')))
-                <div class="bill-muted">Design Note: {{ data_get($customItem->custom_details, 'design_note') }}</div>
-            @endif
-
             @if ($garments->isNotEmpty())
                 @foreach ($garments as $garment)
+                    @php
+                        $garmentNotes = collect((array) ($garment['design_note'] ?? []))
+                            ->map(fn ($note) => trim((string) $note))
+                            ->filter()
+                            ->values();
+                    @endphp
                     <div class="bill-detail-box" style="margin-top:10px;">
                         <div class="bill-detail-row" style="padding-top:0;">
                             <div>
@@ -126,6 +128,9 @@
                                 <div class="bill-detail-meta">
                                     {{ $garment['tailoring_package'] ?? 'Tailoring' }}
                                 </div>
+                                @if ($garmentNotes->isNotEmpty())
+                                    <div class="bill-detail-meta">Design Note: {{ $garmentNotes->implode(', ') }}</div>
+                                @endif
                             </div>
                             <div class="bill-detail-price">
                                 Stitching
@@ -196,12 +201,13 @@
                 {{ data_get($customItem->custom_details, 'garment_title')
                     ?: ($garments->pluck('garment_title')->filter()->implode(', ') ?: 'Custom Garment') }}
             </div>
-            @if (filled(data_get($customItem->custom_details, 'design_note')))
-                <div class="bill-muted">Design Note: {{ data_get($customItem->custom_details, 'design_note') }}</div>
-            @endif
             @if ($garments->isNotEmpty())
                 @foreach ($garments as $garment)
                     @php
+                        $garmentNotes = collect((array) ($garment['design_note'] ?? []))
+                            ->map(fn ($note) => trim((string) $note))
+                            ->filter()
+                            ->values();
                         $garmentDesignImages = collect((array) ($garment['design_images'] ?? []))
                             ->push($garment['design_image'] ?? null)
                             ->filter(fn ($path) => filled($path))
@@ -210,6 +216,9 @@
                     @endphp
                     <div class="bill-muted" style="margin-top:8px;">
                         {{ $garment['garment_title'] ?? 'Garment' }}
+                        @if ($garmentNotes->isNotEmpty())
+                            — Design Note: {{ $garmentNotes->implode(', ') }}
+                        @endif
                     </div>
                     @if ($garmentDesignImages->isNotEmpty())
                         <div class="bill-design-grid" style="margin-top:6px;">

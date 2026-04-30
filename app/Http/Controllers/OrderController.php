@@ -652,7 +652,20 @@ class OrderController extends Controller
                     Order::STATUS_COMPLETED,
                 ], true);
 
+                $savedTasksByPosition = [];
+
                 if ($existingOrder) {
+                    $existingItemsInOrder = $existingOrder->items()->orderBy('id')->get();
+                    foreach ($existingItemsInOrder as $position => $existingItem) {
+                        $itemTasks = $existingItem->tasks()->get();
+                        if ($itemTasks->isNotEmpty()) {
+                            $savedTasksByPosition[$position] = $itemTasks->map(fn (OrderTask $task) => collect($task->getAttributes())
+                                ->except(['id', 'order_id', 'order_item_id', 'created_at', 'updated_at'])
+                                ->toArray()
+                            )->all();
+                        }
+                    }
+
                     if ($this->orderHasIssuedStock($existingOrder)) {
                         $this->restoreOrderInventory($existingOrder);
                     } else {
@@ -689,6 +702,7 @@ class OrderController extends Controller
 
                 $subtotal = 0.0;
                 $tailoringTotal = 0.0;
+                $newItemIdByIndex = [];
 
                 foreach ($items as $itemIndex => $item) {
                     $itemCategory = (string) ($item['item_category'] ?? 'readymade');
@@ -786,7 +800,7 @@ class OrderController extends Controller
                             ->values()
                             ->all();
 
-                        $order->items()->create([
+                        $newItemIdByIndex[$itemIndex] = $order->items()->create([
                             'item_category' => 'custom',
                             'product_id' => null,
                             'unit_id' => null,
@@ -810,7 +824,7 @@ class OrderController extends Controller
                                 'design_images' => $designImagePaths,
                                 'design_image' => $designImagePaths[0] ?? null,
                             ],
-                        ]);
+                        ])->id;
 
                     } else {
                         $productId = (int) $item['product_id'];
@@ -820,7 +834,7 @@ class OrderController extends Controller
                         $unitPrice = $resolvedUnitPrice > 0 ? $resolvedUnitPrice : $submittedUnitPrice;
                         $lineTotal = $quantity * $unitPrice;
 
-                        $order->items()->create([
+                        $newItemIdByIndex[$itemIndex] = $order->items()->create([
                             'item_category' => $itemCategory,
                             'product_id' => $productId,
                             'unit_id' => null,
@@ -830,13 +844,25 @@ class OrderController extends Controller
                             'custom_details' => $itemCategory === 'readymade'
                                 ? ['size' => $item['size'] ?? null]
                                 : null,
-                        ]);
+                        ])->id;
 
                     }
 
                     $subtotal += $lineTotal;
                     if ($itemCategory === 'custom') {
                         $tailoringTotal += $itemTailoringTotal;
+                    }
+                }
+
+                foreach ($newItemIdByIndex as $itemIndex => $newItemId) {
+                    if (! isset($savedTasksByPosition[$itemIndex])) {
+                        continue;
+                    }
+                    foreach ($savedTasksByPosition[$itemIndex] as $taskData) {
+                        OrderTask::create(array_merge($taskData, [
+                            'order_id' => $order->id,
+                            'order_item_id' => $newItemId,
+                        ]));
                     }
                 }
 

@@ -21,7 +21,6 @@
             ->map(fn ($note) => trim((string) $note))
             ->filter()
             ->values();
-        $designNoteText = data_get($customDetails, 'design_note', '-') ?: '-';
         $garmentDesignNoteText = $garmentDesignNotes->isNotEmpty()
             ? $garmentDesignNotes->implode(', ')
             : '-';
@@ -125,10 +124,6 @@
             </div>
             <div class="bill-meta-row">
                 <span>Design Note</span>
-                <span>{{ $designNoteText }}</span>
-            </div>
-            <div class="bill-meta-row">
-                <span>Garment Note</span>
                 <span>{{ $garmentDesignNoteText }}</span>
             </div>
             <div class="bill-meta-row">

@@ -364,14 +364,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <h4>Measurement Details</h4>
                     <div id="measurementFields" class="tp-garment-sections"></div>
                     <small class="tp-hint">Each selected garment keeps its own quantity, measurements, tailoring package, optional design notes, and optional design samples.</small>
-                    <div id="customDesignNoteWrap" class="tp-form-group" style="margin-top: 16px;">
-                        <label for="customDesignNote">Design Note</label>
-                        <textarea
-                            id="customDesignNote"
-                            class="tp-input"
-                            rows="3"
-                            placeholder="Add any extra design instructions for this custom item..."></textarea>
-                    </div>
                 </div>
             </div>
 
@@ -756,8 +748,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const modalProductPrice = document.getElementById('modalProductPrice');
     const modalProductQuantity = document.getElementById('modalProductQuantity');
     const modalProductCounter = document.getElementById('modalProductCounter');
-    const customDesignNoteWrap = document.getElementById('customDesignNoteWrap');
-    const customDesignNoteEl = document.getElementById('customDesignNote');
     const garmentTypeCheckboxes = document.getElementById('garmentTypeCheckboxes');
     const measurementFieldsEl = document.getElementById('measurementFields');
     const customFabricOwnRadio = document.getElementById('customFabricOwn');
@@ -1524,6 +1514,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 quantity: Number(section.querySelector('input[data-garment-qty]')?.value || 1),
                 measurements,
                 designNotes: Array.from(section.querySelectorAll('input[data-design-note]:checked')).map((input) => String(input.value || '')),
+                designNoteText: String(section.querySelector('[data-design-note-text]')?.value || '').trim(),
                 designFiles: Array.from(section.querySelector('input[data-design-images]')?.files || []),
                 existingDesignImages: (() => {
                     try {
@@ -1563,10 +1554,13 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             const baseMeasurements = garment.measurements || [];
             const defaultPackageId = garment.tailoringPackages?.[0]?.id || '';
             const selectedPackageId = draft?.tailoringPackageId || existingGarment?.tailoring?.packageId || defaultPackageId;
+            const presetNoteSet = new Set((garment.designNotes || []).map(String));
+            const allStoredNotes = existingGarment?.designNotes || existingGarment?.designNote || [];
             const selectedDesignNotes = draft?.designNotes
-                || existingGarment?.designNotes
-                || existingGarment?.designNote
-                || [];
+                || allStoredNotes.filter((note) => presetNoteSet.has(String(note)));
+            const existingDesignNoteText = draft?.designNoteText
+                || allStoredNotes.filter((note) => !presetNoteSet.has(String(note))).join(', ')
+                || '';
             const existingDesignImages = draft?.existingDesignImages || existingGarment?.existingDesignImages || [];
             const draftDesignFiles = draft?.designFiles || existingGarment?.designFiles || [];
 
@@ -1616,6 +1610,16 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             } else {
                 designNoteHtml += '<div class="tp-hint">No preset design notes for this garment type.</div>';
             }
+            designNoteHtml += `
+                <div class="tp-form-group" style="margin-top:10px;">
+                    <label>Design Note</label>
+                    <textarea
+                        class="tp-input"
+                        data-design-note-text
+                        rows="3"
+                        placeholder="Add any extra design instructions for this garment...">${existingDesignNoteText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>
+            `;
             designNoteHtml += '</div>';
 
             const designImageHtml = `
@@ -1670,13 +1674,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             bindDesignPreviewActions(section, fileInput, previewHost, existingDesignImages);
         });
 
-        const firstSection = measurementFieldsEl.querySelector('.tp-garment-section');
-        const firstDesignNotePanel = firstSection?.querySelector('.tp-design-note-panel');
-        if (customDesignNoteWrap && firstDesignNotePanel) {
-            firstDesignNotePanel.insertAdjacentElement('afterend', customDesignNoteWrap);
-        } else if (customDesignNoteWrap) {
-            measurementFieldsEl.insertAdjacentElement('afterend', customDesignNoteWrap);
-        }
     }
 
     function updateCustomFabricSourceUI() {
@@ -1716,7 +1713,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         modal.dataset.itemState = JSON.stringify({ garments: [] });
         customFabricOwnRadio.checked = false;
         customFabricStockRadio.checked = true;
-        if (customDesignNoteEl) customDesignNoteEl.value = '';
         if (customOwnFabricQty) customOwnFabricQty.value = '1.00';
         customStockFabricQty.value = '1.00';
         Array.from(garmentTypeCheckboxes.querySelectorAll('input[type="checkbox"]')).forEach((input) => {
@@ -1771,10 +1767,6 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             garments: existingItem?.garments || [],
         };
         modal.dataset.itemState = JSON.stringify(itemState);
-        if (customDesignNoteEl) {
-            customDesignNoteEl.value = String(existingItem?.designNote || '');
-        }
-
         const selectedIds = itemState.garments.length
             ? itemState.garments.map((garment) => String(garment.garmentTypeId))
             : (garmentTypes[0] ? [String(garmentTypes[0].id)] : []);
@@ -1982,6 +1974,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 (garment.designNotes || []).forEach((note, noteIndex) => {
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][design_note][${noteIndex}]`, String(note || '')));
                 });
+                if (garment.designNoteText) {
+                    hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][design_note][${(garment.designNotes || []).length}]`, garment.designNoteText));
+                }
                 (garment.existingDesignImages || []).forEach((path, pathIndex) => {
                     hiddenInputsHost.appendChild(makeHidden(`items[${idx}][custom][garments][${garmentIndex}][existing_design_images][${pathIndex}]`, String(path || '')));
                 });
@@ -2284,6 +2279,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                 quantity: garmentQuantity,
                 measurements,
                 designNotes: Array.from(section.querySelectorAll('input[data-design-note]:checked')).map((input) => String(input.value || '')),
+                designNoteText: String(section.querySelector('[data-design-note-text]')?.value || '').trim(),
                 designFiles: (() => {
                     const selectedFiles = Array.from(section.querySelector('input[data-design-images]')?.files || []);
                     return selectedFiles.length ? selectedFiles : (section._designFiles || []);
@@ -2320,7 +2316,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             baseUnitPrice: stockUnitPrice,
             fabricSource,
             fabricQuantity,
-            designNote: String(customDesignNoteEl?.value || '').trim(),
+            designNote: '',
             garments,
         };
 

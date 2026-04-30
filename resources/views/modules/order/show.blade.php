@@ -606,11 +606,6 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                 <div class="order-item-meta">
                                     Tailoring Total: {{ number_format((float) data_get($customDetails, 'tailoring_total_price', 0), 2) }}
                                 </div>
-                                @if (filled(data_get($customDetails, 'design_note')))
-                                <div class="order-item-meta">
-                                    Design Note: {{ data_get($customDetails, 'design_note') }}
-                                </div>
-                                @endif
                                 @if ($garments->isNotEmpty())
                                 <div class="order-custom-grid">
                                     @foreach ($garments as $garment)
@@ -714,10 +709,6 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                         </div>
                                         <div class="order-custom-notes">
                                             <strong>Design Note:</strong>
-                                            {{ data_get($customDetails, 'design_note', '-') ?: '-' }}
-                                        </div>
-                                        <div class="order-custom-notes">
-                                            <strong>Garment Design Note:</strong>
                                             {{ $garmentNotes->isNotEmpty() ? $garmentNotes->implode(', ') : '-' }}
                                         </div>
                                         @if ($garmentImages->isNotEmpty())
