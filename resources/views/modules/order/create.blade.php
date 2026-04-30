@@ -652,6 +652,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 .tp-design-upload-panel{margin-top:18px;padding:16px 18px;border:1px dashed #e2bd71;border-radius:12px;background:#fffdfa;}
 .tp-design-upload-heading{margin:0 0 12px;color:#3e4a92;font-size:1.1rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;}
 .tp-design-upload-input{padding:12px 14px;background:#fff;border:1px solid #cfd9e5;border-radius:10px;}
+.tp-copy-measurements-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;background:#e3f2fd;border:1px solid #90caf9;color:#1565c0;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;margin-bottom:10px;}
+.tp-copy-measurements-btn:hover:not(:disabled){background:#bbdefb;border-color:#64b5f6;}
+.tp-copy-measurements-btn:disabled{opacity:.7;cursor:default;background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32;}
 .tp-existing-image-note{margin-top:8px;color:#5d6b7a;font-size:.9rem;text-align:center;}
 @media(max-width:900px){.tp-design-note-list{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:560px){.tp-design-note-list{grid-template-columns:1fr;}}
@@ -767,6 +770,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     let pendingCustomQueue = [];
     let pendingCustomIndex = 0;
     let editingCustomIndex = -1;
+    let queueSessionGarments = new Map();
     let garmentDragId = '';
     let garmentReorderRequestId = 0;
     let selectedCustomProductIds = [];
@@ -1564,13 +1568,21 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             const existingDesignImages = draft?.existingDesignImages || existingGarment?.existingDesignImages || [];
             const draftDesignFiles = draft?.designFiles || existingGarment?.designFiles || [];
 
+            const previousGarment = (pendingCustomIndex > 0 && editingCustomIndex === -1)
+                ? queueSessionGarments.get(String(garmentTypeId))
+                : null;
+
             const section = document.createElement('div');
             section.className = 'tp-garment-section';
             section.dataset.garmentTypeId = String(garmentTypeId);
             section.dataset.existingDesignImages = JSON.stringify(existingDesignImages);
             section._designFiles = draftDesignFiles;
 
-            let measurementHtml = '<div class="tp-measurement-grid">';
+            const copyBtnHtml = previousGarment
+                ? `<button type="button" class="tp-copy-measurements-btn" data-copy-prev-garment="${garmentTypeId}"><i class="fas fa-copy"></i> Copy measurements from previous fabric</button>`
+                : '';
+
+            let measurementHtml = `${copyBtnHtml}<div class="tp-measurement-grid">`;
             baseMeasurements.forEach((measurement) => {
                 const existingMeasurement = draft?.measurements?.find((row) => row.type === measurement.title)
                     || existingGarment?.measurements?.find((row) => row.type === measurement.title)
@@ -1669,6 +1681,20 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
             measurementFieldsEl.appendChild(section);
 
+            const copyBtn = section.querySelector(`[data-copy-prev-garment="${garmentTypeId}"]`);
+            if (copyBtn && previousGarment) {
+                copyBtn.addEventListener('click', () => {
+                    (previousGarment.measurements || []).forEach((prev) => {
+                        const input = section.querySelector(`input[data-measure-type="${prev.type}"]`);
+                        if (input) {
+                            input.value = prev.measurement;
+                        }
+                    });
+                    copyBtn.textContent = 'Measurements copied!';
+                    copyBtn.disabled = true;
+                });
+            }
+
             const fileInput = section.querySelector('input[data-design-images]');
             const previewHost = section.querySelector('[data-design-preview]');
             bindDesignPreviewActions(section, fileInput, previewHost, existingDesignImages);
@@ -1727,6 +1753,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         pendingCustomQueue = [];
         pendingCustomIndex = 0;
         editingCustomIndex = -1;
+        queueSessionGarments = new Map();
         saveMeasurementBtn.textContent = 'Add Custom Item';
         resetCustomModalState();
     }
@@ -1802,6 +1829,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         pendingCustomQueue = Array.isArray(queue) ? queue : [queue];
         pendingCustomIndex = 0;
         editingCustomIndex = itemIndex;
+        queueSessionGarments = new Map();
         resetCustomModalState();
         loadPendingCustomIntoModal(existingItem);
     }
@@ -2328,6 +2356,11 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         billItems.push(payload);
+
+        garments.forEach((garment) => {
+            queueSessionGarments.set(String(garment.garmentTypeId), garment);
+        });
+
         pendingCustomIndex += 1;
         if (pendingCustomIndex >= pendingCustomQueue.length) {
             closeModal();
