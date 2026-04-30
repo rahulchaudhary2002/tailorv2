@@ -106,11 +106,8 @@ class PaymentManagementController extends Controller
             return back()->with('error', 'Assign a worker before marking task as paid.');
         }
 
-        if ($task->slip_received_at === null) {
-            return back()->with('error', 'Receive the printed task slip before paying the worker.');
-        }
-
         $task->paid_at = $task->paid_at ?? now();
+        $task->slip_received_at = $task->slip_received_at ?? now();
         $task->save();
 
         return back()->with('success', 'Worker payment marked as paid.');

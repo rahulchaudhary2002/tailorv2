@@ -107,7 +107,7 @@
 
 <div class="table-card">
     <div class="table-header">
-        <div class="table-title">Pending Worker Payments</div>
+        <div class="table-title">Price to be Paid to Workers</div>
     </div>
     <div class="table-container">
         <table class="table">
