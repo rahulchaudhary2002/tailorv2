@@ -399,7 +399,7 @@
                                     data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
                                     data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
                                 >
-                                    Edit
+                                    Assign Task
                                 </button>
                                 @if (! $task->is_paid)
                                     <form action="{{ route('taskManagement.update', $task) }}" method="POST">
