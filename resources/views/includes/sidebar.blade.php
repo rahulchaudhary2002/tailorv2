@@ -49,6 +49,12 @@
                     <span class="nav-text">Dashboard</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="{{ route('report.index') }}" class="nav-link {{ request()->routeIs('report.*') ? 'active' : '' }}">
+                    <i class="fas fa-chart-line nav-icon"></i>
+                    <span class="nav-text">Reports</span>
+                </a>
+            </li>
             @endcan
         </ul>
 
