@@ -400,7 +400,6 @@ input[type="month"].rpt-date-input:focus {
         border-radius: 5px !important;
         padding: 7px 9px !important;
         box-shadow: none !important;
-        break-inside: avoid;
     }
     .rpt-kpi::before { width: 3px !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .rpt-kpi-icon    { display: none !important; }
@@ -422,7 +421,6 @@ input[type="month"].rpt-date-input:focus {
         border-radius: 4px !important;
         margin-bottom: 8px !important;
         box-shadow: none !important;
-        break-inside: avoid;
     }
     .rpt-card-header {
         background: #e8e8e8 !important;
@@ -446,7 +444,7 @@ input[type="month"].rpt-date-input:focus {
 
     /* breakdown */
     .rpt-breakdown { grid-template-columns: repeat(4,1fr) !important; gap: 5px !important; padding: 7px 9px !important; }
-    .rpt-breakdown-item { padding: 6px 7px !important; border: 1px solid #ddd !important; break-inside: avoid; }
+    .rpt-breakdown-item { padding: 6px 7px !important; border: 1px solid #ddd !important; }
     .rpt-breakdown-tag { font-size: 5.5pt !important; padding: 1px 4px !important; margin-bottom: 3px !important; }
     .rpt-breakdown-count { font-size: 9pt !important; }
     .rpt-breakdown-amt   { font-size: 6pt !important; }
