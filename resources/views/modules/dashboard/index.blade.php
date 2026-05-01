@@ -1121,50 +1121,38 @@
     </section>
 
     <section class="atelier-grid">
-        @if ($primaryLink)
-            <a href="{{ $primaryLink }}" class="atelier-card-link atelier-card--hero">
-        @endif
-            <article class="atelier-card atelier-card--hero">
-                <div class="atelier-card__top">
-                    <span class="atelier-icon-badge">
-                        <i class="fa-solid {{ $roleScope === 'worker' ? 'fa-list-check' : 'fa-money-bill-trend-up' }}"></i>
-                    </span>
-                    <span class="atelier-growth">
-                        <i class="fa-solid fa-arrow-trend-up"></i>
-                        <span>{{ $primaryGrowth }}</span>
-                    </span>
-                </div>
-                <p class="atelier-card__eyebrow">{{ $primaryLabel }}</p>
-                <h2 class="atelier-card__value">{{ $primaryValue }}</h2>
-                <p class="atelier-card__meta">{{ $primaryMeta }}</p>
-            </article>
-        @if ($primaryLink)
-            </a>
-        @endif
+        <article class="atelier-card atelier-card--hero">
+            <div class="atelier-card__top">
+                <span class="atelier-icon-badge">
+                    <i class="fa-solid {{ $roleScope === 'worker' ? 'fa-list-check' : 'fa-money-bill-trend-up' }}"></i>
+                </span>
+                <span class="atelier-growth">
+                    <i class="fa-solid fa-arrow-trend-up"></i>
+                    <span>{{ $primaryGrowth }}</span>
+                </span>
+            </div>
+            <p class="atelier-card__eyebrow">{{ $primaryLabel }}</p>
+            <h2 class="atelier-card__value">{{ $primaryValue }}</h2>
+            <p class="atelier-card__meta">{{ $primaryMeta }}</p>
+        </article>
 
-        @if ($secondaryPanelLink)
-            <a href="{{ $secondaryPanelLink }}" class="atelier-card-link atelier-card--side">
-        @endif
-            <article class="atelier-card atelier-card--side">
-                <p class="atelier-card__eyebrow">{{ $secondaryPanelEyebrow }}</p>
-                <h2 class="atelier-section-title" style="margin-top:0;">
-                    {{ $secondaryPanelTitle }}
-                </h2>
-                <p class="atelier-card__meta" style="margin-top:0;">
-                    {{ $secondaryPanelText }}
-                </p>
-                <div class="atelier-mini-grid">
-                    @foreach (array_slice($statCards, 0, 2) as $mini)
-                        <div class="atelier-mini">
-                            <p class="atelier-mini__label">{{ $mini['label'] }}</p>
-                            <p class="atelier-mini__value">{{ $mini['value'] }}</p>
-                        </div>
-                    @endforeach
-                </div>
-            </article>
-        @if ($secondaryPanelLink)
-            </a>
-        @endif
+        <article class="atelier-card atelier-card--side">
+            <p class="atelier-card__eyebrow">{{ $secondaryPanelEyebrow }}</p>
+            <h2 class="atelier-section-title" style="margin-top:0;">
+                {{ $secondaryPanelTitle }}
+            </h2>
+            <p class="atelier-card__meta" style="margin-top:0;">
+                {{ $secondaryPanelText }}
+            </p>
+            <div class="atelier-mini-grid">
+                @foreach (array_slice($statCards, 0, 2) as $mini)
+                    <div class="atelier-mini">
+                        <p class="atelier-mini__label">{{ $mini['label'] }}</p>
+                        <p class="atelier-mini__value">{{ $mini['value'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </article>
 
         <div class="atelier-stats">
             @foreach ($statCards as $card)
@@ -1182,7 +1170,7 @@
             @endforeach
         </div>
 
-        <article class="atelier-card atelier-card--chart">
+        <article class="atelier-card atelier-card--wide">
             <div class="atelier-chart-head">
                 <div>
                     <p class="atelier-card__eyebrow">Performance & Insights</p>
@@ -1212,58 +1200,6 @@
             @else
                 <div class="atelier-empty">No trend data available for the selected range.</div>
             @endif
-        </article>
-
-        <article class="atelier-card atelier-card--list">
-            <div class="atelier-chart-head">
-                <div>
-                    <p class="atelier-card__eyebrow">{{ $spotlightEyebrow }}</p>
-                    <h3 style="margin:0;">{{ $spotlightTitle }}</h3>
-                </div>
-                @if ($roleScope !== 'worker')
-                    @if ($canViewInventoryBoard)
-                        <a href="{{ route('inventory.index') }}" style="font-size:0.84rem;font-weight:700;">View All</a>
-                    @elseif ($canViewProductBoard)
-                        <a href="{{ route('product.index') }}" style="font-size:0.84rem;font-weight:700;">View All</a>
-                    @endif
-                @endif
-            </div>
-
-            @if ($showcaseItems->isNotEmpty())
-                <div class="atelier-list">
-                    @foreach ($showcaseItems as $item)
-                        <div class="atelier-list-item">
-                            <div class="atelier-swatch {{ $item['swatch'] }}"></div>
-                            <div>
-                                <h4 class="atelier-list-item__title">{{ $item['title'] }}</h4>
-                                <p class="atelier-list-item__sub">{{ $item['sub'] }}</p>
-                            </div>
-                            <div class="atelier-list-item__meta">
-                                <p class="atelier-list-item__value">{{ $item['value'] }}</p>
-                                <span class="atelier-badge {{ $item['badgeClass'] }}">{{ $item['badge'] }}</span>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @else
-                <div class="atelier-empty">Nothing to highlight in this panel yet.</div>
-            @endif
-        </article>
-
-        <article class="atelier-card atelier-card--wide">
-            <div class="atelier-alert">
-                <div class="atelier-alert__icon">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
-                <div>
-                    <h3>{{ $attentionTitle }}</h3>
-                    <p>{{ $attentionBody }}</p>
-                    <a class="atelier-alert__link" href="{{ $attentionLink }}">
-                        <span>{{ $attentionLinkLabel }}</span>
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </a>
-                </div>
-            </div>
         </article>
 
         <article class="atelier-card atelier-card--wide">
