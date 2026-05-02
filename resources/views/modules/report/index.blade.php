@@ -534,10 +534,14 @@ input[type="month"].rpt-date-input:focus {
         page-break-inside: avoid;
     }
     .rpt-chart-wrap canvas {
-        display: block !important;
         max-height: 160pt !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+    }
+    .rpt-chart-wrap img {
+        display: block !important;
+        width: 100% !important;
+        max-height: 160pt !important;
     }
 
     /* table — compact for landscape A4 */
@@ -1021,13 +1025,32 @@ input[type="month"].rpt-date-input:focus {
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script>
 (function () {
-    /* ── Print header/footer reveal ─────────────────────────── */
-    var printEls = document.querySelectorAll('.rpt-print-header, .rpt-print-footer');
+    /* ── Print header/footer + chart image swap ─────────────── */
+    var printEls   = document.querySelectorAll('.rpt-print-header, .rpt-print-footer');
+    var dailyChart = null;
+
     window.addEventListener('beforeprint', function () {
         printEls.forEach(function (el) { el.style.display = ''; });
+
+        // Convert canvas chart to a static <img> so it prints reliably
+        if (dailyChart) {
+            var canvas = document.getElementById('dailyBreakdownChart');
+            var img    = document.createElement('img');
+            img.id     = 'dailyBreakdownChartImg';
+            img.src    = canvas.toDataURL('image/png');
+            img.style.cssText = 'width:100%;display:block;';
+            canvas.parentNode.insertBefore(img, canvas);
+            canvas.style.display = 'none';
+        }
     });
+
     window.addEventListener('afterprint', function () {
         printEls.forEach(function (el) { el.style.display = 'none'; });
+
+        var img    = document.getElementById('dailyBreakdownChartImg');
+        var canvas = document.getElementById('dailyBreakdownChart');
+        if (img)    { img.remove(); }
+        if (canvas) { canvas.style.display = ''; }
     });
 
     /* ── Daily breakdown line chart ─────────────────────────── */
@@ -1048,7 +1071,7 @@ input[type="month"].rpt-date-input:focus {
     (function () {
         var ctx = document.getElementById('dailyBreakdownChart');
         if (!ctx) { return; }
-        new Chart(ctx, {
+        dailyChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: @json($chartLabels),
