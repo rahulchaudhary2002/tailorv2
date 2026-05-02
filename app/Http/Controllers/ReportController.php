@@ -30,7 +30,18 @@ class ReportController extends Controller
                 $end = now()->endOfMonth();
                 $month = now()->format('Y-m');
             }
+        } elseif ($type === 'weekly') {
+            $weekDate = $request->query('week', now()->toDateString());
+            try {
+                $start = Carbon::parse($weekDate)->startOfWeek();
+                $end = $start->copy()->endOfWeek();
+            } catch (\Exception) {
+                $start = now()->startOfWeek();
+                $end = now()->endOfWeek();
+                $weekDate = now()->toDateString();
+            }
         } else {
+            $type = 'daily';
             $date = $request->query('date', now()->toDateString());
             try {
                 $start = Carbon::parse($date)->startOfDay();
@@ -47,7 +58,8 @@ class ReportController extends Controller
             ->when($outletId > 0, fn ($q) => $q->where('outlet_id', $outletId))
             ->whereBetween('ordered_at', [$start, $end])
             ->where('status', '!=', Order::STATUS_CANCELLED)
-            ->orderBy('ordered_at');
+            ->orderByRaw("CASE payment_status WHEN 'unpaid' THEN 1 WHEN 'partial' THEN 2 WHEN 'paid' THEN 3 ELSE 4 END")
+            ->orderBy('ordered_at', 'desc');
 
         $orders = $ordersQuery->get();
 
@@ -86,7 +98,7 @@ class ReportController extends Controller
         $totalWorkerPayable = (float) (clone $tasksQuery)->sum('payable_amount');
         $totalWorkerPaid = (float) (clone $tasksQuery)->whereNotNull('paid_at')->sum('payable_amount');
 
-        if ($type === 'monthly') {
+        if (in_array($type, ['monthly', 'weekly'])) {
             $dailyBreakdown = Order::query()
                 ->select(
                     DB::raw('DATE(ordered_at) as day'),
@@ -111,7 +123,8 @@ class ReportController extends Controller
             'itemCategoryBreakdown',
             'totalWorkerPayable', 'totalWorkerPaid',
             'start', 'end',
-            ...($type === 'monthly' ? ['dailyBreakdown', 'month'] : ['date']),
+            ...($type === 'monthly' ? ['dailyBreakdown', 'month'] :
+                ($type === 'weekly' ? ['dailyBreakdown', 'weekDate'] : ['date'])),
         ));
     }
 }

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', $type === 'monthly' ? 'Monthly Report' : 'Daily Report')
+@section('title', $type === 'weekly' ? 'Weekly Report' : ($type === 'monthly' ? 'Monthly Report' : 'Daily Report'))
 
 @section('page-specific-style')
 <style>
@@ -267,6 +267,15 @@ input[type="month"].rpt-date-input:focus {
 .rpt-breakdown-count { font-size: 1.1rem; font-weight: 800; color: #0f2942; }
 .rpt-breakdown-amt   { font-size: .78rem; color: #64748b; margin-top: 3px; }
 
+/* ── Daily breakdown chart ──────────────────────────────────── */
+.rpt-chart-wrap {
+    padding: 16px 18px 20px;
+    position: relative;
+}
+.rpt-chart-wrap canvas {
+    max-height: 280px;
+}
+
 /* ── Tables ─────────────────────────────────────────────────── */
 .rpt-table-wrap { overflow-x: auto; }
 .rpt-table {
@@ -352,6 +361,70 @@ input[type="month"].rpt-date-input:focus {
     vertical-align: middle;
 }
 
+/* ── Pagination ─────────────────────────────────────────────── */
+.rpt-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 18px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+.rpt-pagination-info {
+    font-size: .78rem;
+    color: #64748b;
+    min-width: 140px;
+}
+.rpt-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.rpt-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #374151;
+    font-size: .82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+    line-height: 1;
+}
+.rpt-page-btn:hover:not(:disabled) { background: #e2e8f0; }
+.rpt-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.rpt-page-btn.active {
+    background: var(--primary, #1a3a5c);
+    color: #fff;
+    border-color: var(--primary, #1a3a5c);
+}
+.rpt-page-size {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .78rem;
+    color: #64748b;
+}
+.rpt-page-size select {
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    font-size: .82rem;
+    background: #fff;
+    cursor: pointer;
+    color: #374151;
+}
+.rpt-row-hidden { display: none; }
+
 /* ════════════════════════════════════════════════════════════════
    PRINT / PDF  —  A4 LANDSCAPE (fits wide table)
 ════════════════════════════════════════════════════════════════ */
@@ -421,6 +494,7 @@ input[type="month"].rpt-date-input:focus {
         border-radius: 4px !important;
         margin-bottom: 8px !important;
         box-shadow: none !important;
+        page-break-inside: avoid;
     }
     .rpt-card-header {
         background: #e8e8e8 !important;
@@ -454,6 +528,18 @@ input[type="month"].rpt-date-input:focus {
         print-color-adjust: exact;
     }
 
+    /* daily breakdown chart */
+    .rpt-chart-wrap {
+        padding: 6px 9px 8px !important;
+        page-break-inside: avoid;
+    }
+    .rpt-chart-wrap canvas {
+        display: block !important;
+        max-height: 160pt !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
     /* table — compact for landscape A4 */
     .rpt-table-wrap { overflow: visible !important; }
     .rpt-table { font-size: 7pt !important; table-layout: fixed; width: 100% !important; }
@@ -474,6 +560,10 @@ input[type="month"].rpt-date-input:focus {
         print-color-adjust: exact;
     }
     .rpt-table tbody tr:hover td { background: transparent !important; }
+
+    /* pagination: hide controls, show all rows */
+    .rpt-pagination { display: none !important; }
+    #orders-tbody tr.rpt-row-hidden { display: table-row !important; }
 
     /* column widths for landscape A4 (usable ~257mm) */
     .col-sn      { width: 18pt; }
@@ -523,8 +613,16 @@ input[type="month"].rpt-date-input:focus {
 @php
     $appName     = config('app.name', 'Fashion Tailor Pro');
     $phone       = \App\Models\Setting::valueFor('printer_phone_number', '');
-    $periodLabel = $type === 'monthly' ? $start->format('F Y') : $start->format('l, d F Y');
-    $reportTitle = $type === 'monthly' ? 'Monthly Report' : 'Daily Report';
+    $periodLabel = match($type) {
+        'monthly' => $start->format('F Y'),
+        'weekly'  => $start->format('D, d M') . ' – ' . $end->format('D, d M Y'),
+        default   => $start->format('l, d F Y'),
+    };
+    $reportTitle = match($type) {
+        'monthly' => 'Monthly Report',
+        'weekly'  => 'Weekly Report',
+        default   => 'Daily Report',
+    };
     $currentParams = request()->except('type');
 @endphp
 
@@ -555,6 +653,10 @@ input[type="month"].rpt-date-input:focus {
                class="{{ $type === 'daily' ? 'active' : '' }}">
                <i class="fas fa-calendar-day"></i> Daily
             </a>
+            <a href="{{ route('report.index', array_merge($currentParams, ['type' => 'weekly'])) }}"
+               class="{{ $type === 'weekly' ? 'active' : '' }}">
+               <i class="fas fa-calendar-week"></i> Weekly
+            </a>
             <a href="{{ route('report.index', array_merge($currentParams, ['type' => 'monthly'])) }}"
                class="{{ $type === 'monthly' ? 'active' : '' }}">
                <i class="fas fa-calendar-alt"></i> Monthly
@@ -571,6 +673,13 @@ input[type="month"].rpt-date-input:focus {
             <input id="rpt-date" type="date" name="date"
                    class="rpt-date-input"
                    value="{{ $date }}">
+        </div>
+        @elseif($type === 'weekly')
+        <div class="rpt-filter-group">
+            <label for="rpt-week">Week of</label>
+            <input id="rpt-week" type="date" name="week"
+                   class="rpt-date-input"
+                   value="{{ $weekDate ?? now()->toDateString() }}">
         </div>
         @else
         <div class="rpt-filter-group">
@@ -718,62 +827,24 @@ input[type="month"].rpt-date-input:focus {
 
 </div>
 
-{{-- ════ MONTHLY: DAY-BY-DAY BREAKDOWN ══════════════════════ --}}
-@if($type === 'monthly' && isset($dailyBreakdown) && $dailyBreakdown->count())
+{{-- ════ WEEKLY / MONTHLY: DAILY BREAKDOWN LINE CHART ════════ --}}
+@if(in_array($type, ['monthly', 'weekly']) && isset($dailyBreakdown))
 <div class="rpt-card">
     <div class="rpt-card-header">
         <div class="rpt-card-title">
-            <i class="fas fa-chart-bar"></i> Daily Breakdown — {{ $start->format('F Y') }}
+            <i class="fas fa-chart-line"></i> Daily Breakdown —
+            @if($type === 'monthly')
+                {{ $start->format('F Y') }}
+            @else
+                {{ $start->format('d M') }} – {{ $end->format('d M Y') }}
+            @endif
         </div>
-        <div class="rpt-card-badge">{{ $start->daysInMonth }} days</div>
+        <div class="rpt-card-badge">
+            {{ $type === 'monthly' ? $start->daysInMonth . ' days' : '7 days' }}
+        </div>
     </div>
-    <div class="rpt-table-wrap">
-        <table class="rpt-table">
-            <colgroup>
-                <col style="width:50px">
-                <col>
-                <col style="width:80px">
-                <col style="width:140px">
-            </colgroup>
-            <thead>
-                <tr>
-                    <th>Day</th>
-                    <th>Date</th>
-                    <th class="r">Orders</th>
-                    <th class="r">Revenue (NPR)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @php $mOrders = 0; $mRevenue = 0; @endphp
-                @for($day = $start->copy(); $day->lte($end) && $day->lte(now()); $day->addDay())
-                    @php
-                        $ds       = $day->toDateString();
-                        $row      = $dailyBreakdown->get($ds);
-                        $isToday  = $day->isToday();
-                        $mOrders  += $row ? $row->order_count : 0;
-                        $mRevenue += $row ? $row->revenue     : 0;
-                    @endphp
-                    <tr class="{{ $isToday ? 'day-today' : '' }}">
-                        <td class="day-name" style="font-weight:600;color:#1e40af;">{{ $day->format('D') }}</td>
-                        <td>
-                            {{ $day->format('d M Y') }}
-                            @if($isToday)
-                                <span class="day-badge">Today</span>
-                            @endif
-                        </td>
-                        <td class="r">{{ $row ? $row->order_count : '—' }}</td>
-                        <td class="r">{{ $row ? number_format($row->revenue, 2) : '—' }}</td>
-                    </tr>
-                @endfor
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="2">Monthly Total</td>
-                    <td class="r">{{ $mOrders }}</td>
-                    <td class="r">{{ number_format($mRevenue, 2) }}</td>
-                </tr>
-            </tfoot>
-        </table>
+    <div class="rpt-chart-wrap">
+        <canvas id="dailyBreakdownChart"></canvas>
     </div>
 </div>
 @endif
@@ -793,6 +864,30 @@ input[type="month"].rpt-date-input:focus {
             No orders found for this period.
         </div>
     @else
+    {{-- Pagination top --}}
+    <div class="rpt-pagination" id="rpt-pagination-top">
+        <div class="rpt-page-size">
+            <label for="rpt-page-size" style="white-space:nowrap;">Rows per page:</label>
+            <select id="rpt-page-size">
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="0">All</option>
+            </select>
+        </div>
+        <div class="rpt-pagination-controls">
+            <button type="button" class="rpt-page-btn" id="rpt-prev-btn" disabled>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div id="rpt-pages" style="display:flex;align-items:center;gap:4px;"></div>
+            <button type="button" class="rpt-page-btn" id="rpt-next-btn">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        <div class="rpt-pagination-info" id="rpt-page-info"></div>
+    </div>
+
     <div class="rpt-table-wrap">
         <table class="rpt-table">
             <colgroup>
@@ -825,7 +920,7 @@ input[type="month"].rpt-date-input:focus {
                     <th class="r">Due</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="orders-tbody">
                 @php $tSub=$tDisc=$tTail=$tTot=$tAdv=$tDue=0; @endphp
                 @foreach($orders as $i => $order)
                 @php
@@ -898,6 +993,20 @@ input[type="month"].rpt-date-input:focus {
             </tfoot>
         </table>
     </div>
+
+    {{-- Pagination bottom --}}
+    <div class="rpt-pagination" id="rpt-pagination-bottom">
+        <div class="rpt-pagination-info" id="rpt-page-info-bottom"></div>
+        <div class="rpt-pagination-controls">
+            <button type="button" class="rpt-page-btn" id="rpt-prev-btn-bottom" disabled>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div id="rpt-pages-bottom" style="display:flex;align-items:center;gap:4px;"></div>
+            <button type="button" class="rpt-page-btn" id="rpt-next-btn-bottom">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
     @endif
 </div>
 
@@ -909,8 +1018,10 @@ input[type="month"].rpt-date-input:focus {
 @endsection
 
 @section('page-specific-script')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script>
 (function () {
+    /* ── Print header/footer reveal ─────────────────────────── */
     var printEls = document.querySelectorAll('.rpt-print-header, .rpt-print-footer');
     window.addEventListener('beforeprint', function () {
         printEls.forEach(function (el) { el.style.display = ''; });
@@ -918,6 +1029,200 @@ input[type="month"].rpt-date-input:focus {
     window.addEventListener('afterprint', function () {
         printEls.forEach(function (el) { el.style.display = 'none'; });
     });
+
+    /* ── Daily breakdown line chart ─────────────────────────── */
+@if(in_array($type, ['monthly', 'weekly']) && isset($dailyBreakdown))
+@php
+    $chartLabels  = [];
+    $chartRevenue = [];
+    $chartOrders  = [];
+    $chartEnd     = $end->copy()->min(now());
+    for ($day = $start->copy(); $day->lte($chartEnd); $day->addDay()) {
+        $ds = $day->toDateString();
+        $row = $dailyBreakdown->get($ds);
+        $chartLabels[]  = $day->format('d M');
+        $chartRevenue[] = $row ? round((float) $row->revenue, 2) : 0;
+        $chartOrders[]  = $row ? (int) $row->order_count : 0;
+    }
+@endphp
+    (function () {
+        var ctx = document.getElementById('dailyBreakdownChart');
+        if (!ctx) { return; }
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: @json($chartLabels),
+                datasets: [
+                    {
+                        label: 'Revenue (NPR)',
+                        data: @json($chartRevenue),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59,130,246,0.08)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        yAxisID: 'yRevenue',
+                    },
+                    {
+                        label: 'Orders',
+                        data: @json($chartOrders),
+                        borderColor: '#22c55e',
+                        backgroundColor: 'transparent',
+                        fill: false,
+                        tension: 0.35,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        borderDash: [5, 3],
+                        yAxisID: 'yOrders',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                if (ctx.datasetIndex === 0) {
+                                    return ' Revenue: NPR ' + ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                                }
+                                return ' Orders: ' + ctx.parsed.y;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    yRevenue: {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'Revenue (NPR)', font: { size: 11 } },
+                        ticks: {
+                            callback: function (val) { return 'NPR ' + val.toLocaleString(); }
+                        }
+                    },
+                    yOrders: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: 'Orders', font: { size: 11 } },
+                        grid: { drawOnChartArea: false },
+                        ticks: { precision: 0 }
+                    }
+                }
+            }
+        });
+    })();
+@endif
+
+    /* ── Client-side pagination ──────────────────────────────── */
+    (function () {
+        var tbody = document.getElementById('orders-tbody');
+        if (!tbody) { return; }
+
+        var rows       = Array.from(tbody.querySelectorAll('tr'));
+        var total      = rows.length;
+        var page       = 1;
+        var pageSize   = 10;
+
+        var prevTop    = document.getElementById('rpt-prev-btn');
+        var nextTop    = document.getElementById('rpt-next-btn');
+        var pagesTop   = document.getElementById('rpt-pages');
+        var infoTop    = document.getElementById('rpt-page-info');
+        var prevBot    = document.getElementById('rpt-prev-btn-bottom');
+        var nextBot    = document.getElementById('rpt-next-btn-bottom');
+        var pagesBot   = document.getElementById('rpt-pages-bottom');
+        var infoBot    = document.getElementById('rpt-page-info-bottom');
+        var sizeSelect = document.getElementById('rpt-page-size');
+
+        function totalPages() {
+            return pageSize === 0 ? 1 : Math.ceil(total / pageSize);
+        }
+
+        function pageRange(cur, tp) {
+            if (tp <= 7) {
+                var arr = [];
+                for (var i = 1; i <= tp; i++) { arr.push(i); }
+                return arr;
+            }
+            var pages = [1];
+            if (cur > 3) { pages.push('…'); }
+            var from = Math.max(2, cur - 1);
+            var to   = Math.min(tp - 1, cur + 1);
+            for (var j = from; j <= to; j++) { pages.push(j); }
+            if (cur < tp - 2) { pages.push('…'); }
+            pages.push(tp);
+            return pages;
+        }
+
+        function buildPages(container) {
+            container.innerHTML = '';
+            var tp = totalPages();
+            if (pageSize === 0 || tp <= 1) { return; }
+            pageRange(page, tp).forEach(function (p) {
+                if (typeof p === 'string') {
+                    var span = document.createElement('span');
+                    span.textContent = p;
+                    span.style.cssText = 'padding:0 5px;color:#94a3b8;font-size:.82rem;';
+                    container.appendChild(span);
+                } else {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = p;
+                    btn.className = 'rpt-page-btn' + (p === page ? ' active' : '');
+                    (function (pg) {
+                        btn.addEventListener('click', function () { page = pg; render(); });
+                    }(p));
+                    container.appendChild(btn);
+                }
+            });
+        }
+
+        function render() {
+            var tp   = totalPages();
+            var from = pageSize === 0 ? 1 : (page - 1) * pageSize + 1;
+            var to   = pageSize === 0 ? total : Math.min(page * pageSize, total);
+
+            rows.forEach(function (row, i) {
+                var visible = pageSize === 0 || (i >= from - 1 && i < to);
+                row.classList.toggle('rpt-row-hidden', !visible);
+            });
+
+            var info = 'Showing ' + from + '–' + to + ' of ' + total;
+            if (infoTop)  { infoTop.textContent  = info; }
+            if (infoBot)  { infoBot.textContent  = info; }
+
+            var atFirst = page <= 1 || pageSize === 0;
+            var atLast  = page >= tp || pageSize === 0;
+            if (prevTop) { prevTop.disabled = atFirst; }
+            if (nextTop) { nextTop.disabled = atLast; }
+            if (prevBot) { prevBot.disabled = atFirst; }
+            if (nextBot) { nextBot.disabled = atLast; }
+
+            buildPages(pagesTop || document.createElement('div'));
+            buildPages(pagesBot || document.createElement('div'));
+        }
+
+        function prevPage() { if (page > 1) { page--; render(); } }
+        function nextPage() { if (page < totalPages()) { page++; render(); } }
+
+        if (prevTop) { prevTop.addEventListener('click', prevPage); }
+        if (nextTop) { nextTop.addEventListener('click', nextPage); }
+        if (prevBot) { prevBot.addEventListener('click', prevPage); }
+        if (nextBot) { nextBot.addEventListener('click', nextPage); }
+
+        if (sizeSelect) {
+            sizeSelect.addEventListener('change', function () {
+                pageSize = parseInt(this.value, 10);
+                page = 1;
+                render();
+            });
+        }
+
+        render();
+    })();
 })();
 </script>
 @endsection
