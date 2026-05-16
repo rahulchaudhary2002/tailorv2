@@ -50,12 +50,12 @@
                 <span>{{ $order->order_number }}</span>
             </div>
             <div class="bill-meta-row">
-                <span>Trans. Date</span>
-                <span>{{ $order->ordered_at?->format('d/m/Y h:i A') ?: '-' }}</span>
+                <span>Bill Date</span>
+                <span>{{ now()->format('d/m/Y h:i A') }}</span>
             </div>
             <div class="bill-meta-row">
-                <span>Invoice Date</span>
-                <span>{{ now()->format('d/m/Y') }}</span>
+                <span>Trans. Date</span>
+                <span>{{ $order->ordered_at?->format('d/m/Y h:i A') ?: '-' }}</span>
             </div>
             <div class="bill-meta-row">
                 <span>Payment Mode</span>
