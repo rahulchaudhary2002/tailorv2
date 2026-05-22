@@ -1,87 +1,75 @@
 @extends('layouts.app')
 
-@section('title', $type === 'weekly' ? 'Weekly Report' : ($type === 'monthly' ? 'Monthly Report' : 'Daily Report'))
+@section('title', 'Report')
 
 @section('page-specific-style')
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
 <style>
 /* ════════════════════════════════════════════════════════════════
    SCREEN STYLES — normal full-width web layout
 ════════════════════════════════════════════════════════════════ */
 
-/* ── Filter bar ─────────────────────────────────────────────── */
-.rpt-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
+/* ── Filter bar (dashboard-style) ───────────────────────────── */
+.rpt-filter-card {
+    margin-bottom: 18px;
+    padding: 18px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.84);
+    border: 1px solid rgba(138, 90, 68, 0.08);
+    box-shadow: 0 14px 32px rgba(26, 18, 14, 0.05);
+}
+.rpt-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.4fr) auto;
     gap: 14px;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 16px 20px;
-    margin-bottom: 22px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    align-items: end;
 }
-.rpt-filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-.rpt-filter-group > label {
-    font-size: .7rem;
+.rpt-filter-grid .outlet-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.76rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .07em;
-    color: #64748b;
+    letter-spacing: 0.12em;
+    color: #816657;
 }
-
-/* type switch tabs */
-.rpt-tabs {
-    display: inline-flex;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #f8fafc;
-}
-.rpt-tabs a {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 18px;
-    font-size: .85rem;
-    font-weight: 600;
-    color: #475569;
-    text-decoration: none;
-    border-right: 1px solid #cbd5e1;
-    transition: background .15s, color .15s;
-    white-space: nowrap;
-}
-.rpt-tabs a:last-child { border-right: 0; }
-.rpt-tabs a.active {
-    background: var(--primary, #1a3a5c);
-    color: #fff;
-}
-.rpt-tabs a:not(.active):hover { background: #eef2f7; }
-
-/* date / month native inputs */
-input[type="date"].rpt-date-input,
-input[type="month"].rpt-date-input {
-    height: 40px;
-    padding: 0 12px;
-    border: 1px solid #cbd5e1;
-    border-radius: 9px;
-    font-size: .9rem;
-    font-family: inherit;
-    color: #1e293b;
+.rpt-filter-grid .outlet-input {
+    min-height: 48px;
+    border-radius: 15px;
+    border: 1px solid #eadfd4;
     background: #fff;
-    outline: none;
-    transition: border-color .15s, box-shadow .15s;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
     cursor: pointer;
-    width: 170px;
 }
-input[type="date"].rpt-date-input:focus,
-input[type="month"].rpt-date-input:focus {
-    border-color: var(--primary, #1a3a5c);
-    box-shadow: 0 0 0 3px rgba(26,58,92,.12);
+.rpt-filter-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.rpt-filter-actions .btn {
+    min-height: 48px;
+    border-radius: 15px;
+    padding-inline: 18px;
+}
+.daterangepicker {
+    font-family: 'Poppins', sans-serif;
+    border-radius: 18px;
+    border-color: #eadfd4;
+    box-shadow: 0 18px 40px rgba(28, 20, 15, 0.12);
+}
+.daterangepicker .ranges li.active,
+.daterangepicker td.active,
+.daterangepicker td.active:hover {
+    background-color: #8a5a44;
+}
+@media (max-width: 640px) {
+    .rpt-filter-grid {
+        grid-template-columns: 1fr;
+    }
+    .rpt-filter-actions {
+        grid-column: 1 / -1;
+    }
 }
 
 /* print button */
@@ -617,17 +605,11 @@ input[type="month"].rpt-date-input:focus {
 @php
     $appName     = config('app.name', 'Fashion Tailor Pro');
     $phone       = \App\Models\Setting::valueFor('printer_phone_number', '');
-    $periodLabel = match($type) {
-        'monthly' => $start->format('F Y'),
-        'weekly'  => $start->format('D, d M') . ' – ' . $end->format('D, d M Y'),
-        default   => $start->format('l, d F Y'),
-    };
-    $reportTitle = match($type) {
-        'monthly' => 'Monthly Report',
-        'weekly'  => 'Weekly Report',
-        default   => 'Daily Report',
-    };
-    $currentParams = request()->except('type');
+    $isSingleDay = $start->toDateString() === $end->toDateString();
+    $periodLabel = $isSingleDay
+        ? $start->format('l, d F Y')
+        : $start->format('d M Y') . ' – ' . $end->format('d M Y');
+    $reportTitle = 'Report';
 @endphp
 
 {{-- ── Print-only header (JS reveals on beforeprint) ── --}}
@@ -649,64 +631,33 @@ input[type="month"].rpt-date-input:focus {
 </div>
 
 {{-- ── Filter bar (screen only) ── --}}
-<div class="rpt-filters">
-    <div class="rpt-filter-group">
-        <label>Report Type</label>
-        <div class="rpt-tabs">
-            <a href="{{ route('report.index', array_merge($currentParams, ['type' => 'daily'])) }}"
-               class="{{ $type === 'daily' ? 'active' : '' }}">
-               <i class="fas fa-calendar-day"></i> Daily
-            </a>
-            <a href="{{ route('report.index', array_merge($currentParams, ['type' => 'weekly'])) }}"
-               class="{{ $type === 'weekly' ? 'active' : '' }}">
-               <i class="fas fa-calendar-week"></i> Weekly
-            </a>
-            <a href="{{ route('report.index', array_merge($currentParams, ['type' => 'monthly'])) }}"
-               class="{{ $type === 'monthly' ? 'active' : '' }}">
-               <i class="fas fa-calendar-alt"></i> Monthly
-            </a>
+<div class="rpt-filter-card">
+    <form method="GET" action="{{ route('report.index') }}" class="rpt-filter-grid">
+        <div class="outlet-form-group">
+            <label for="rpt_date_range">Date Range</label>
+            <input
+                id="rpt_date_range"
+                type="text"
+                class="outlet-input"
+                value="{{ $fromDate . ' - ' . $toDate }}"
+                placeholder="Select date range"
+                autocomplete="off"
+            >
+            <input id="rpt_from_date" type="hidden" name="from_date" value="{{ $fromDate }}">
+            <input id="rpt_to_date" type="hidden" name="to_date" value="{{ $toDate }}">
         </div>
-    </div>
 
-    <form method="GET" action="{{ route('report.index') }}" style="display:contents;">
-        <input type="hidden" name="type" value="{{ $type }}">
-
-        @if($type === 'daily')
-        <div class="rpt-filter-group">
-            <label for="rpt-date">Date</label>
-            <input id="rpt-date" type="date" name="date"
-                   class="rpt-date-input"
-                   value="{{ $date }}">
-        </div>
-        @elseif($type === 'weekly')
-        <div class="rpt-filter-group">
-            <label for="rpt-week">Week of</label>
-            <input id="rpt-week" type="date" name="week"
-                   class="rpt-date-input"
-                   value="{{ $weekDate ?? now()->toDateString() }}">
-        </div>
-        @else
-        <div class="rpt-filter-group">
-            <label for="rpt-month">Month</label>
-            <input id="rpt-month" type="month" name="month"
-                   class="rpt-date-input"
-                   value="{{ $month }}">
-        </div>
-        @endif
-
-        <div class="rpt-filter-group">
-            <label>&nbsp;</label>
-            <button type="submit" class="btn btn-primary" style="height:40px;padding:0 20px;white-space:nowrap;">
-                <i class="fas fa-search"></i> Generate
+        <div class="rpt-filter-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-filter"></i>
+                <span>Apply</span>
             </button>
+            <a href="{{ route('report.index') }}" class="btn btn-light">Reset</a>
+            <a href="javascript:window.print()" class="rpt-print-btn">
+                <i class="fas fa-print"></i> Print / Save PDF
+            </a>
         </div>
     </form>
-
-    <div style="margin-left:auto;display:flex;align-items:flex-end;">
-        <a href="javascript:window.print()" class="rpt-print-btn">
-            <i class="fas fa-print"></i> Print / Save PDF
-        </a>
-    </div>
 </div>
 
 {{-- ════ KPI CARDS ════════════════════════════════════════════ --}}
@@ -831,20 +782,15 @@ input[type="month"].rpt-date-input:focus {
 
 </div>
 
-{{-- ════ WEEKLY / MONTHLY: DAILY BREAKDOWN LINE CHART ════════ --}}
-@if(in_array($type, ['monthly', 'weekly']) && isset($dailyBreakdown))
+{{-- ════ DAILY BREAKDOWN LINE CHART (multi-day ranges) ════════ --}}
+@if(isset($dailyBreakdown) && !$isSingleDay)
 <div class="rpt-card">
     <div class="rpt-card-header">
         <div class="rpt-card-title">
-            <i class="fas fa-chart-line"></i> Daily Breakdown —
-            @if($type === 'monthly')
-                {{ $start->format('F Y') }}
-            @else
-                {{ $start->format('d M') }} – {{ $end->format('d M Y') }}
-            @endif
+            <i class="fas fa-chart-line"></i> Daily Breakdown — {{ $start->format('d M') }} – {{ $end->format('d M Y') }}
         </div>
         <div class="rpt-card-badge">
-            {{ $type === 'monthly' ? $start->daysInMonth . ' days' : '7 days' }}
+            {{ $start->diffInDays($end) + 1 }} days
         </div>
     </div>
     <div class="rpt-chart-wrap">
@@ -1022,9 +968,61 @@ input[type="month"].rpt-date-input:focus {
 @endsection
 
 @section('page-specific-script')
+<script src="https://cdn.jsdelivr.net/npm/moment@2.30.1/min/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script>
 (function () {
+    /* ── Date range picker ───────────────────────────────────── */
+    var drInput = document.getElementById('rpt_date_range');
+    var drFrom  = document.getElementById('rpt_from_date');
+    var drTo    = document.getElementById('rpt_to_date');
+
+    if (drInput && drFrom && drTo && window.jQuery && window.jQuery.fn && window.jQuery.fn.daterangepicker) {
+        var drOptions = {
+            autoUpdateInput: false,
+            alwaysShowCalendars: true,
+            opens: 'left',
+            linkedCalendars: false,
+            showCustomRangeLabel: true,
+            ranges: {
+                'Today':        [window.moment(), window.moment()],
+                'Yesterday':    [window.moment().subtract(1, 'days'), window.moment().subtract(1, 'days')],
+                'Last 7 Days':  [window.moment().subtract(6, 'days'), window.moment()],
+                'Last 30 Days': [window.moment().subtract(29, 'days'), window.moment()],
+                'This Month':   [window.moment().startOf('month'), window.moment().endOf('month')],
+                'Last Month':   [window.moment().subtract(1, 'month').startOf('month'), window.moment().subtract(1, 'month').endOf('month')],
+            },
+            locale: {
+                cancelLabel: 'Clear',
+                format: 'YYYY-MM-DD',
+                customRangeLabel: 'Custom Range',
+            },
+        };
+
+        if (drFrom.value && drTo.value) {
+            drOptions.startDate = drFrom.value;
+            drOptions.endDate   = drTo.value;
+            drInput.value       = drFrom.value + ' - ' + drTo.value;
+        }
+
+        window.jQuery(drInput).daterangepicker(drOptions);
+
+        window.jQuery(drInput).on('apply.daterangepicker', function (_event, picker) {
+            var start = picker.startDate.format('YYYY-MM-DD');
+            var end   = picker.endDate.format('YYYY-MM-DD');
+            drFrom.value  = start;
+            drTo.value    = end;
+            drInput.value = start + ' - ' + end;
+        });
+
+        window.jQuery(drInput).on('cancel.daterangepicker', function () {
+            drFrom.value  = '';
+            drTo.value    = '';
+            drInput.value = '';
+        });
+    }
+
     /* ── Print header/footer + chart image swap ─────────────── */
     var printEls   = document.querySelectorAll('.rpt-print-header, .rpt-print-footer');
     var dailyChart = null;
@@ -1054,7 +1052,7 @@ input[type="month"].rpt-date-input:focus {
     });
 
     /* ── Daily breakdown line chart ─────────────────────────── */
-@if(in_array($type, ['monthly', 'weekly']) && isset($dailyBreakdown))
+@if(isset($dailyBreakdown) && !$isSingleDay)
 @php
     $chartLabels  = [];
     $chartRevenue = [];

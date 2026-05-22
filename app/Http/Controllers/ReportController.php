@@ -17,40 +17,24 @@ class ReportController extends Controller
         abort_unless($user, 403);
 
         $outletId = (int) ($user->current_outlet_id ?? 0);
-        $type = $request->query('type', 'daily');
         $outlets = Outlet::query()->orderBy('name')->get();
 
-        if ($type === 'monthly') {
-            $month = $request->query('month', now()->format('Y-m'));
-            try {
-                $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-                $end = $start->copy()->endOfMonth();
-            } catch (\Exception) {
-                $start = now()->startOfMonth();
-                $end = now()->endOfMonth();
-                $month = now()->format('Y-m');
-            }
-        } elseif ($type === 'weekly') {
-            $weekDate = $request->query('week', now()->toDateString());
-            try {
-                $start = Carbon::parse($weekDate)->startOfWeek();
-                $end = $start->copy()->endOfWeek();
-            } catch (\Exception) {
-                $start = now()->startOfWeek();
-                $end = now()->endOfWeek();
-                $weekDate = now()->toDateString();
-            }
-        } else {
-            $type = 'daily';
-            $date = $request->query('date', now()->toDateString());
-            try {
-                $start = Carbon::parse($date)->startOfDay();
-                $end = Carbon::parse($date)->endOfDay();
-            } catch (\Exception) {
-                $start = now()->startOfDay();
-                $end = now()->endOfDay();
-                $date = now()->toDateString();
-            }
+        $fromDate = trim((string) $request->query('from_date', now()->toDateString()));
+        $toDate = trim((string) $request->query('to_date', now()->toDateString()));
+
+        try {
+            $start = Carbon::parse($fromDate)->startOfDay();
+            $end = Carbon::parse($toDate)->endOfDay();
+        } catch (\Exception) {
+            $start = now()->startOfDay();
+            $end = now()->endOfDay();
+            $fromDate = now()->toDateString();
+            $toDate = now()->toDateString();
+        }
+
+        if ($start->greaterThan($end)) {
+            [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+            [$fromDate, $toDate] = [$start->toDateString(), $end->toDateString()];
         }
 
         $ordersQuery = Order::query()
@@ -98,33 +82,30 @@ class ReportController extends Controller
         $totalWorkerPayable = (float) (clone $tasksQuery)->sum('payable_amount');
         $totalWorkerPaid = (float) (clone $tasksQuery)->whereNotNull('paid_at')->sum('payable_amount');
 
-        if (in_array($type, ['monthly', 'weekly'])) {
-            $dailyBreakdown = Order::query()
-                ->select(
-                    DB::raw('DATE(ordered_at) as day'),
-                    DB::raw('COUNT(*) as order_count'),
-                    DB::raw('SUM(subtotal_amount - discount_amount + tailoring_amount) as revenue')
-                )
-                ->when($outletId > 0, fn ($q) => $q->where('outlet_id', $outletId))
-                ->whereBetween('ordered_at', [$start, $end])
-                ->where('status', '!=', Order::STATUS_CANCELLED)
-                ->groupBy('day')
-                ->orderBy('day')
-                ->get()
-                ->keyBy('day');
-        }
+        $dailyBreakdown = Order::query()
+            ->select(
+                DB::raw('DATE(ordered_at) as day'),
+                DB::raw('COUNT(*) as order_count'),
+                DB::raw('COALESCE(SUM(GREATEST(0, COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)), 0) as revenue')
+            )
+            ->when($outletId > 0, fn ($q) => $q->where('outlet_id', $outletId))
+            ->whereBetween('ordered_at', [$start, $end])
+            ->where('status', '!=', Order::STATUS_CANCELLED)
+            ->groupBy('day')
+            ->orderBy('day')
+            ->get()
+            ->keyBy('day');
 
         return view('modules.report.index', compact(
-            'type', 'outlets', 'outletId', 'orders',
+            'outlets', 'outletId', 'orders',
+            'fromDate', 'toDate', 'start', 'end',
             'totalOrders', 'totalRevenue', 'totalAdvance', 'totalDue',
             'totalTailoring', 'totalDiscount',
             'paidOrders', 'partialOrders', 'unpaidOrders',
             'deliveredOrders', 'completedOrders', 'cancelledCount',
             'itemCategoryBreakdown',
             'totalWorkerPayable', 'totalWorkerPaid',
-            'start', 'end',
-            ...($type === 'monthly' ? ['dailyBreakdown', 'month'] :
-                ($type === 'weekly' ? ['dailyBreakdown', 'weekDate'] : ['date'])),
+            'dailyBreakdown',
         ));
     }
 }

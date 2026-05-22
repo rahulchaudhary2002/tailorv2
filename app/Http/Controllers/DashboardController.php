@@ -46,14 +46,14 @@ class DashboardController extends Controller
                     ->with(['customer:id,name,phone', 'outlet:id,name'])
                     ->when($outletId > 0, fn ($query) => $query->where('outlet_id', $outletId))
                     ->when(
-                        !$user->hasPermission('view-orders') && !$user->hasPermission('manage-orders'),
+                        ! $user->hasPermission('view-orders') && ! $user->hasPermission('manage-orders'),
                         fn ($query) => $query->whereHas('tasks', fn ($taskQuery) => $taskQuery->where('worker_id', (int) $user->id))
                     )
                     ->where(function ($query) use ($qLower): void {
-                        $query->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                        $query->whereRaw('LOWER(order_number) LIKE ?', ['%'.$qLower.'%'])
                             ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
-                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$qLower.'%']);
                             });
                     })
                     ->latest('id')
@@ -68,9 +68,9 @@ class DashboardController extends Controller
                         $query->whereHas('orders', fn ($orderQuery) => $orderQuery->where('outlet_id', $outletId));
                     })
                     ->where(function ($query) use ($qLower): void {
-                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', ['%' . $qLower . '%']);
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', ['%'.$qLower.'%']);
                     })
                     ->latest('id')
                     ->limit(8)
@@ -81,8 +81,8 @@ class DashboardController extends Controller
                 $results['products'] = Product::query()
                     ->with('category:id,name,slug')
                     ->where(function ($query) use ($qLower): void {
-                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$qLower.'%']);
                     })
                     ->latest('id')
                     ->limit(8)
@@ -103,8 +103,8 @@ class DashboardController extends Controller
                         }
                     })
                     ->where(function ($query) use ($qLower): void {
-                        $query->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(email) LIKE ?', ['%' . $qLower . '%']);
+                        $query->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(email) LIKE ?', ['%'.$qLower.'%']);
                     })
                     ->orderBy('name')
                     ->limit(8)
@@ -124,16 +124,16 @@ class DashboardController extends Controller
                         }
                     })
                     ->when(
-                        $user->hasPermission('view-assigned-jobs') && !$user->hasPermission('view-task-management') && !$user->hasPermission('manage-task-management') && !$user->hasPermission('manage-orders'),
+                        $user->hasPermission('view-assigned-jobs') && ! $user->hasPermission('view-task-management') && ! $user->hasPermission('manage-task-management') && ! $user->hasPermission('manage-orders'),
                         fn ($query) => $query->where('worker_id', (int) $user->id)
                     )
                     ->where(function ($query) use ($qLower): void {
-                        $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
-                            ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                        $query->whereRaw('LOWER(task_number) LIKE ?', ['%'.$qLower.'%'])
+                            ->orWhereRaw('LOWER(task_title) LIKE ?', ['%'.$qLower.'%'])
                             ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
-                                $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                                $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%'.$qLower.'%'])
                                     ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
-                                        $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
+                                        $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%']);
                                     });
                             });
                     })
@@ -163,24 +163,24 @@ class DashboardController extends Controller
         $orderStatus = trim((string) $request->query('order_status', ''));
         $paymentStatus = trim((string) $request->query('payment_status', ''));
 
-        if (!in_array($chartView, ['bar', 'line'], true)) {
+        if (! in_array($chartView, ['bar', 'line'], true)) {
             $chartView = 'bar';
         }
 
-        if (!in_array($outletChartView, ['table', 'bars'], true)) {
+        if (! in_array($outletChartView, ['table', 'bars'], true)) {
             $outletChartView = 'table';
         }
-        if (!in_array($trendGroup, ['day', 'week', 'month'], true)) {
+        if (! in_array($trendGroup, ['day', 'week', 'month'], true)) {
             $trendGroup = 'day';
         }
-        if (!in_array($trendMetric, ['sales', 'orders'], true)) {
+        if (! in_array($trendMetric, ['sales', 'orders'], true)) {
             $trendMetric = 'sales';
         }
 
         $accessibleOutletIds = $user->outlets()->pluck('outlets.id')->map(fn ($id) => (int) $id)->values();
         $currentOutletId = (int) ($user->current_outlet_id ?? 0);
 
-        $isWorker = $user->hasPermission('view-assigned-jobs') && !$user->hasPermission('manage-orders');
+        $isWorker = $user->hasPermission('view-assigned-jobs') && ! $user->hasPermission('manage-orders');
         // Keep owner/admin dashboard strictly for super admin.
         // Other non-worker users should see outlet manager dashboard.
         $isOwnerAdmin = (bool) $user->is_super_admin;
@@ -203,16 +203,19 @@ class DashboardController extends Controller
         $scopeOutletIds = collect();
         if ($selectedOutletId > 0) {
             $scopeOutletIds = collect([$selectedOutletId]);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $scopeOutletIds = $accessibleOutletIds;
         }
 
+        $salesAmountSql = 'COALESCE(SUM(GREATEST(0, COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)), 0)';
+
         $orderScope = Order::query()
-            ->whereBetween('ordered_at', [$dateFrom, $dateTo]);
+            ->whereBetween('ordered_at', [$dateFrom, $dateTo])
+            ->where('status', '!=', Order::STATUS_CANCELLED);
 
         if ($scopeOutletIds->isNotEmpty()) {
             $orderScope->whereIn('outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $orderScope->whereRaw('1=0');
         }
 
@@ -225,7 +228,7 @@ class DashboardController extends Controller
         }
 
         $totalSales = (float) (clone $orderScope)
-            ->selectRaw('COALESCE(SUM(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0)), 0) as total')
+            ->selectRaw($salesAmountSql.' as total')
             ->value('total');
 
         $ordersCount = (int) (clone $orderScope)->count();
@@ -233,9 +236,9 @@ class DashboardController extends Controller
         $pendingPayments = (float) (clone $orderScope)
             ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
             ->selectRaw(
-                'COALESCE(SUM(GREATEST(0, ' .
-                '(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)' .
-                ' - COALESCE(advance_payment_amount, 0)' .
+                'COALESCE(SUM(GREATEST(0, '.
+                '(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)'.
+                ' - COALESCE(advance_payment_amount, 0)'.
                 ')), 0) as total'
             )
             ->value('total');
@@ -257,11 +260,12 @@ class DashboardController extends Controller
         $trendEnd = $dateTo->copy()->endOfDay();
 
         $trendQuery = Order::query()
-            ->whereBetween('ordered_at', [$trendStart, $trendEnd]);
+            ->whereBetween('ordered_at', [$trendStart, $trendEnd])
+            ->where('status', '!=', Order::STATUS_CANCELLED);
 
         if ($scopeOutletIds->isNotEmpty()) {
             $trendQuery->whereIn('outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $trendQuery->whereRaw('1=0');
         }
 
@@ -275,7 +279,7 @@ class DashboardController extends Controller
 
         $trendRows = $trendQuery
             ->selectRaw('DATE(ordered_at) as day')
-            ->selectRaw('COALESCE(SUM(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0)), 0) as sales')
+            ->selectRaw($salesAmountSql.' as sales')
             ->selectRaw('COUNT(*) as orders_count')
             ->groupBy('day')
             ->orderBy('day')
@@ -332,7 +336,7 @@ class DashboardController extends Controller
                 }
 
                 $label = $trendGroup === 'week'
-                    ? 'Wk ' . $segmentStart->format('M d')
+                    ? 'Wk '.$segmentStart->format('M d')
                     : $segmentStart->format('M Y');
 
                 $salesTrend[] = [
@@ -357,7 +361,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $salesByOutletQuery->whereIn('orders.outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $salesByOutletQuery->whereRaw('1=0');
         }
 
@@ -386,7 +390,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $topProductsQuery->whereIn('orders.outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $topProductsQuery->whereRaw('1=0');
         }
 
@@ -433,7 +437,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $overdueDeliveriesQuery->whereIn('outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $overdueDeliveriesQuery->whereRaw('1=0');
         }
 
@@ -484,7 +488,9 @@ class DashboardController extends Controller
         $lowStockItems = collect();
 
         if ($outletContextId > 0) {
-            $outletBaseOrders = Order::query()->where('outlet_id', $outletContextId);
+            $outletBaseOrders = Order::query()
+                ->where('outlet_id', $outletContextId)
+                ->where('status', '!=', Order::STATUS_CANCELLED);
 
             if ($orderStatus !== '') {
                 $outletBaseOrders->where('status', $orderStatus);
@@ -495,7 +501,7 @@ class DashboardController extends Controller
 
             $outletSalesToday = (float) (clone $outletBaseOrders)
                 ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
-                ->selectRaw('COALESCE(SUM(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0)), 0) as total')
+                ->selectRaw($salesAmountSql.' as total')
                 ->value('total');
 
             $outletOrdersToday = (int) (clone $outletBaseOrders)
@@ -516,9 +522,9 @@ class DashboardController extends Controller
             $outletPendingPayments = (float) (clone $outletBaseOrders)
                 ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
                 ->selectRaw(
-                    'COALESCE(SUM(GREATEST(0, ' .
-                    '(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)' .
-                    ' - COALESCE(advance_payment_amount, 0)' .
+                    'COALESCE(SUM(GREATEST(0, '.
+                    '(COALESCE(subtotal_amount, 0) - COALESCE(discount_amount, 0) + COALESCE(tailoring_amount, 0) + CASE WHEN vat_enabled IS TRUE THEN COALESCE(vat_amount, 0) ELSE 0 END)'.
+                    ' - COALESCE(advance_payment_amount, 0)'.
                     ')), 0) as total'
                 )
                 ->value('total');
@@ -630,7 +636,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $topCustomersQuery->whereIn('orders.outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $topCustomersQuery->whereRaw('1=0');
         }
         if ($orderStatus !== '') {
@@ -659,7 +665,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $fastMovingQuery->whereIn('orders.outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $fastMovingQuery->whereRaw('1=0');
         }
         if ($orderStatus !== '') {
@@ -686,7 +692,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $recentMovementProductIdsQuery->whereIn('orders.outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $recentMovementProductIdsQuery->whereRaw('1=0');
         }
         if ($orderStatus !== '') {
@@ -714,7 +720,7 @@ class DashboardController extends Controller
 
         if ($scopeOutletIds->isNotEmpty()) {
             $deadStockQuery->whereIn('inventory_locations.outlet_id', $scopeOutletIds);
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $deadStockQuery->whereRaw('1=0');
         }
 
@@ -727,7 +733,7 @@ class DashboardController extends Controller
             $purchasesThisMonthQuery->whereHas('inventoryLocation', function (Builder $query) use ($scopeOutletIds): void {
                 $query->whereIn('outlet_id', $scopeOutletIds);
             });
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $purchasesThisMonthQuery->whereRaw('1=0');
         }
 
@@ -742,7 +748,7 @@ class DashboardController extends Controller
                 'vendor_raw_material_purchases.inventory_location_id',
                 InventoryLocation::query()->whereIn('outlet_id', $scopeOutletIds)->pluck('id')
             );
-        } elseif (!$isOwnerAdmin) {
+        } elseif (! $isOwnerAdmin) {
             $topVendorsQuery->whereRaw('1=0');
         }
 
