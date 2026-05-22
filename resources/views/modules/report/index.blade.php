@@ -19,12 +19,20 @@
     box-shadow: 0 14px 32px rgba(26, 18, 14, 0.05);
 }
 .rpt-filter-grid {
-    display: grid;
-    grid-template-columns: minmax(220px, 1.4fr) auto;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
     gap: 14px;
-    align-items: end;
+    flex-wrap: wrap;
 }
-.rpt-filter-grid .outlet-form-group label {
+.rpt-filter-left {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+.rpt-filter-left .outlet-form-group label {
     display: block;
     margin-bottom: 8px;
     font-size: 0.76rem;
@@ -33,7 +41,7 @@
     letter-spacing: 0.12em;
     color: #816657;
 }
-.rpt-filter-grid .outlet-input {
+.rpt-filter-left .outlet-input {
     min-height: 48px;
     border-radius: 15px;
     border: 1px solid #eadfd4;
@@ -65,10 +73,11 @@
 }
 @media (max-width: 640px) {
     .rpt-filter-grid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: stretch;
     }
-    .rpt-filter-actions {
-        grid-column: 1 / -1;
+    .rpt-filter-left {
+        flex-direction: column;
     }
 }
 
@@ -633,30 +642,33 @@
 {{-- ── Filter bar (screen only) ── --}}
 <div class="rpt-filter-card">
     <form method="GET" action="{{ route('report.index') }}" class="rpt-filter-grid">
-        <div class="outlet-form-group">
-            <label for="rpt_date_range">Date Range</label>
-            <input
-                id="rpt_date_range"
-                type="text"
-                class="outlet-input"
-                value="{{ $fromDate . ' - ' . $toDate }}"
-                placeholder="Select date range"
-                autocomplete="off"
-            >
-            <input id="rpt_from_date" type="hidden" name="from_date" value="{{ $fromDate }}">
-            <input id="rpt_to_date" type="hidden" name="to_date" value="{{ $toDate }}">
+        <div class="rpt-filter-left">
+            <div class="outlet-form-group">
+                <label for="rpt_date_range">Date Range</label>
+                <input
+                    id="rpt_date_range"
+                    type="text"
+                    class="outlet-input"
+                    style="width: 280px;"
+                    value="{{ $fromDate . ' - ' . $toDate }}"
+                    placeholder="Select date range"
+                    autocomplete="off"
+                >
+                <input id="rpt_from_date" type="hidden" name="from_date" value="{{ $fromDate }}">
+                <input id="rpt_to_date" type="hidden" name="to_date" value="{{ $toDate }}">
+            </div>
+            <div class="rpt-filter-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Apply</span>
+                </button>
+                <a href="{{ route('report.index') }}" class="btn btn-light">Reset</a>
+            </div>
         </div>
 
-        <div class="rpt-filter-actions">
-            <button type="submit" class="btn btn-primary">
-                <i class="fa-solid fa-filter"></i>
-                <span>Apply</span>
-            </button>
-            <a href="{{ route('report.index') }}" class="btn btn-light">Reset</a>
-            <a href="javascript:window.print()" class="rpt-print-btn">
-                <i class="fas fa-print"></i> Print / Save PDF
-            </a>
-        </div>
+        <a href="javascript:window.print()" class="rpt-print-btn">
+            <i class="fas fa-print"></i> Print / Save PDF
+        </a>
     </form>
 </div>
 
