@@ -4,7 +4,6 @@
             'id' => $product->id,
             'name' => $product->name,
             'code' => $product->code,
-            'barcode' => $product->barcode,
             'amount' => (float) $product->amount,
             'category' => $product->category?->slug,
         ];
@@ -71,57 +70,49 @@
             productTypeHidden.disabled = true;
         }
 
+        const codeMatcher = (params, data) => {
+            const term = String(params.term || '').trim().toLowerCase();
+            if (!term) {
+                return data;
+            }
+            const text = String(data.text || '').toLowerCase();
+            const code = String(data.element?.dataset?.code || '').toLowerCase();
+            return text.includes(term) || code.includes(term) ? data : null;
+        };
+
+        const bindExactCodeSelection = (selectEl) => {
+            const $select = window.jQuery(selectEl);
+            $select.on('select2:open.codeSelect', () => {
+                window.setTimeout(() => {
+                    const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+                    if (!searchInput) {
+                        return;
+                    }
+                    const selectExactMatch = () => {
+                        const term = String(searchInput.value || '').trim().toLowerCase();
+                        if (!term) {
+                            return;
+                        }
+                        const matchedOption = Array.from(selectEl.options || []).find((option) => {
+                            const code = String(option.dataset.code || '').toLowerCase();
+                            return code !== '' && code === term;
+                        });
+                        if (!matchedOption) {
+                            return;
+                        }
+                        $select.val(String(matchedOption.value || '')).trigger('change');
+                        $select.select2('close');
+                    };
+                    searchInput.addEventListener('input', selectExactMatch);
+                    searchInput.addEventListener('change', selectExactMatch);
+                }, 0);
+            });
+        };
+
         function initPurchaseMaterialSelect2(root = document) {
             if (!window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
                 return;
             }
-
-            const barcodeMatcher = (params, data) => {
-                const term = String(params.term || '').trim().toLowerCase();
-                if (!term) {
-                    return data;
-                }
-
-                const text = String(data.text || '').toLowerCase();
-                const barcode = String(data.element?.dataset?.barcode || '').trim().toLowerCase();
-
-                return text.includes(term) || (barcode && barcode.includes(term)) ? data : null;
-            };
-
-            const bindExactBarcodeSelection = (selectEl) => {
-                const $select = window.jQuery(selectEl);
-
-                $select.on('select2:open.barcodeSelect', () => {
-                    window.setTimeout(() => {
-                        const searchInput = document.querySelector('.select2-container--open .select2-search__field');
-                        if (!searchInput) {
-                            return;
-                        }
-
-                        const selectExactBarcodeMatch = () => {
-                            const scannedValue = String(searchInput.value || '').replace(/\D+/g, '');
-                            if (!scannedValue) {
-                                return;
-                            }
-
-                            const matchedOption = Array.from(selectEl.options || []).find((option) => {
-                                const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
-                                return barcode !== '' && barcode === scannedValue;
-                            });
-
-                            if (!matchedOption) {
-                                return;
-                            }
-
-                            $select.val(String(matchedOption.value || '')).trigger('change');
-                            $select.select2('close');
-                        };
-
-                        searchInput.addEventListener('input', selectExactBarcodeMatch);
-                        searchInput.addEventListener('change', selectExactBarcodeMatch);
-                    }, 0);
-                });
-            };
 
             root.querySelectorAll('#vendor_id').forEach((selectEl) => {
                 if (selectEl.dataset.select2Ready === '1') {
@@ -147,21 +138,11 @@
                     tags: true,
                     placeholder: selectEl.options[0]?.textContent?.trim() || 'Select or type vendor product',
                     allowClear: !selectEl.required,
-                    matcher: barcodeMatcher,
+                    matcher: codeMatcher,
                     createTag(params) {
                         const term = params.term.trim();
 
                         if (!term) {
-                            return null;
-                        }
-
-                        const normalizedTerm = term.replace(/\D+/g, '');
-                        const hasBarcodeMatch = normalizedTerm !== '' && Array.from(selectEl.options || []).some((option) => {
-                            const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
-                            return barcode !== '' && barcode === normalizedTerm;
-                        });
-
-                        if (hasBarcodeMatch) {
                             return null;
                         }
 
@@ -172,8 +153,7 @@
                         };
                     },
                 });
-
-                bindExactBarcodeSelection(selectEl);
+                bindExactCodeSelection(selectEl);
 
                 selectEl.dataset.select2Ready = '1';
             });

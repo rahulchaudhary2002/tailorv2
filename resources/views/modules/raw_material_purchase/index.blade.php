@@ -45,7 +45,7 @@
                     <select id="product_filter" name="product_id" class="outlet-input js-product-filter-select">
                         <option value="">All Products</option>
                         @foreach ($products as $product)
-                            <option value="{{ $product->id }}" data-barcode="{{ $product->barcode }}" @selected($selectedProductId === (int) $product->id)>
+                            <option value="{{ $product->id }}" data-code="{{ $product->code }}" @selected($selectedProductId === (int) $product->id)>
                                 {{ $product->name }}@if($product->code) ({{ $product->code }})@endif
                             </option>
                         @endforeach
@@ -157,56 +157,52 @@
             return;
         }
 
-        const $select = window.jQuery(productFilter);
-        const matcher = (params, data) => {
+        const codeMatcher = (params, data) => {
             const term = String(params.term || '').trim().toLowerCase();
             if (!term) {
                 return data;
             }
-
             const text = String(data.text || '').toLowerCase();
-            const barcode = String(data.element?.dataset?.barcode || '').trim().toLowerCase();
-
-            return text.includes(term) || (barcode && barcode.includes(term)) ? data : null;
+            const code = String(data.element?.dataset?.code || '').toLowerCase();
+            return text.includes(term) || code.includes(term) ? data : null;
         };
-        const selectExactBarcodeMatch = () => {
-            const searchInput = document.querySelector('.select2-container--open .select2-search__field');
-            const scannedValue = String(searchInput?.value || '').replace(/\D+/g, '');
-            if (!scannedValue) {
-                return;
-            }
 
-            const matchedOption = Array.from(productFilter.options || []).find((option) => {
-                const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
-                return barcode !== '' && barcode === scannedValue;
+        const bindExactCodeSelection = (selectEl) => {
+            const $select = window.jQuery(selectEl);
+            $select.on('select2:open.codeSelect', () => {
+                window.setTimeout(() => {
+                    const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+                    if (!searchInput) {
+                        return;
+                    }
+                    const selectExactMatch = () => {
+                        const term = String(searchInput.value || '').trim().toLowerCase();
+                        if (!term) {
+                            return;
+                        }
+                        const matchedOption = Array.from(selectEl.options || []).find((option) => {
+                            const code = String(option.dataset.code || '').toLowerCase();
+                            return code !== '' && code === term;
+                        });
+                        if (!matchedOption) {
+                            return;
+                        }
+                        $select.val(String(matchedOption.value || '')).trigger('change');
+                        $select.select2('close');
+                    };
+                    searchInput.addEventListener('input', selectExactMatch);
+                    searchInput.addEventListener('change', selectExactMatch);
+                }, 0);
             });
-
-            if (!matchedOption) {
-                return;
-            }
-
-            $select.val(String(matchedOption.value || '')).trigger('change');
-            $select.select2('close');
         };
 
-        $select.select2({
+        window.jQuery(productFilter).select2({
             width: '100%',
             placeholder: productFilter.options[0]?.textContent?.trim() || 'All Products',
             allowClear: true,
-            matcher,
+            matcher: codeMatcher,
         });
-
-        $select.on('select2:open.barcodeSelect', () => {
-            window.setTimeout(() => {
-                const searchInput = document.querySelector('.select2-container--open .select2-search__field');
-                if (!searchInput) {
-                    return;
-                }
-
-                searchInput.addEventListener('input', selectExactBarcodeMatch);
-                searchInput.addEventListener('change', selectExactBarcodeMatch);
-            }, 0);
-        });
+        bindExactCodeSelection(productFilter);
     })();
 </script>
 <style>

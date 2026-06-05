@@ -12,7 +12,6 @@ $productPayload = $products->map(function ($product) use ($productAvailableQty) 
         'id' => $product->id,
         'name' => $product->name,
         'code' => $product->code,
-        'barcode' => $product->barcode,
         'category' => $product->category?->slug, // expect 'fabrics' for fabric
         'unitLabel' => $isFabric ? 'm' : 'pcs',
         'availableQty' => array_key_exists($product->id, $productAvailableQty)
@@ -178,7 +177,7 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 <div class="form-group">
                     <label>Select Product *</label>
                     <select id="productSelect" class="tp-input">
-                        <option value="">-- Select or scan barcode --</option>
+                        <option value="">-- Select Product --</option>
                     </select>
                 </div>
 
@@ -923,12 +922,13 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         filterProductsByCategory('custom').forEach((product) => {
             const option = document.createElement('option');
             option.value = String(product.id);
-            option.dataset.barcode = String(product.barcode || '');
             option.textContent = `${product.name} (${product.code}) | Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim();
+            option.dataset.code = String(product.code || '');
             modalProductSelect.appendChild(option);
         });
 
         setupOrderSelect2(modalProductSelect, 'Change custom fabric');
+        bindExactCodeSelection(modalProductSelect);
     }
 
     function applyPendingProductChange(productId) {
@@ -1000,56 +1000,51 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
     }
 
+    const codeMatcher = (params, data) => {
+        const term = String(params.term || '').trim().toLowerCase();
+        if (!term) {
+            return data;
+        }
+        const text = String(data.text || '').toLowerCase();
+        const code = String(data.element?.dataset?.code || '').toLowerCase();
+        return text.includes(term) || code.includes(term) ? data : null;
+    };
+
+    const bindExactCodeSelection = (selectEl) => {
+        const $select = window.jQuery(selectEl);
+        $select.on('select2:open.codeSelect', () => {
+            window.setTimeout(() => {
+                const searchInput = document.querySelector('.select2-container--open .select2-search__field');
+                if (!searchInput) {
+                    return;
+                }
+                const selectExactMatch = () => {
+                    const term = String(searchInput.value || '').trim().toLowerCase();
+                    if (!term) {
+                        return;
+                    }
+                    const matchedOption = Array.from(selectEl.options || []).find((option) => {
+                        const code = String(option.dataset.code || '').toLowerCase();
+                        return code !== '' && code === term;
+                    });
+                    if (!matchedOption) {
+                        return;
+                    }
+                    $select.val(String(matchedOption.value || '')).trigger('change');
+                    $select.select2('close');
+                };
+                searchInput.addEventListener('input', selectExactMatch);
+                searchInput.addEventListener('change', selectExactMatch);
+            }, 0);
+        });
+    };
+
     function setupOrderSelect2(selectEl, placeholder, extraOptions = {}) {
         if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
             return;
         }
 
         const $select = window.jQuery(selectEl);
-        const defaultMatcher = (params, data) => {
-            const term = String(params.term || '').trim().toLowerCase();
-            if (!term) {
-                return data;
-            }
-
-            const text = String(data.text || '').toLowerCase();
-            const barcode = String(data.element?.dataset?.barcode || '').trim().toLowerCase();
-
-            if (text.includes(term) || (barcode && barcode.includes(term))) {
-                return data;
-            }
-
-            return null;
-        };
-
-        const selectExactBarcodeMatch = () => {
-            const searchInput = document.querySelector('.select2-container--open .select2-search__field');
-            const scannedValue = String(searchInput?.value || '').replace(/\D+/g, '');
-
-            if (!scannedValue) {
-                return;
-            }
-
-            const matchedOption = Array.from(selectEl.options || []).find((option) => {
-                const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
-                return barcode !== '' && barcode === scannedValue;
-            });
-
-            if (!matchedOption) {
-                return;
-            }
-
-            const nextValue = String(matchedOption.value || '');
-            if (selectEl.multiple) {
-                const currentValues = new Set(($select.val() || []).map((value) => String(value || '')));
-                currentValues.add(nextValue);
-                $select.val(Array.from(currentValues)).trigger('change');
-            } else {
-                $select.val(nextValue).trigger('change');
-                $select.select2('close');
-            }
-        };
-
         if ($select.hasClass('select2-hidden-accessible')) {
             $select.off('.orderSelect2');
             $select.select2('destroy');
@@ -1062,21 +1057,10 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             allowClear: hasEmptyOption && !selectEl.multiple,
             closeOnSelect: !selectEl.multiple,
             dropdownParent: window.jQuery(selectEl.closest('.tp-modal') || document.body),
-            matcher: defaultMatcher,
+            matcher: codeMatcher,
             ...extraOptions,
         });
-
-        $select.on('select2:open.orderSelect2', () => {
-            window.setTimeout(() => {
-                const searchInput = document.querySelector('.select2-container--open .select2-search__field');
-                if (!searchInput) {
-                    return;
-                }
-
-                searchInput.addEventListener('input', selectExactBarcodeMatch);
-                searchInput.addEventListener('change', selectExactBarcodeMatch);
-            }, 0);
-        });
+        bindExactCodeSelection(selectEl);
     }
 
     function bindSelect2Change(selectEl, handler) {
@@ -1301,8 +1285,8 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         list.forEach((product) => {
             const option = document.createElement('option');
             option.value = String(product.id);
-            option.dataset.barcode = String(product.barcode || '');
             option.textContent = `${product.name} (${product.code}) | Available: ${money(product.availableQty)} ${product.unitLabel || ''}`.trim();
+            option.dataset.code = String(product.code || '');
             if (selectedValues.includes(String(product.id))) {
                 option.selected = true;
             }
@@ -1320,7 +1304,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
 
         setupOrderSelect2(
             productSelect,
-            isCustom ? 'Search and select custom fabrics' : 'Select or scan barcode',
+            isCustom ? 'Search and select custom fabrics' : 'Select Product',
             isCustom
                 ? {
                     closeOnSelect: false,
@@ -2539,7 +2523,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
     });
 
-    setupOrderSelect2(productSelect, 'Select or scan barcode');
+    setupOrderSelect2(productSelect, 'Select Product');
     fillGarmentTypeOptions();
     customerDirectory.forEach(upsertCustomerIndex);
     if (customerSelect.value) {

@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Inventory\AdjustStockRequest;
 use App\Models\InventoryAlert;
 use App\Models\InventoryLocation;
+use App\Models\InventoryReorderLevel;
 use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryType;
-use App\Models\InventoryReorderLevel;
 use App\Models\Product;
 use App\Models\Vendor;
 use App\Services\NotificationService;
@@ -53,10 +53,10 @@ class InventoryController extends Controller
         if ($q !== '') {
             $stocksQuery->where(function ($query) use ($qLower): void {
                 $query->whereHas('product', function ($productQuery) use ($qLower): void {
-                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
+                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$qLower.'%']);
                 })->orWhereHas('location', function ($locationQuery) use ($qLower): void {
-                    $locationQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
+                    $locationQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%']);
                 });
             });
         }
@@ -94,7 +94,7 @@ class InventoryController extends Controller
 
         $products = Product::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'barcode']);
+            ->get(['id', 'name', 'code']);
 
         $vendors = Vendor::query()
             ->where('is_active', true)
@@ -173,19 +173,19 @@ class InventoryController extends Controller
 
         $isTransfer = $trxType === InventoryTransaction::TYPE_TRANSFER;
         if (
-            (!$isTransfer && !$this->isValidSingleLocationForUser($locationId, $outletId)) ||
-            ($isTransfer && !$this->isValidActiveLocation($fromLocationId)) ||
-            ($isTransfer && !$this->isValidActiveLocation($toLocationId))
+            (! $isTransfer && ! $this->isValidSingleLocationForUser($locationId, $outletId)) ||
+            ($isTransfer && ! $this->isValidActiveLocation($fromLocationId)) ||
+            ($isTransfer && ! $this->isValidActiveLocation($toLocationId))
         ) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Selected location is not valid for this transaction.');
         }
 
-        if (in_array($trxType, [InventoryTransaction::TYPE_IN, InventoryTransaction::TYPE_OUT, InventoryTransaction::TYPE_ADJUSTMENT], true) && !$locationId) {
+        if (in_array($trxType, [InventoryTransaction::TYPE_IN, InventoryTransaction::TYPE_OUT, InventoryTransaction::TYPE_ADJUSTMENT], true) && ! $locationId) {
             return $this->redirectToIndex($tab)->with('error', 'Location is required for selected transaction type.');
         }
 
-        if ($trxType === InventoryTransaction::TYPE_TRANSFER && (!$fromLocationId || !$toLocationId || $fromLocationId === $toLocationId)) {
+        if ($trxType === InventoryTransaction::TYPE_TRANSFER && (! $fromLocationId || ! $toLocationId || $fromLocationId === $toLocationId)) {
             return $this->redirectToIndex($tab)->with('error', 'Valid source and destination locations are required for transfer.');
         }
 
@@ -195,7 +195,7 @@ class InventoryController extends Controller
         }
 
         $inventoryTypeId = $this->resolveInventoryTypeId($trxType, $locationId, $fromLocationId);
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Unable to resolve inventory type from selected location.');
         }
@@ -263,6 +263,7 @@ class InventoryController extends Controller
                     foreach ($updatedTargetStocks as $targetStock) {
                         $this->syncLowStockAlert($targetStock);
                     }
+
                     return;
                 }
 
@@ -293,6 +294,7 @@ class InventoryController extends Controller
                     }
 
                     $this->syncLowStockAlert($stock);
+
                     return;
                 }
 
@@ -349,7 +351,7 @@ class InventoryController extends Controller
             $outletId,
             [
                 'title' => 'Inventory updated',
-                'message' => $actorName . ': ' . ucfirst($trxType) . ' transaction of ' . number_format($quantity, 2) . ' ' . $product->defaultUnitLabel() . ' recorded for ' . $product->name . '.',
+                'message' => $actorName.': '.ucfirst($trxType).' transaction of '.number_format($quantity, 2).' '.$product->defaultUnitLabel().' recorded for '.$product->name.'.',
                 'url' => $url,
                 'module' => 'Inventory',
             ],
@@ -364,7 +366,7 @@ class InventoryController extends Controller
 
     private function isValidSingleLocationForUser(?int $locationId, int $outletId): bool
     {
-        if (!$locationId) {
+        if (! $locationId) {
             return true;
         }
 
@@ -387,7 +389,7 @@ class InventoryController extends Controller
 
     private function isValidActiveLocation(?int $locationId): bool
     {
-        if (!$locationId) {
+        if (! $locationId) {
             return false;
         }
 
@@ -423,7 +425,7 @@ class InventoryController extends Controller
     {
         $allowedTabs = ['transaction', 'alerts', 'stock-summary'];
         $tab = in_array((string) $tab, $allowedTabs, true) ? (string) $tab : '';
-        $url = route('inventory.index') . ($tab !== '' ? ('#' . $tab) : '');
+        $url = route('inventory.index').($tab !== '' ? ('#'.$tab) : '');
 
         return redirect()->to($url);
     }
@@ -617,7 +619,7 @@ class InventoryController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$reorder) {
+        if (! $reorder) {
             return;
         }
 
@@ -635,6 +637,7 @@ class InventoryController extends Controller
                     'current_qty' => $stock->on_hand_qty,
                     'min_qty' => $reorder->min_qty,
                 ]);
+
                 return;
             }
 

@@ -11,13 +11,13 @@ class Product extends Model
     use SoftDeletes;
 
     public const DEFAULT_UNIT_CODE_METER = 'METER';
+
     public const DEFAULT_UNIT_CODE_PIECE = 'PIECE';
 
     protected $fillable = [
         'product_category_id',
         'name',
         'code',
-        'barcode',
         'amount',
     ];
 
@@ -84,30 +84,21 @@ class Product extends Model
             ->value('id');
     }
 
+    public function getBarcodeSvgAttribute(): string
+    {
+        $code = $this->attributes['code'] ?? '';
+
+        if (blank($code)) {
+            return '';
+        }
+
+        return app(ProductBarcodeService::class)->renderCode128Svg((string) $code);
+    }
+
     // Backward compatibility for legacy reads/writes.
     public function getSkuAttribute(): ?string
     {
         return $this->attributes['code'] ?? null;
-    }
-
-    public function ensureBarcode(): void
-    {
-        if (!blank($this->barcode) || !$this->exists) {
-            return;
-        }
-
-        $this->forceFill([
-            'barcode' => app(ProductBarcodeService::class)->generateForProductId((int) $this->id),
-        ])->saveQuietly();
-    }
-
-    public function getBarcodeSvgAttribute(): string
-    {
-        if (blank($this->barcode)) {
-            return '';
-        }
-
-        return app(ProductBarcodeService::class)->renderSvg((string) $this->barcode);
     }
 
     public function getUnitIdAttribute(): ?int

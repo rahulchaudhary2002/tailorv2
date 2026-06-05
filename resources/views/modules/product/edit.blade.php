@@ -23,22 +23,23 @@
 </div>
 
 <div class="js-product-tab-panel" data-tab-panel="details" hidden>
-    <div class="table-card outlet-form-card product-barcode-card">
-        <div class="table-header">
-            <div class="table-title">Product Barcode</div>
-        </div>
-
-        <div class="outlet-form-grid">
-            <div class="outlet-form-group">
-                <label>Barcode Number</label>
-                <input type="text" class="outlet-input" value="{{ $product->barcode }}" readonly>
+    @if ($product->barcode_svg !== '')
+        <div class="table-card outlet-form-card product-barcode-card">
+            <div class="table-header">
+                <div class="table-title">Product Barcode</div>
             </div>
-            <div class="outlet-form-group outlet-form-group-full">
-                <label>Barcode Preview</label>
-                <div class="product-barcode-svg">{!! $product->barcode_svg !!}</div>
+            <div class="outlet-form-grid">
+                <div class="outlet-form-group">
+                    <label>Barcode Code</label>
+                    <input type="text" class="outlet-input" value="{{ $product->code }}" readonly>
+                </div>
+                <div class="outlet-form-group outlet-form-group-full">
+                    <label>Barcode Preview</label>
+                    <div class="product-barcode-svg">{!! $product->barcode_svg !!}</div>
+                </div>
             </div>
         </div>
-    </div>
+    @endif
 
     <form action="{{ route('product.update', $product) }}" method="POST">
         @csrf

@@ -288,7 +288,7 @@ class OrderController extends Controller
                 $query->whereIn('slug', ['ready-made', 'accessories', 'fabrics']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'barcode', 'product_category_id', 'amount']);
+            ->get(['id', 'name', 'code', 'product_category_id', 'amount']);
 
         $outletLocation = null;
         if ($outletId > 0) {

@@ -52,7 +52,7 @@
                     <select id="product_filter" name="product_id" class="outlet-input js-product-filter-select">
                         <option value="">All Products</option>
                         @foreach ($productionProducts as $product)
-                            <option value="{{ $product->id }}" data-barcode="{{ $product->barcode }}" @selected($selectedProductId === (int) $product->id)>
+                            <option value="{{ $product->id }}" data-code="{{ $product->code }}" @selected($selectedProductId === (int) $product->id)>
                                 {{ $product->name }}@if($product->code) ({{ $product->code }})@endif
                             </option>
                         @endforeach
@@ -404,7 +404,7 @@
                 <select name="target_product_id" class="outlet-input js-target-product" required>
                     <option value="">Select Product</option>
                     @foreach ($productionProducts as $productionProduct)
-                        <option value="{{ $productionProduct->id }}" data-barcode="{{ $productionProduct->barcode }}">
+                        <option value="{{ $productionProduct->id }}" data-code="{{ $productionProduct->code }}">
                             {{ $productionProduct->name }} ({{ $productionProduct->code }})
                         </option>
                     @endforeach
@@ -742,64 +742,59 @@
         const targetProduct = productionModal?.querySelector('.js-target-product');
         const productFilter = document.querySelector('.js-product-filter-select');
 
-        const attachBarcodeSelect2 = (selectEl, options = {}) => {
-            if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
-                return;
+        const codeMatcher = (params, data) => {
+            const term = String(params.term || '').trim().toLowerCase();
+            if (!term) {
+                return data;
             }
+            const text = String(data.text || '').toLowerCase();
+            const code = String(data.element?.dataset?.code || '').toLowerCase();
+            return text.includes(term) || code.includes(term) ? data : null;
+        };
 
+        const bindExactCodeSelection = (selectEl) => {
             const $select = window.jQuery(selectEl);
-            const matcher = (params, data) => {
-                const term = String(params.term || '').trim().toLowerCase();
-                if (!term) {
-                    return data;
-                }
-
-                const text = String(data.text || '').toLowerCase();
-                const barcode = String(data.element?.dataset?.barcode || '').trim().toLowerCase();
-
-                return text.includes(term) || (barcode && barcode.includes(term)) ? data : null;
-            };
-            const selectExactBarcodeMatch = () => {
-                const searchInput = document.querySelector('.select2-container--open .select2-search__field');
-                const scannedValue = String(searchInput?.value || '').replace(/\D+/g, '');
-                if (!scannedValue) {
-                    return;
-                }
-
-                const matchedOption = Array.from(selectEl.options || []).find((option) => {
-                    const barcode = String(option.dataset.barcode || '').replace(/\D+/g, '');
-                    return barcode !== '' && barcode === scannedValue;
-                });
-
-                if (!matchedOption) {
-                    return;
-                }
-
-                $select.val(String(matchedOption.value || '')).trigger('change');
-                $select.select2('close');
-            };
-
-            if ($select.hasClass('select2-hidden-accessible')) {
-                $select.off('.barcodeSelect');
-                $select.select2('destroy');
-            }
-
-            $select.select2({
-                width: '100%',
-                matcher,
-                ...options,
-            });
-
-            $select.on('select2:open.barcodeSelect', () => {
+            $select.on('select2:open.codeSelect', () => {
                 window.setTimeout(() => {
                     const searchInput = document.querySelector('.select2-container--open .select2-search__field');
                     if (!searchInput) {
                         return;
                     }
-
-                    searchInput.addEventListener('input', selectExactBarcodeMatch);
-                    searchInput.addEventListener('change', selectExactBarcodeMatch);
+                    const selectExactMatch = () => {
+                        const term = String(searchInput.value || '').trim().toLowerCase();
+                        if (!term) {
+                            return;
+                        }
+                        const matchedOption = Array.from(selectEl.options || []).find((option) => {
+                            const code = String(option.dataset.code || '').toLowerCase();
+                            return code !== '' && code === term;
+                        });
+                        if (!matchedOption) {
+                            return;
+                        }
+                        $select.val(String(matchedOption.value || '')).trigger('change');
+                        $select.select2('close');
+                    };
+                    searchInput.addEventListener('input', selectExactMatch);
+                    searchInput.addEventListener('change', selectExactMatch);
                 }, 0);
+            });
+        };
+
+        const attachSelect2 = (selectEl, options = {}) => {
+            if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+                return;
+            }
+
+            const $select = window.jQuery(selectEl);
+
+            if ($select.hasClass('select2-hidden-accessible')) {
+                $select.select2('destroy');
+            }
+
+            $select.select2({
+                width: '100%',
+                ...options,
             });
         };
 
@@ -812,11 +807,13 @@
                 return;
             }
 
-            attachBarcodeSelect2(targetProduct, {
+            attachSelect2(targetProduct, {
                 placeholder: targetProduct.options[0]?.textContent?.trim() || 'Select Product',
                 allowClear: !targetProduct.required,
                 dropdownParent: window.jQuery(productionModal),
+                matcher: codeMatcher,
             });
+            bindExactCodeSelection(targetProduct);
 
             targetProduct.dataset.select2Ready = '1';
         };
@@ -830,10 +827,12 @@
                 return;
             }
 
-            attachBarcodeSelect2(productFilter, {
+            attachSelect2(productFilter, {
                 placeholder: productFilter.options[0]?.textContent?.trim() || 'All Products',
                 allowClear: true,
+                matcher: codeMatcher,
             });
+            bindExactCodeSelection(productFilter);
 
             productFilter.dataset.select2Ready = '1';
         };

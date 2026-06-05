@@ -48,17 +48,6 @@
         </div>
 
         <div class="outlet-form-group">
-            <label for="barcode_preview">Barcode</label>
-            <input
-                id="barcode_preview"
-                type="text"
-                class="outlet-input"
-                value="{{ isset($product) ? $product->barcode : 'Auto generated after product is created' }}"
-                readonly
-            >
-        </div>
-
-        <div class="outlet-form-group">
             <label for="product_category_id">Category</label>
             <select id="product_category_id" name="product_category_id" class="outlet-input @error('product_category_id') is-invalid @enderror" required>
                 <option value="">Select Category</option>
@@ -213,5 +202,6 @@
             width: min(100%, 420px);
             height: auto;
         }
+
     </style>
 @endonce

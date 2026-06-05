@@ -104,7 +104,7 @@
                             @if ($product->barcode_svg !== '')
                                 <div class="barcode-preview">{!! $product->barcode_svg !!}</div>
                             @else
-                                <span class="barcode-inline">{{ $product->barcode ?: '-' }}</span>
+                                <span class="barcode-fallback">{{ $product->code ?: '-' }}</span>
                             @endif
                         </td>
                         <td>Rs {{ number_format((float) $product->amount, 2) }}</td>
@@ -177,7 +177,7 @@
         gap: 10px;
     }
 
-    .barcode-inline {
+    .barcode-fallback {
         font-family: monospace;
         font-size: 0.92rem;
         letter-spacing: 0.06em;

@@ -40,10 +40,10 @@ class RawMaterialPurchaseController extends Controller
         if ($q !== '') {
             $purchasesQuery->where(function ($query) use ($qLower): void {
                 $query->whereHas('vendor', function ($vendorQuery) use ($qLower): void {
-                    $vendorQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
+                    $vendorQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%']);
                 })->orWhereHas('product', function ($productQuery) use ($qLower): void {
-                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
+                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$qLower.'%']);
                 });
             });
         }
@@ -71,7 +71,7 @@ class RawMaterialPurchaseController extends Controller
                 $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'barcode', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'product_category_id']);
 
         $vendors = Vendor::query()
             ->where('is_active', true)
@@ -103,7 +103,7 @@ class RawMaterialPurchaseController extends Controller
                 $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'barcode', 'amount', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'amount', 'product_category_id']);
 
         $selectedVendorId = (int) ($request->query('vendor_id') ?? 0);
 
@@ -117,7 +117,7 @@ class RawMaterialPurchaseController extends Controller
     {
         $validated = $request->validated();
         $warehouseLocationId = $this->currentWarehouseLocationId();
-        if (!$warehouseLocationId) {
+        if (! $warehouseLocationId) {
             return redirect()
                 ->route('rawMaterialPurchase.index')
                 ->with('error', 'No active warehouse location found.');
@@ -164,7 +164,7 @@ class RawMaterialPurchaseController extends Controller
 
         $this->notifyPurchaseRecipients(
             'Purchase created',
-            number_format($items->count()) . ' raw material item(s) were added to purchase records.',
+            number_format($items->count()).' raw material item(s) were added to purchase records.',
             route('rawMaterialPurchase.index')
         );
 
@@ -193,7 +193,7 @@ class RawMaterialPurchaseController extends Controller
                 $query->whereIn('slug', ['fabrics', 'accessories', 'ready-made']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'barcode', 'amount', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'amount', 'product_category_id']);
 
         return view('modules.raw_material_purchase.edit', compact('purchase', 'vendors', 'products'));
     }
@@ -215,7 +215,7 @@ class RawMaterialPurchaseController extends Controller
                 $unitPrice = (float) ($item['unit_price'] ?? 0);
                 $warehouseLocationId = $this->resolveWarehouseLocationIdForPurchase($purchase);
 
-                if (!$warehouseLocationId) {
+                if (! $warehouseLocationId) {
                     throw new \RuntimeException('No active warehouse location found.');
                 }
 
@@ -258,7 +258,7 @@ class RawMaterialPurchaseController extends Controller
 
         $this->notifyPurchaseRecipients(
             'Purchase updated',
-            'Purchase for ' . ($purchase->product?->name ?: 'raw material') . ' was updated.',
+            'Purchase for '.($purchase->product?->name ?: 'raw material').' was updated.',
             route('rawMaterialPurchase.index')
         );
 
@@ -276,7 +276,7 @@ class RawMaterialPurchaseController extends Controller
             (int) (auth()->user()?->current_outlet_id ?? 0),
             [
                 'title' => $title,
-                'message' => $actorName . ': ' . $message,
+                'message' => $actorName.': '.$message,
                 'url' => $url,
                 'module' => 'Purchase',
             ],
@@ -302,7 +302,7 @@ class RawMaterialPurchaseController extends Controller
                 ->with('category:id,slug')
                 ->find($productId);
 
-            if (!$product || !in_array((string) $product->category?->slug, ['fabrics', 'accessories', 'ready-made'], true)) {
+            if (! $product || ! in_array((string) $product->category?->slug, ['fabrics', 'accessories', 'ready-made'], true)) {
                 throw new \RuntimeException('One or more selected products is invalid.');
             }
 
@@ -369,10 +369,10 @@ class RawMaterialPurchaseController extends Controller
         $maxSequence = 0;
 
         Product::query()
-            ->where('code', 'like', $prefix . '-%')
+            ->where('code', 'like', $prefix.'-%')
             ->pluck('code')
             ->each(function ($code) use (&$maxSequence, $prefix): void {
-                if (preg_match('/^' . preg_quote($prefix, '/') . '-(\d+)$/', (string) $code, $matches) === 1) {
+                if (preg_match('/^'.preg_quote($prefix, '/').'-(\d+)$/', (string) $code, $matches) === 1) {
                     $maxSequence = max($maxSequence, (int) $matches[1]);
                 }
             });
@@ -424,7 +424,7 @@ class RawMaterialPurchaseController extends Controller
             ->where('type', InventoryLocation::TYPE_WAREHOUSE)
             ->exists();
 
-        if (!$belongsToWarehouse) {
+        if (! $belongsToWarehouse) {
             abort(404);
         }
     }
@@ -478,7 +478,7 @@ class RawMaterialPurchaseController extends Controller
             ->where('code', InventoryType::VENDOR_SUPPLIED)
             ->value('id');
 
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             throw new \RuntimeException('Inventory type vendor_supplied is missing. Run inventory type seeder.');
         }
 
@@ -523,7 +523,7 @@ class RawMaterialPurchaseController extends Controller
                     ->where('vendor_id', (int) $transaction->vendor_id)
                     ->first();
 
-                if (!$stock) {
+                if (! $stock) {
                     continue;
                 }
 
@@ -563,8 +563,9 @@ class RawMaterialPurchaseController extends Controller
             ->latest('id')
             ->first();
 
-        if (!$transaction || $transaction->items->isEmpty()) {
+        if (! $transaction || $transaction->items->isEmpty()) {
             $this->applyInventoryUpdate($purchase, $locationId, $inventoryUnitCost, $notes, $now);
+
             return;
         }
 
@@ -643,7 +644,7 @@ class RawMaterialPurchaseController extends Controller
             ->where('vendor_id', $vendorId)
             ->first();
 
-        if (!$stock) {
+        if (! $stock) {
             return;
         }
 

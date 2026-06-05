@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ManufactureUnit\StoreTransferRequest;
-use App\Http\Requests\ManufactureUnit\TransferFinalGoodsRequest;
 use App\Http\Requests\ManufactureUnit\StoreWorkflowRequest;
+use App\Http\Requests\ManufactureUnit\TransferFinalGoodsRequest;
 use App\Http\Requests\ManufactureUnit\TransferProductionOutputRequest;
 use App\Http\Requests\ManufactureUnit\UpdateTransferStatusRequest;
 use App\Models\InventoryLocation;
@@ -37,10 +37,10 @@ class ManufactureUnitController extends Controller
         if ($q !== '') {
             $stocksQuery->where(function ($query) use ($qLower): void {
                 $query->whereHas('product', function ($productQuery) use ($qLower): void {
-                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                        ->orWhereRaw('LOWER(code) LIKE ?', ['%' . $qLower . '%']);
+                    $productQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                        ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$qLower.'%']);
                 })->orWhereHas('location', function ($locationQuery) use ($qLower): void {
-                    $locationQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%']);
+                    $locationQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%']);
                 });
             });
         }
@@ -91,7 +91,7 @@ class ManufactureUnitController extends Controller
                 $query->whereIn('slug', ['ready-made', 'accessories']);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'barcode', 'product_category_id']);
+            ->get(['id', 'name', 'code', 'product_category_id']);
 
         $productionLogs = InventoryTransaction::query()
             ->whereHas('inventoryType', function ($query) {
@@ -111,7 +111,7 @@ class ManufactureUnitController extends Controller
         $productionOutputIds = $productionLogs->pluck('id')->all();
         $transferredByOutputId = collect();
 
-        if (!empty($productionOutputIds)) {
+        if (! empty($productionOutputIds)) {
             $transferredByOutputId = DB::table('inventory_transactions as trx')
                 ->join('inventory_transaction_items as item', 'item.inventory_transaction_id', '=', 'trx.id')
                 ->where('trx.reference_type', 'production_output_distribution')
@@ -174,7 +174,7 @@ class ManufactureUnitController extends Controller
             ->where('code', InventoryType::MANUFACTURING)
             ->value('id');
 
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Inventory type manufacturing is missing. Run inventory type seeder.');
         }
@@ -185,7 +185,7 @@ class ManufactureUnitController extends Controller
             ->with('category:id,slug')
             ->findOrFail((int) $validated['target_product_id']);
 
-        if (!in_array($targetProduct->category?->slug, ['ready-made', 'accessories'], true)) {
+        if (! in_array($targetProduct->category?->slug, ['ready-made', 'accessories'], true)) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Transfer for production is allowed only to ready-made or accessories goods.');
         }
@@ -197,7 +197,7 @@ class ManufactureUnitController extends Controller
                     ->lockForUpdate()
                     ->findOrFail($stock->id);
 
-                if (!$lockedStock->location || !in_array($lockedStock->location->type, [InventoryLocation::TYPE_WAREHOUSE, InventoryLocation::TYPE_FACTORY], true)) {
+                if (! $lockedStock->location || ! in_array($lockedStock->location->type, [InventoryLocation::TYPE_WAREHOUSE, InventoryLocation::TYPE_FACTORY], true)) {
                     throw new \RuntimeException('Transfer is allowed only from warehouse or factory locations.');
                 }
 
@@ -209,13 +209,13 @@ class ManufactureUnitController extends Controller
                 $lockedStock->on_hand_qty = $availableQty - $quantity;
                 $lockedStock->save();
 
-                $targetLabel = $targetProduct->name . ' (' . $targetProduct->code . ')';
+                $targetLabel = $targetProduct->name.' ('.$targetProduct->code.')';
 
                 $notes = trim((string) ($validated['notes'] ?? ''));
                 if ($notes !== '') {
                     $notes .= ' | ';
                 }
-                $notes .= 'Target finished good: ' . $targetLabel;
+                $notes .= 'Target finished good: '.$targetLabel;
 
                 $transaction = InventoryTransaction::query()->create([
                     'inventory_type_id' => $inventoryTypeId,
@@ -272,7 +272,7 @@ class ManufactureUnitController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$destinationLocation || !in_array($destinationLocation->type, [InventoryLocation::TYPE_OUTLET, InventoryLocation::TYPE_WAREHOUSE], true)) {
+        if (! $destinationLocation || ! in_array($destinationLocation->type, [InventoryLocation::TYPE_OUTLET, InventoryLocation::TYPE_WAREHOUSE], true)) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Destination must be an active outlet or warehouse location.');
         }
@@ -284,7 +284,7 @@ class ManufactureUnitController extends Controller
             ->where('code', $inventoryTypeCode)
             ->value('id');
 
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Required inventory type is missing. Run inventory type seeder.');
         }
@@ -299,7 +299,7 @@ class ManufactureUnitController extends Controller
                     ->lockForUpdate()
                     ->findOrFail($stock->id);
 
-                if (!$sourceStock->location || $sourceStock->location->type !== InventoryLocation::TYPE_FACTORY) {
+                if (! $sourceStock->location || $sourceStock->location->type !== InventoryLocation::TYPE_FACTORY) {
                     throw new \RuntimeException('Final goods transfer is allowed only from factory stock.');
                 }
 
@@ -347,7 +347,7 @@ class ManufactureUnitController extends Controller
 
                 $notes = 'Final goods transferred from factory stock.';
                 if ($userNotes !== '') {
-                    $notes .= ' ' . $userNotes;
+                    $notes .= ' '.$userNotes;
                 }
 
                 $transaction = InventoryTransaction::query()->create([
@@ -411,7 +411,7 @@ class ManufactureUnitController extends Controller
             ->where('code', InventoryType::MANUFACTURING)
             ->exists();
 
-        if (!$isManufacturing) {
+        if (! $isManufacturing) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Only manufacturing transfer records can be updated from this screen.');
         }
@@ -434,7 +434,7 @@ class ManufactureUnitController extends Controller
             ->where('code', InventoryType::MANUFACTURING)
             ->value('id');
 
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Inventory type manufacturing is missing. Run inventory type seeder.');
         }
@@ -445,7 +445,7 @@ class ManufactureUnitController extends Controller
             ->orderBy('name')
             ->first();
 
-        if (!$location) {
+        if (! $location) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'No active factory location found. Create/activate a factory location first.');
         }
@@ -472,11 +472,11 @@ class ManufactureUnitController extends Controller
                 }
 
                 $product = $transfer->targetProduct;
-                if (!$product) {
+                if (! $product) {
                     throw new \RuntimeException('Selected transfer has no target finished good. Create a new transfer with target product.');
                 }
 
-                if (!in_array($product->category?->slug, ['ready-made', 'accessories'], true)) {
+                if (! in_array($product->category?->slug, ['ready-made', 'accessories'], true)) {
                     throw new \RuntimeException('Transfer target must be ready-made or accessories.');
                 }
 
@@ -559,7 +559,7 @@ class ManufactureUnitController extends Controller
             ->where('code', InventoryType::OUTLET)
             ->value('id');
 
-        if (!$inventoryTypeId) {
+        if (! $inventoryTypeId) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'Inventory type outlet is missing. Run inventory type seeder.');
         }
@@ -576,7 +576,7 @@ class ManufactureUnitController extends Controller
             ->where('outlet_id', $currentOutletId)
             ->first();
 
-        if (!$outletLocation) {
+        if (! $outletLocation) {
             return $this->redirectToIndex($tab)
                 ->with('error', 'No active inventory location found for your current outlet.');
         }
@@ -596,7 +596,7 @@ class ManufactureUnitController extends Controller
                 }
 
                 $outputItem = $lockedOutput->items->first();
-                if (!$outputItem) {
+                if (! $outputItem) {
                     throw new \RuntimeException('Production output transaction item is missing.');
                 }
 
@@ -612,7 +612,7 @@ class ManufactureUnitController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if (!$sourceStock) {
+                if (! $sourceStock) {
                     throw new \RuntimeException('Source stock not found for produced goods.');
                 }
 
@@ -650,7 +650,7 @@ class ManufactureUnitController extends Controller
 
                 $notes = 'Produced goods moved to current outlet inventory.';
                 if ($userNotes !== '') {
-                    $notes .= ' ' . $userNotes;
+                    $notes .= ' '.$userNotes;
                 }
 
                 $distributionTransaction = InventoryTransaction::query()->create([
@@ -697,7 +697,7 @@ class ManufactureUnitController extends Controller
     {
         $allowedTabs = ['stock-records', 'production-transfers', 'production-log'];
         $tab = in_array((string) $tab, $allowedTabs, true) ? (string) $tab : '';
-        $url = route('manufactureUnit.index') . ($tab !== '' ? ('#' . $tab) : '');
+        $url = route('manufactureUnit.index').($tab !== '' ? ('#'.$tab) : '');
 
         return redirect()->to($url);
     }

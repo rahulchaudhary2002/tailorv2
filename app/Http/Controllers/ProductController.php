@@ -88,7 +88,6 @@ class ProductController extends Controller
                 'product_category_id' => $data['product_category_id'],
                 'amount' => $data['amount'],
             ]);
-            $product->ensureBarcode();
             $savedProduct = $product;
 
             $quantity = (float) ($data['opening_quantity'] ?? 0);
@@ -183,8 +182,6 @@ class ProductController extends Controller
             'inventoryStocks.vendor:id,name',
             'inventoryStocks.unit:id,name,symbol',
         ]);
-        $product->ensureBarcode();
-
         $inventoryTransactions = InventoryTransaction::query()
             ->with([
                 'inventoryType:id,name,code',
@@ -456,16 +453,10 @@ class ProductController extends Controller
         $productsQuery = Product::query();
 
         if ($q !== '') {
-            $barcodeQuery = preg_replace('/\D+/', '', $q) ?? '';
-
-            $productsQuery->where(function ($query) use ($q, $qLower, $barcodeQuery): void {
+            $productsQuery->where(function ($query) use ($q, $qLower): void {
                 $query->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
                     ->orWhereRaw('LOWER(code) LIKE ?', ['%'.$qLower.'%'])
                     ->orWhereRaw('CAST(amount AS CHAR) LIKE ?', ['%'.$q.'%']);
-
-                if ($barcodeQuery !== '') {
-                    $query->orWhere('barcode', 'like', '%'.$barcodeQuery.'%');
-                }
             });
         }
 

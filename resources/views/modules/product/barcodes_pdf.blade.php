@@ -207,7 +207,7 @@
                             @if ($product->barcode_svg !== '')
                                 {!! $product->barcode_svg !!}
                             @else
-                                <span class="label__fallback">{{ $product->barcode ?: $product->code ?: '-' }}</span>
+                                <span class="label__fallback">{{ $product->code ?: '-' }}</span>
                             @endif
                         </div>
                     </section>
