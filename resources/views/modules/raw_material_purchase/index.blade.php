@@ -187,7 +187,15 @@
                         if (!matchedOption) {
                             return;
                         }
-                        $select.val(String(matchedOption.value || '')).trigger('change');
+                        const newVal = String(matchedOption.value || '');
+                        if (selectEl.multiple) {
+                            const current = $select.val() || [];
+                            if (!current.includes(newVal)) {
+                                $select.val([...current, newVal]).trigger('change');
+                            }
+                        } else {
+                            $select.val(newVal).trigger('change');
+                        }
                         $select.select2('close');
                     };
                     searchInput.addEventListener('input', selectExactMatch);
