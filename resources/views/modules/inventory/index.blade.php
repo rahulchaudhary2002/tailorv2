@@ -368,6 +368,7 @@
                     <th>Product</th>
                     <th>On Hand</th>
                     <th>Reserved</th>
+                    <th>Available</th>
                     <th>Unit</th>
                     <th>Unit Cost</th>
                     <th>Updated</th>
@@ -382,13 +383,14 @@
                         <td>{{ $stock->product?->name ?: '-' }}</td>
                         <td>{{ number_format((float) $stock->on_hand_qty, 2) }}</td>
                         <td>{{ number_format((float) $stock->reserved_qty, 2) }}</td>
+                        <td>{{ number_format(max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty), 2) }}</td>
                         <td>{{ $stock->unit?->symbol ?: ($stock->product?->defaultUnitLabel() ?: '-') }}</td>
                         <td>{{ number_format((float) $stock->unit_cost, 2) }}</td>
                         <td>{{ $stock->updated_at->format('M d, Y h:i A') }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="empty">No inventory records found.</td>
+                        <td colspan="10" class="empty">No inventory records found.</td>
                     </tr>
                 @endforelse
             </tbody>
