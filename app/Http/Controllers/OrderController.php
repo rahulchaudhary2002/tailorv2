@@ -17,9 +17,9 @@ use App\Models\OrderTask;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\OrderInventoryService;
 use App\Services\OrderWorkflowService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Storage;
 class OrderController extends Controller
 {
     private const WORKER_PERMISSION_KEY = 'view-assigned-jobs';
+
+    public function __construct(private readonly OrderInventoryService $inventoryService) {}
 
     /**
      * Display a listing of orders.
@@ -666,10 +668,10 @@ class OrderController extends Controller
                         }
                     }
 
-                    if ($this->orderHasIssuedStock($existingOrder)) {
-                        $this->restoreOrderInventory($existingOrder);
+                    if ($this->inventoryService->orderHasIssuedStock($existingOrder)) {
+                        $this->inventoryService->restoreOrderInventory($existingOrder);
                     } else {
-                        $this->releaseReservedStockForOrder($existingOrder, (int) $outletLocation->id);
+                        $this->inventoryService->releaseReservedStockForOrder($existingOrder, (int) $outletLocation->id);
                     }
                     $existingOrder->items()->delete();
                 }
@@ -899,8 +901,8 @@ class OrderController extends Controller
 
                 $this->syncCustomerMeasurementsFromOrderItems((int) $validated['customer_id'], $items);
 
-                if ($this->orderHasIssuedStock($order)) {
-                    $this->issueStockForOrder(
+                if ($this->inventoryService->orderHasIssuedStock($order)) {
+                    $this->inventoryService->issueStockForOrder(
                         $order,
                         (int) $outletLocation->id,
                         (int) $inventoryTypeId,
@@ -908,7 +910,7 @@ class OrderController extends Controller
                         (int) auth()->id()
                     );
                 } else {
-                    $this->reserveStockForOrder($order, (int) $outletLocation->id);
+                    $this->inventoryService->reserveStockForOrder($order, (int) $outletLocation->id);
                 }
 
                 $savedOrder = $order;
@@ -994,7 +996,7 @@ class OrderController extends Controller
             DB::transaction(function () use ($order, $validated): void {
                 $targetStatus = (string) ($validated['status'] ?? '');
                 $currentStatus = (string) $order->status;
-                $outletLocationId = $this->resolveOutletLocationId((int) $order->outlet_id);
+                $outletLocationId = $this->inventoryService->resolveOutletLocationId((int) $order->outlet_id);
                 $targetHasIssuedStock = in_array($targetStatus, [
                     Order::STATUS_FABRIC_ISSUED,
                     Order::STATUS_ASSIGNED,
@@ -1008,14 +1010,14 @@ class OrderController extends Controller
                     throw new \RuntimeException('No active inventory location found for this order outlet.');
                 }
 
-                if ($targetHasIssuedStock && ! $this->orderHasIssuedStock($order)) {
-                    $inventoryTypeId = $this->resolveOutletInventoryTypeId();
+                if ($targetHasIssuedStock && ! $this->inventoryService->orderHasIssuedStock($order)) {
+                    $inventoryTypeId = $this->inventoryService->resolveOutletInventoryTypeId();
 
                     if ($inventoryTypeId < 1) {
                         throw new \RuntimeException('Inventory type outlet is missing. Run inventory type seeder.');
                     }
 
-                    $this->issueStockForOrder(
+                    $this->inventoryService->issueStockForOrder(
                         $order,
                         $outletLocationId,
                         $inventoryTypeId,
@@ -1025,16 +1027,16 @@ class OrderController extends Controller
                 }
 
                 if ($targetStatus === Order::STATUS_CANCELLED) {
-                    if ($this->orderHasIssuedStock($order)) {
-                        $this->restoreOrderInventory($order);
+                    if ($this->inventoryService->orderHasIssuedStock($order)) {
+                        $this->inventoryService->restoreOrderInventory($order);
                     } else {
-                        $this->releaseReservedStockForOrder($order, $outletLocationId);
+                        $this->inventoryService->releaseReservedStockForOrder($order, $outletLocationId);
                     }
-                } elseif (! $targetHasIssuedStock && $this->orderHasIssuedStock($order)) {
-                    $this->restoreOrderInventory($order);
-                    $this->reserveStockForOrder($order, $outletLocationId);
+                } elseif (! $targetHasIssuedStock && $this->inventoryService->orderHasIssuedStock($order)) {
+                    $this->inventoryService->restoreOrderInventory($order);
+                    $this->inventoryService->reserveStockForOrder($order, $outletLocationId);
                 } elseif ($currentStatus === Order::STATUS_CANCELLED && ! $targetHasIssuedStock) {
-                    $this->reserveStockForOrder($order, $outletLocationId);
+                    $this->inventoryService->reserveStockForOrder($order, $outletLocationId);
                 }
 
                 app(OrderWorkflowService::class)->transition($order, $validated);
@@ -1217,315 +1219,6 @@ class OrderController extends Controller
             'workerPayment' => $workerPayment,
             'profitMargin' => $profitMargin,
         ];
-    }
-
-    private function deductFromOutletStock(int $locationId, int $productId, float $requiredQty): ?float
-    {
-        $remainingQty = $requiredQty;
-
-        $stocks = InventoryStock::query()
-            ->where('location_id', $locationId)
-            ->where('product_id', $productId)
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
-
-        $availableQty = (float) $stocks->sum(function (InventoryStock $stock) {
-            return max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
-        });
-
-        if ($availableQty < $requiredQty) {
-            throw new \RuntimeException('Insufficient stock for one or more order items at current outlet.');
-        }
-
-        $totalCost = 0.0;
-        $consumedQty = 0.0;
-
-        /** @var Collection<int, InventoryStock> $stocks */
-        foreach ($stocks as $stock) {
-            if ($remainingQty <= 0) {
-                break;
-            }
-
-            $availableStockQty = max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
-            if ($availableStockQty <= 0) {
-                continue;
-            }
-
-            $deductQty = min($remainingQty, $availableStockQty);
-            $stock->on_hand_qty = (float) $stock->on_hand_qty - $deductQty;
-            $stock->save();
-
-            $cost = (float) $stock->unit_cost;
-            $totalCost += $deductQty * $cost;
-            $consumedQty += $deductQty;
-            $remainingQty -= $deductQty;
-        }
-
-        if ($consumedQty <= 0) {
-            return null;
-        }
-
-        return $totalCost / $consumedQty;
-    }
-
-    private function reserveStockForOrder(Order $order, int $locationId): void
-    {
-        foreach ($this->getOrderCommittedStockMap($order) as $productId => $qty) {
-            $this->reserveOutletStock($locationId, (int) $productId, (float) $qty);
-        }
-    }
-
-    private function releaseReservedStockForOrder(Order $order, int $locationId): void
-    {
-        foreach ($this->getOrderCommittedStockMap($order) as $productId => $qty) {
-            $this->releaseReservedOutletStock($locationId, (int) $productId, (float) $qty);
-        }
-    }
-
-    private function issueStockForOrder(
-        Order $order,
-        int $locationId,
-        int $inventoryTypeId,
-        mixed $trxDate,
-        int $createdBy
-    ): void {
-        $requirements = $this->getOrderCommittedStockMap($order);
-
-        foreach ($requirements as $productId => $qty) {
-            $this->releaseReservedOutletStock($locationId, (int) $productId, (float) $qty);
-
-            $averageCost = $this->deductFromOutletStock(
-                locationId: $locationId,
-                productId: (int) $productId,
-                requiredQty: (float) $qty
-            );
-
-            $transaction = InventoryTransaction::query()->create([
-                'inventory_type_id' => $inventoryTypeId,
-                'trx_type' => InventoryTransaction::TYPE_OUT,
-                'reference_type' => 'order',
-                'reference_id' => $order->id,
-                'from_location_id' => $locationId,
-                'to_location_id' => null,
-                'vendor_id' => null,
-                'trx_date' => $trxDate,
-                'notes' => 'Order '.$order->order_number.' stock deduction',
-                'created_by' => $createdBy,
-            ]);
-
-            $transaction->items()->create([
-                'product_id' => (int) $productId,
-                'qty' => (float) $qty,
-                'unit_cost' => $averageCost,
-                'total_cost' => $averageCost !== null ? $averageCost * (float) $qty : null,
-            ]);
-        }
-    }
-
-    private function reserveOutletStock(int $locationId, int $productId, float $requiredQty): void
-    {
-        $remainingQty = $requiredQty;
-
-        $stocks = InventoryStock::query()
-            ->where('location_id', $locationId)
-            ->where('product_id', $productId)
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
-
-        $availableQty = (float) $stocks->sum(function (InventoryStock $stock) {
-            return max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
-        });
-
-        if ($availableQty + 0.000001 < $requiredQty) {
-            throw new \RuntimeException('Insufficient stock for one or more order items at current outlet.');
-        }
-
-        foreach ($stocks as $stock) {
-            if ($remainingQty <= 0) {
-                break;
-            }
-
-            $availableStockQty = max(0, (float) $stock->on_hand_qty - (float) $stock->reserved_qty);
-            if ($availableStockQty <= 0) {
-                continue;
-            }
-
-            $reserveQty = min($remainingQty, $availableStockQty);
-            $stock->reserved_qty = (float) $stock->reserved_qty + $reserveQty;
-            $stock->save();
-            $remainingQty -= $reserveQty;
-        }
-    }
-
-    private function releaseReservedOutletStock(int $locationId, int $productId, float $qtyToRelease): void
-    {
-        if ($qtyToRelease <= 0) {
-            return;
-        }
-
-        $remainingQty = $qtyToRelease;
-
-        $stocks = InventoryStock::query()
-            ->where('location_id', $locationId)
-            ->where('product_id', $productId)
-            ->where('reserved_qty', '>', 0)
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->get();
-
-        foreach ($stocks as $stock) {
-            if ($remainingQty <= 0) {
-                break;
-            }
-
-            $reservedQty = (float) $stock->reserved_qty;
-            if ($reservedQty <= 0) {
-                continue;
-            }
-
-            $releaseQty = min($remainingQty, $reservedQty);
-            $stock->reserved_qty = $reservedQty - $releaseQty;
-            $stock->save();
-            $remainingQty -= $releaseQty;
-        }
-    }
-
-    private function restoreOrderInventory(Order $order): void
-    {
-        $transactions = InventoryTransaction::query()
-            ->where('reference_type', 'order')
-            ->where('reference_id', (int) $order->id)
-            ->where('trx_type', InventoryTransaction::TYPE_OUT)
-            ->with('items')
-            ->lockForUpdate()
-            ->get();
-
-        foreach ($transactions as $transaction) {
-            $locationId = (int) ($transaction->from_location_id ?? 0);
-            if ($locationId < 1) {
-                $transaction->items()->delete();
-                $transaction->delete();
-
-                continue;
-            }
-
-            foreach ($transaction->items as $transactionItem) {
-                $productId = (int) ($transactionItem->product_id ?? 0);
-                $qty = (float) ($transactionItem->qty ?? 0);
-                $unitCost = (float) ($transactionItem->unit_cost ?? 0);
-
-                if ($productId < 1 || $qty <= 0) {
-                    continue;
-                }
-
-                $stock = InventoryStock::query()
-                    ->where('location_id', $locationId)
-                    ->where('product_id', $productId)
-                    ->orderBy('created_at')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $stock) {
-                    $stock = InventoryStock::query()->create([
-                        'location_id' => $locationId,
-                        'product_id' => $productId,
-                        'vendor_id' => null,
-                        'unit_id' => null,
-                        'on_hand_qty' => 0,
-                        'reserved_qty' => 0,
-                        'unit_cost' => $unitCost,
-                    ]);
-                }
-
-                $currentQty = (float) $stock->on_hand_qty;
-                $currentValue = $currentQty * (float) $stock->unit_cost;
-                $incomingValue = $qty * $unitCost;
-                $newQty = $currentQty + $qty;
-
-                $stock->unit_cost = $newQty > 0 ? (($currentValue + $incomingValue) / $newQty) : 0;
-                $stock->on_hand_qty = $newQty;
-                $stock->save();
-            }
-
-            $transaction->items()->delete();
-            $transaction->delete();
-        }
-    }
-
-    /**
-     * @return array<string, float>
-     */
-    private function getOrderCommittedStockMap(Order $order): array
-    {
-        $order->loadMissing('items');
-
-        $requirements = [];
-
-        foreach ($order->items as $item) {
-            $itemCategory = (string) ($item->item_category ?? '');
-
-            if ($itemCategory === 'custom') {
-                if ((string) data_get($item->custom_details, 'fabric_source') !== 'stock') {
-                    continue;
-                }
-
-                $productId = (int) data_get($item->custom_details, 'fabric_product_id', 0);
-                $qty = (float) data_get($item->custom_details, 'fabric_quantity', $item->quantity);
-            } else {
-                $productId = (int) ($item->product_id ?? 0);
-                $qty = (float) ($item->quantity ?? 0);
-            }
-
-            if ($productId < 1 || $qty <= 0) {
-                continue;
-            }
-
-            $stockKey = (string) $productId;
-            if (! array_key_exists($stockKey, $requirements)) {
-                $requirements[$stockKey] = 0.0;
-            }
-
-            $requirements[$stockKey] += $qty;
-        }
-
-        return $requirements;
-    }
-
-    private function orderHasIssuedStock(Order $order): bool
-    {
-        return in_array((string) $order->status, [
-            Order::STATUS_FABRIC_ISSUED,
-            Order::STATUS_ASSIGNED,
-            Order::STATUS_IN_PROGRESS,
-            Order::STATUS_NEAR_COMPLETION,
-            Order::STATUS_COMPLETED,
-            Order::STATUS_DELIVERED,
-        ], true);
-    }
-
-    private function resolveOutletLocationId(int $outletId): int
-    {
-        if ($outletId < 1) {
-            return 0;
-        }
-
-        return (int) (InventoryLocation::query()
-            ->where('outlet_id', $outletId)
-            ->where('type', InventoryLocation::TYPE_OUTLET)
-            ->where('is_active', true)
-            ->value('id') ?? 0);
-    }
-
-    private function resolveOutletInventoryTypeId(): int
-    {
-        return (int) (InventoryType::query()
-            ->where('code', InventoryType::OUTLET)
-            ->value('id') ?? 0);
     }
 
     private function ensureOrderIsEditable(Order $order): void

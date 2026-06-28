@@ -7,13 +7,18 @@ use App\Models\OrderTask;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\OrderInventoryService;
 use App\Services\OrderTaskService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class TaskManagementController extends Controller
 {
-    public function __construct(private readonly OrderTaskService $taskService) {}
+    public function __construct(
+        private readonly OrderTaskService $taskService,
+        private readonly OrderInventoryService $inventoryService,
+    ) {}
 
     private function workerRoleId(): int
     {
@@ -252,9 +257,13 @@ class TaskManagementController extends Controller
                 : null;
         }
 
-        $task->save();
-        $order = $task->order()->firstOrFail();
-        $this->taskService->syncOrderStatus($order);
+        DB::transaction(function () use ($task): void {
+            $task->save();
+            $order = $task->order()->firstOrFail();
+            $previousOrderStatus = (string) $order->status;
+            $this->taskService->syncOrderStatus($order);
+            $this->syncOrderStockAfterStatusChange($order, $previousOrderStatus);
+        });
 
         $task->loadMissing(['order.customer:id,name', 'worker:id,name']);
         $this->notifyTaskRecipients(
@@ -298,9 +307,13 @@ class TaskManagementController extends Controller
             $task->worker_deadline_at = $deadlineInput;
         }
 
-        $task->save();
-        $order = $task->order()->firstOrFail();
-        $this->taskService->syncOrderStatus($order);
+        DB::transaction(function () use ($task): void {
+            $task->save();
+            $order = $task->order()->firstOrFail();
+            $previousOrderStatus = (string) $order->status;
+            $this->taskService->syncOrderStatus($order);
+            $this->syncOrderStockAfterStatusChange($order, $previousOrderStatus);
+        });
 
         $task->loadMissing(['order.customer:id,name', 'worker:id,name']);
         if ($targetStatus !== '' && array_key_exists('worker_deadline_at', $validated)) {
@@ -318,6 +331,34 @@ class TaskManagementController extends Controller
         $this->notifyTaskRecipients($task, $title, $message);
 
         return back()->with('success', 'Task updated successfully.');
+    }
+
+    private function syncOrderStockAfterStatusChange(Order $order, string $previousStatus): void
+    {
+        $order->refresh();
+        $newStatus = (string) $order->status;
+
+        if ($newStatus === $previousStatus) {
+            return;
+        }
+
+        $previousHadIssuedStock = $this->inventoryService->statusRequiresIssuedStock($previousStatus);
+        $newRequiresIssuedStock = $this->inventoryService->orderHasIssuedStock($order);
+        $outletLocationId = $this->inventoryService->resolveOutletLocationId((int) $order->outlet_id);
+
+        if ($outletLocationId < 1) {
+            return;
+        }
+
+        if ($newRequiresIssuedStock && ! $previousHadIssuedStock) {
+            $inventoryTypeId = $this->inventoryService->resolveOutletInventoryTypeId();
+            if ($inventoryTypeId > 0) {
+                $this->inventoryService->issueStockForOrder($order, $outletLocationId, $inventoryTypeId, now(), (int) auth()->id());
+            }
+        } elseif (! $newRequiresIssuedStock && $previousHadIssuedStock) {
+            $this->inventoryService->restoreOrderInventory($order);
+            $this->inventoryService->reserveStockForOrder($order, $outletLocationId);
+        }
     }
 
     private function notifyTaskRecipients(OrderTask $task, string $title, string $message, ?User $directWorker = null): void
