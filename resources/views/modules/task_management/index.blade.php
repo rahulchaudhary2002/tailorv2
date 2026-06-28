@@ -285,7 +285,6 @@
                     <th>Customer</th>
                     <th>Garment</th>
                     <th>Qty</th>
-                    <th>Rate</th>
                     <th>Payable</th>
                     <th>Paid</th>
                     <th>Status</th>
@@ -328,7 +327,6 @@
                         </td>
                         <td>{{ $task->task_title }}</td>
                         <td>{{ number_format((float) $task->quantity, 2) }}</td>
-                        <td>{{ number_format((float) $task->rate_amount, 2) }}</td>
                         <td>{{ number_format((float) $task->payable_amount, 2) }}</td>
                         <td>
                             <span class="app-badge {{ $task->is_paid ? 'app-badge--success' : 'app-badge--danger' }}">
@@ -368,6 +366,7 @@
                                     data-status="{{ $task->status }}"
                                     data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
                                     data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
+                                    data-payable-amount="{{ number_format((float) $task->payable_amount, 2, '.', '') }}"
                                     aria-label="Edit task assignment"
                                     title="Edit task assignment"
                                     style="width:26px; height:26px; border-radius:999px; padding:0; display:inline-flex; align-items:center; justify-content:center;"
@@ -398,6 +397,7 @@
                                     data-status="{{ $task->status }}"
                                     data-slip-received="{{ $task->slip_received_at ? '1' : '0' }}"
                                     data-is-paid="{{ $task->is_paid ? '1' : '0' }}"
+                                    data-payable-amount="{{ number_format((float) $task->payable_amount, 2, '.', '') }}"
                                 >
                                     Assign Task
                                 </button>
@@ -431,7 +431,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12" class="empty">No custom task assignments found.</td>
+                        <td colspan="11" class="empty">No custom task assignments found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -493,6 +493,11 @@
                 </div>
 
                 <div class="outlet-form-group outlet-form-group-full">
+                    <label for="taskAssignPayableAmount">Payable Amount (Worker)</label>
+                    <input id="taskAssignPayableAmount" type="number" name="payable_amount" class="outlet-input" placeholder="0.00" min="0" step="0.01">
+                </div>
+
+                <div class="outlet-form-group outlet-form-group-full">
                     <label class="task-assign-check">
                         <input id="taskAssignSlip" type="checkbox" name="slip_received" value="1">
                         <span>Slip Received</span>
@@ -532,12 +537,13 @@
         const statusInput = document.getElementById('taskAssignStatus');
         const slipInput = document.getElementById('taskAssignSlip');
         const paidInput = document.getElementById('taskAssignPaid');
+        const payableAmountInput = document.getElementById('taskAssignPayableAmount');
         const modalPanel = modal.querySelector('.task-assign-modal__panel');
         const rangeInput = document.getElementById('deadline_range_filter');
         const fromInput = document.getElementById('deadline_from_filter');
         const toInput = document.getElementById('deadline_to_filter');
 
-        if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !statusInput || !slipInput || !paidInput) {
+        if (!modal || !form || !workerInput || !deadlineInput || !notesInput || !statusInput || !slipInput || !paidInput || !payableAmountInput) {
             return;
         }
 
@@ -619,6 +625,7 @@
                 statusInput.value = button.dataset.status || 'pending';
                 slipInput.checked = button.dataset.slipReceived === '1';
                 paidInput.checked = button.dataset.isPaid === '1';
+                payableAmountInput.value = button.dataset.payableAmount || '';
 
                 if (meta) {
                     meta.textContent = `${button.dataset.taskNumber} | Order ${button.dataset.orderNumber} | ${button.dataset.customerName} | ${button.dataset.taskTitle}`;

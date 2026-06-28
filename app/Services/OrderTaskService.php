@@ -39,7 +39,6 @@ class OrderTaskService
                 $garments = collect((array) data_get($item->custom_details, 'garments', []))->values();
                 foreach ($garments as $index => $garment) {
                     $quantity = max(1, (float) ($garment['quantity'] ?? 1));
-                    $rateAmount = max(0, (float) ($garment['tailoring_amount'] ?? 0));
                     $task = OrderTask::query()->updateOrCreate(
                         [
                             'order_item_id' => (int) $item->id,
@@ -47,16 +46,14 @@ class OrderTaskService
                         ],
                         [
                             'order_id' => (int) $order->id,
-                            'garment_type_id' => !empty($garment['garment_type_id']) ? (int) $garment['garment_type_id'] : null,
+                            'garment_type_id' => ! empty($garment['garment_type_id']) ? (int) $garment['garment_type_id'] : null,
                             'task_title' => trim((string) ($garment['garment_title'] ?? 'Custom Task')) ?: 'Custom Task',
                             'quantity' => $quantity,
-                            'rate_amount' => $rateAmount,
-                            'payable_amount' => $quantity * $rateAmount,
                             'created_by' => (int) ($order->created_by ?? auth()->id()),
                         ]
                     );
 
-                    if (!$task->task_number) {
+                    if (! $task->task_number) {
                         $task->task_number = sprintf('TASK-%06d', $task->id);
                         $task->save();
                     }
@@ -94,13 +91,13 @@ class OrderTaskService
 
         $activeTasks = $tasks->filter(fn ($task) => (string) $task->status !== OrderTask::STATUS_CANCELLED)->values();
 
-        if (!$hasFabricOrCustom) {
+        if (! $hasFabricOrCustom) {
             // For non-fabric/non-custom, only allow in progress and delivered
             if ($activeTasks->isEmpty()) {
                 $nextStatus = Order::STATUS_CONFIRMED;
-            } elseif ($activeTasks->every(fn($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
+            } elseif ($activeTasks->every(fn ($task) => (string) $task->status === OrderTask::STATUS_COMPLETED)) {
                 $nextStatus = Order::STATUS_DELIVERED;
-            } elseif ($activeTasks->contains(fn($task) => (string) $task->status === OrderTask::STATUS_IN_PROGRESS)) {
+            } elseif ($activeTasks->contains(fn ($task) => (string) $task->status === OrderTask::STATUS_IN_PROGRESS)) {
                 $nextStatus = Order::STATUS_IN_PROGRESS;
             } else {
                 $nextStatus = Order::STATUS_CONFIRMED;

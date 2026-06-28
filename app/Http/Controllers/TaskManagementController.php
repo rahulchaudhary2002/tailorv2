@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Product;
 use App\Models\OrderTask;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\OrderTaskService;
@@ -13,9 +13,7 @@ use Illuminate\Validation\Rule;
 
 class TaskManagementController extends Controller
 {
-    public function __construct(private readonly OrderTaskService $taskService)
-    {
-    }
+    public function __construct(private readonly OrderTaskService $taskService) {}
 
     private function workerRoleId(): int
     {
@@ -67,7 +65,7 @@ class TaskManagementController extends Controller
             ->get(['id', 'name']);
 
         $validWorkerIds = $workers->pluck('id')->map(fn ($id) => (int) $id)->all();
-        if ($selectedWorkerId > 0 && !in_array($selectedWorkerId, $validWorkerIds, true)) {
+        if ($selectedWorkerId > 0 && ! in_array($selectedWorkerId, $validWorkerIds, true)) {
             $selectedWorkerId = 0;
         }
 
@@ -88,13 +86,13 @@ class TaskManagementController extends Controller
 
         if ($q !== '') {
             $tasksQuery->where(function ($query) use ($qLower): void {
-                $query->whereRaw('LOWER(task_number) LIKE ?', ['%' . $qLower . '%'])
-                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%' . $qLower . '%'])
+                $query->whereRaw('LOWER(task_number) LIKE ?', ['%'.$qLower.'%'])
+                    ->orWhereRaw('LOWER(task_title) LIKE ?', ['%'.$qLower.'%'])
                     ->orWhereHas('order', function ($orderQuery) use ($qLower): void {
-                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%' . $qLower . '%'])
+                        $orderQuery->whereRaw('LOWER(order_number) LIKE ?', ['%'.$qLower.'%'])
                             ->orWhereHas('customer', function ($customerQuery) use ($qLower): void {
-                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%' . $qLower . '%'])
-                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . $qLower . '%']);
+                                $customerQuery->whereRaw('LOWER(name) LIKE ?', ['%'.$qLower.'%'])
+                                    ->orWhereRaw('LOWER(phone) LIKE ?', ['%'.$qLower.'%']);
                             });
                     });
             });
@@ -153,6 +151,7 @@ class TaskManagementController extends Controller
         $previousWorkerId = (int) ($task->worker_id ?? 0);
 
         $validated = $request->validate([
+            'payable_amount' => ['nullable', 'numeric', 'min:0'],
             'worker_id' => [
                 'nullable',
                 'integer',
@@ -208,6 +207,10 @@ class TaskManagementController extends Controller
         $task->worker_deadline_at = $validated['worker_deadline_at'] ?? null;
         $task->notes = $validated['notes'] ?? null;
 
+        if (array_key_exists('payable_amount', $validated) && $validated['payable_amount'] !== null) {
+            $task->payable_amount = (float) $validated['payable_amount'];
+        }
+
         if ($task->worker_id) {
             if (in_array($task->status, [OrderTask::STATUS_PENDING, OrderTask::STATUS_CANCELLED], true)) {
                 $task->status = OrderTask::STATUS_ASSIGNED;
@@ -257,7 +260,7 @@ class TaskManagementController extends Controller
         $this->notifyTaskRecipients(
             $task,
             'Task assignment updated',
-            'Task ' . ($task->task_number ?: $task->task_title) . ' for order ' . ($task->order?->order_number ?: '-') . ' was updated.',
+            'Task '.($task->task_number ?: $task->task_title).' for order '.($task->order?->order_number ?: '-').' was updated.',
             $task->worker_id && (int) $task->worker_id !== $previousWorkerId ? $task->worker : null
         );
 
@@ -301,14 +304,14 @@ class TaskManagementController extends Controller
 
         $task->loadMissing(['order.customer:id,name', 'worker:id,name']);
         if ($targetStatus !== '' && array_key_exists('worker_deadline_at', $validated)) {
-            $message = 'Task ' . ($task->task_number ?: $task->task_title)
-                . ' deadline was updated and status is now ' . $task->statusLabel() . '.';
+            $message = 'Task '.($task->task_number ?: $task->task_title)
+                .' deadline was updated and status is now '.$task->statusLabel().'.';
             $title = 'Task updated';
         } elseif ($targetStatus !== '') {
-            $message = 'Task ' . ($task->task_number ?: $task->task_title) . ' is now ' . $task->statusLabel() . '.';
+            $message = 'Task '.($task->task_number ?: $task->task_title).' is now '.$task->statusLabel().'.';
             $title = 'Task status updated';
         } else {
-            $message = 'Task ' . ($task->task_number ?: $task->task_title) . ' deadline was updated.';
+            $message = 'Task '.($task->task_number ?: $task->task_title).' deadline was updated.';
             $title = 'Task deadline updated';
         }
 
@@ -328,7 +331,7 @@ class TaskManagementController extends Controller
             (int) ($task->order?->outlet_id ?? auth()->user()?->current_outlet_id ?? 0),
             [
                 'title' => $title,
-                'message' => $actorName . ': ' . $message,
+                'message' => $actorName.': '.$message,
                 'url' => $taskUrl,
                 'module' => 'Task',
             ],
@@ -340,7 +343,7 @@ class TaskManagementController extends Controller
                 $directWorker,
             ], [
                 'title' => 'New task assigned',
-                'message' => $actorName . ': You have been assigned task ' . ($task->task_number ?: $task->task_title) . ' for order ' . ($task->order?->order_number ?: '-') . '.',
+                'message' => $actorName.': You have been assigned task '.($task->task_number ?: $task->task_title).' for order '.($task->order?->order_number ?: '-').'.',
                 'url' => route('order.assignedJobs', ['q' => $task->task_number ?: $task->task_title]),
                 'module' => 'Task',
             ]);
@@ -389,7 +392,7 @@ class TaskManagementController extends Controller
             ->where('outlet_id', $outletId)
             ->exists();
 
-        if (!$belongs) {
+        if (! $belongs) {
             abort(404);
         }
     }
@@ -408,7 +411,7 @@ class TaskManagementController extends Controller
             ->whereIn('outlet_id', $accessibleOutletIds)
             ->exists();
 
-        if (!$belongs || (int) ($task->worker_id ?? 0) !== $userId) {
+        if (! $belongs || (int) ($task->worker_id ?? 0) !== $userId) {
             abort(404);
         }
     }

@@ -7,9 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class OrderTask extends Model
 {
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_ASSIGNED = 'assigned';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
@@ -21,7 +25,6 @@ class OrderTask extends Model
         'task_number',
         'task_title',
         'quantity',
-        'rate_amount',
         'payable_amount',
         'status',
         'assigned_at',
@@ -35,7 +38,6 @@ class OrderTask extends Model
 
     protected $casts = [
         'quantity' => 'decimal:2',
-        'rate_amount' => 'decimal:2',
         'payable_amount' => 'decimal:2',
         'assigned_at' => 'datetime',
         'completed_at' => 'datetime',
