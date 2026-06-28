@@ -233,6 +233,9 @@ class DashboardController extends Controller
 
         $ordersCount = (int) (clone $orderScope)->count();
         $advanceCollected = (float) (clone $orderScope)->sum('advance_payment_amount');
+        $totalPaid = (float) (clone $orderScope)
+            ->where('payment_status', Order::PAYMENT_STATUS_PAID)
+            ->sum('advance_payment_amount');
         $pendingPayments = (float) (clone $orderScope)
             ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
             ->selectRaw(
@@ -478,6 +481,8 @@ class DashboardController extends Controller
         }
 
         $outletSalesToday = 0.0;
+        $outletRevenueToday = 0.0;
+        $outletTotalPaidToday = 0.0;
         $outletOrdersToday = 0;
         $dueTodayCount = 0;
         $overdueOutletCount = 0;
@@ -503,6 +508,15 @@ class DashboardController extends Controller
                 ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
                 ->selectRaw($salesAmountSql.' as total')
                 ->value('total');
+
+            $outletRevenueToday = (float) (clone $outletBaseOrders)
+                ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
+                ->sum('advance_payment_amount');
+
+            $outletTotalPaidToday = (float) (clone $outletBaseOrders)
+                ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
+                ->where('payment_status', Order::PAYMENT_STATUS_PAID)
+                ->sum('advance_payment_amount');
 
             $outletOrdersToday = (int) (clone $outletBaseOrders)
                 ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
@@ -805,6 +819,7 @@ class DashboardController extends Controller
                 'totalSales' => $totalSales,
                 'ordersCount' => $ordersCount,
                 'advanceCollected' => $advanceCollected,
+                'totalPaid' => $totalPaid,
                 'pendingPayments' => $pendingPayments,
                 'deliveredOrders' => $deliveredOrders,
                 'inventoryValue' => $inventoryValue,
@@ -823,6 +838,8 @@ class DashboardController extends Controller
             'pendingInventoryTransactions' => $pendingInventoryTransactions,
             'outletKpis' => [
                 'outletSalesToday' => $outletSalesToday,
+                'outletRevenueToday' => $outletRevenueToday,
+                'outletTotalPaidToday' => $outletTotalPaidToday,
                 'outletOrdersToday' => $outletOrdersToday,
                 'dueTodayCount' => $dueTodayCount,
                 'overdueOutletCount' => $overdueOutletCount,

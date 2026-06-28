@@ -862,13 +862,13 @@
 
     $primaryLabel = match ($roleScope) {
         'owner_admin' => 'Total Revenue',
-        'outlet_manager' => 'Outlet Sales',
+        'outlet_manager' => 'Total Revenue',
         default => 'Assigned Tasks',
     };
 
     $primaryMeta = match ($roleScope) {
-        'owner_admin' => number_format($kpis['ordersCount'] ?? 0) . ' orders in the selected range',
-        'outlet_manager' => number_format($outletKpis['outletOrdersToday'] ?? 0) . ' orders captured for ' . $rangeLabel,
+        'owner_admin' => number_format($kpis['ordersCount'] ?? 0) . ' orders today',
+        'outlet_manager' => number_format($outletKpis['outletOrdersToday'] ?? 0) . ' orders today',
         default => number_format($workerKpis['completedThisWeek'] ?? 0) . ' tasks completed this week',
     };
 
@@ -881,15 +881,15 @@
     $statCards = match ($roleScope) {
         'owner_admin' => [
             ['label' => 'Active Orders', 'value' => number_format($kpis['ordersCount'] ?? 0), 'icon' => 'fa-solid fa-scissors', 'tone' => 'color:#8a5a44;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
+            ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($kpis['advanceCollected'] ?? 0), 'icon' => 'fa-solid fa-hand-holding-dollar', 'tone' => 'color:#2e7d32;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Total Paid', 'value' => 'Rs ' . $formatMoney($kpis['totalPaid'] ?? 0), 'icon' => 'fa-solid fa-circle-check', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
             ['label' => 'Pending Payments', 'value' => 'Rs ' . $formatMoney($kpis['pendingPayments'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
-            ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($kpis['advanceCollected'] ?? 0), 'icon' => 'fa-solid fa-wallet', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
-            ['label' => 'Delivered', 'value' => number_format($kpis['deliveredOrders'] ?? 0), 'icon' => 'fa-solid fa-award', 'tone' => 'color:#8c715d;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
         ],
         'outlet_manager' => [
             ['label' => 'Orders', 'value' => number_format($outletKpis['outletOrdersToday'] ?? 0), 'icon' => 'fa-solid fa-bag-shopping', 'tone' => 'color:#8a5a44;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
-            ['label' => 'Overdue', 'value' => number_format($outletKpis['overdueOutletCount'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
-            ['label' => 'Pending Payment', 'value' => 'Rs ' . $formatMoney($outletKpis['outletPendingPayments'] ?? 0), 'icon' => 'fa-solid fa-money-bill-wave', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
-            ['label' => 'Stock Value', 'value' => 'Rs ' . $formatMoney($outletKpis['outletStockValue'] ?? 0), 'icon' => 'fa-solid fa-layer-group', 'tone' => 'color:#8c715d;', 'href' => $canViewInventoryBoard ? route('inventory.index') : null],
+            ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($outletKpis['outletRevenueToday'] ?? 0), 'icon' => 'fa-solid fa-hand-holding-dollar', 'tone' => 'color:#2e7d32;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Total Paid', 'value' => 'Rs ' . $formatMoney($outletKpis['outletTotalPaidToday'] ?? 0), 'icon' => 'fa-solid fa-circle-check', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Pending Payment', 'value' => 'Rs ' . $formatMoney($outletKpis['outletPendingPayments'] ?? 0), 'icon' => 'fa-solid fa-money-bill-wave', 'tone' => 'color:#c1362b;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
         ],
         default => [
             ['label' => 'Due Today', 'value' => number_format($workerKpis['dueToday'] ?? 0), 'icon' => 'fa-solid fa-calendar-day', 'tone' => 'color:#8a5a44;', 'href' => $workerDashboardRoute],
