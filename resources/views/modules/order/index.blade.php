@@ -715,9 +715,12 @@
                 const isDelivered = selected === '{{ \App\Models\Order::STATUS_DELIVERED }}';
 
                 if (remainingWrap && remainingInput && dueInput) {
-                    remainingWrap.style.display = isDelivered ? 'flex' : 'none';
-                    remainingInput.required = isDelivered;
-                    if (isDelivered && !remainingInput.value) {
+                    const remainingDue = parseFloat(dueInput.value || '0') || 0;
+                    const requiresPayment = isDelivered && remainingDue > 0;
+
+                    remainingWrap.style.display = requiresPayment ? 'flex' : 'none';
+                    remainingInput.required = requiresPayment;
+                    if (requiresPayment && !remainingInput.value) {
                         remainingInput.value = dueInput.value || '0.00';
                     }
                 }

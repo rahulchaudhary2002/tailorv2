@@ -38,7 +38,10 @@ class UpdateStatusRequest extends FormRequest
         $validator->after(function (\Illuminate\Validation\Validator $validator): void {
             $status = (string) $this->input('status', '');
 
-            if ($status === Order::STATUS_DELIVERED && empty($this->input('payment_method'))) {
+            $order = $this->route('order');
+            $remainingDue = $order instanceof Order ? $order->dueAmount() : 0.0;
+
+            if ($status === Order::STATUS_DELIVERED && $remainingDue > 0.0001 && empty($this->input('payment_method'))) {
                 $validator->errors()->add('payment_method', 'Payment method is required when delivering the order.');
             }
         });
