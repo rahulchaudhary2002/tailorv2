@@ -12,7 +12,9 @@
 
 <div class="bill-wrap pos-receipt-print">
     <div class="bill-actions">
-        <button type="button" class="btn btn-secondary" onclick="window.print()">Print</button>
+        <select id="billPrinterSelect" class="outlet-input"></select>
+        <button type="button" id="billPrintButton" class="btn btn-secondary" disabled>Print</button>
+        <span id="billPrintStatus" class="bill-print-status"></span>
     </div>
 
     @php
@@ -210,69 +212,102 @@
 @section('page-specific-style')
 @include('modules.order.bills.partials.style')
 <style>
-    @page {
-        size: 80mm auto;
-        margin: 0;
-    }
-
-    @media print {
-        html,
-        body {
-            width: 80mm;
-            min-width: 80mm;
-            height: auto !important;
-            min-height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-        }
-
-        body {
-            overflow: visible !important;
-        }
-
-        body::before,
-        body::after,
-        .main-content::before,
-        .main-content::after {
-            display: none !important;
-            content: none !important;
-        }
-
-        .main-content,
-        .bill-wrap {
-            width: 80mm !important;
-            min-width: 80mm !important;
-            max-width: 80mm !important;
-            height: auto !important;
-            min-height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-        }
-
-        .pos-receipt-print,
-        .pos-receipt-print .bill-receipt {
-            page-break-before: avoid !important;
-            page-break-after: avoid !important;
-            page-break-inside: avoid !important;
-            break-before: avoid !important;
-            break-after: avoid !important;
-            break-inside: avoid !important;
-        }
+    .bill-print-status {
+        margin-left: 0.5rem;
+        color: var(--bs-secondary-color, #6c757d);
+        font-size: 0.85rem;
     }
 </style>
 @endsection
 
 @section('page-specific-script')
-@if (request()->boolean('autoprint'))
 <script>
-window.addEventListener('load', function () {
-    var url = new URL(window.location.href);
-    url.searchParams.delete('autoprint');
-    window.history.replaceState({}, '', url.toString());
-    window.print();
-});
+(function () {
+    const csrfToken = @json(csrf_token());
+    const printersUrl = @json(route('order.bill.customer.printers'));
+    const printUrl = @json(route('order.bill.customer.print', $order));
+    const autoprint = @json(request()->boolean('autoprint'));
+
+    const select = document.getElementById('billPrinterSelect');
+    const button = document.getElementById('billPrintButton');
+    const status = document.getElementById('billPrintStatus');
+
+    function setStatus(message) {
+        status.textContent = message || '';
+    }
+
+    async function loadPrinters() {
+        setStatus('Loading printers…');
+
+        let data;
+        try {
+            const response = await fetch(printersUrl, {
+                headers: { 'Accept': 'application/json' },
+            });
+            data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.message || 'Unable to load printers.');
+            }
+        } catch (error) {
+            setStatus(error.message || 'Unable to reach the Print Agent.');
+            select.innerHTML = '<option value="">No printers available</option>';
+            return;
+        }
+
+        const printers = data?.printers || [];
+        if (printers.length === 0) {
+            select.innerHTML = '<option value="">No printers found</option>';
+            setStatus('No printers registered with the Print Agent.');
+            return;
+        }
+
+        select.innerHTML = printers.map((printer) => {
+            const label = `${printer.name}${printer.status !== 'online' ? ` (${printer.status})` : ''}`;
+            return `<option value="${printer.id}">${label}</option>`;
+        }).join('');
+
+        const defaultPrinter = printers.find((printer) => printer.is_default) || printers[0];
+        select.value = defaultPrinter.id;
+        button.disabled = false;
+        setStatus('');
+
+        if (autoprint) {
+            printBill();
+        }
+    }
+
+    async function printBill() {
+        if (!select.value) {
+            return;
+        }
+
+        button.disabled = true;
+        setStatus('Sending to printer…');
+
+        try {
+            const response = await fetch(printUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ printer_id: select.value }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.message || 'Unable to print bill.');
+            }
+            setStatus('Sent to printer.');
+        } catch (error) {
+            setStatus(error.message || 'Unable to print bill.');
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    button.addEventListener('click', printBill);
+    loadPrinters();
+})();
 </script>
-@endif
 @endsection
