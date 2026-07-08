@@ -15,6 +15,7 @@ use App\Models\InventoryType;
 use App\Models\Order;
 use App\Models\OrderTask;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\OrderInventoryService;
@@ -24,6 +25,14 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use PrintAgent\Sdk\Builders\ReceiptBuilder;
+use PrintAgent\Sdk\DTO\Enums\Alignment;
+use PrintAgent\Sdk\DTO\Enums\CharacterSize;
+use PrintAgent\Sdk\Exceptions\ApiException;
+use PrintAgent\Sdk\Exceptions\ConnectionException;
+use PrintAgent\Sdk\Exceptions\PrinterOfflineException;
+use PrintAgent\Sdk\Exceptions\TimeoutException;
+use PrintAgent\Sdk\Facades\PrintAgent;
 
 class OrderController extends Controller
 {
@@ -174,6 +183,55 @@ class OrderController extends Controller
         $data = $this->prepareBillData($order);
 
         return view('modules.order.bills.customer', $data);
+    }
+
+    /**
+     * Printers known to the local Print Agent, for the customer bill print dialog.
+     */
+    public function customerBillPrinters()
+    {
+        try {
+            $printers = PrintAgent::printers()->list();
+        } catch (ApiException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (ConnectionException|TimeoutException $e) {
+            return response()->json(['message' => 'Could not reach the Print Agent. Make sure it is running.'], 503);
+        }
+
+        return response()->json([
+            'printers' => array_map(fn ($printer) => [
+                'id' => $printer->id,
+                'name' => $printer->name,
+                'status' => $printer->status->value,
+                'is_default' => $printer->isDefault,
+            ], $printers),
+        ]);
+    }
+
+    /**
+     * Sends the customer bill as a receipt print job to the local Print Agent.
+     */
+    public function printCustomerBill(Request $request, Order $order)
+    {
+        $this->ensureOrderBelongsToCurrentOutlet($order);
+
+        $validated = $request->validate([
+            'printer_id' => ['required', 'string'],
+        ]);
+
+        $document = $this->buildCustomerBillReceipt($order);
+
+        try {
+            $job = PrintAgent::jobs()->print('document', $document->toJson(), printerId: $validated['printer_id']);
+        } catch (PrinterOfflineException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        } catch (ApiException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } catch (ConnectionException|TimeoutException $e) {
+            return response()->json(['message' => 'Could not reach the Print Agent. Make sure it is running.'], 503);
+        }
+
+        return response()->json(['job_id' => $job->id, 'status' => $job->status->value]);
     }
 
     /**
@@ -1132,6 +1190,165 @@ class OrderController extends Controller
             ->count();
 
         return $prefix.'-'.str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
+    }
+
+    private function buildCustomerBillReceipt(Order $order): ReceiptBuilder
+    {
+        $data = $this->prepareBillData($order);
+        $order = $data['order'];
+        $items = $data['items'];
+        $customFabricProducts = $data['customFabricProducts'];
+
+        $formatMoney = function ($amount): string {
+            $amount = (float) $amount;
+
+            return abs($amount - round($amount)) < 0.005
+                ? number_format($amount, 0)
+                : number_format($amount, 2);
+        };
+
+        $itemColumns = [
+            ['width' => 3, 'align' => Alignment::Center],
+            ['width' => 18, 'wrap' => true],
+            ['width' => 6, 'align' => Alignment::Right],
+            ['width' => 8, 'align' => Alignment::Right],
+            ['width' => 9, 'align' => Alignment::Right],
+        ];
+
+        $printerPhoneNumber = Setting::valueFor('printer_phone_number', '');
+
+        $receipt = ReceiptBuilder::make(48);
+        $document = $receipt->document();
+
+        $document->center(
+            (string) config('app.name', 'SUIT LAND'),
+            ['bold' => true, 'characterSize' => CharacterSize::DoubleWidthHeight],
+        );
+        if (filled($printerPhoneNumber)) {
+            $document->center(strtoupper($printerPhoneNumber));
+        }
+        $document->center('ESTIMATED BILL');
+        $receipt->line();
+
+        $document->table(
+            columns: [['width' => 14], ['width' => 30, 'align' => Alignment::Right]],
+            rows: [
+                ['Bill #', (string) $order->order_number],
+                ['Bill Date', now()->format('d/m/Y h:i A')],
+                ['Trans. Date', $order->ordered_at?->format('d/m/Y h:i A') ?: '-'],
+                ['Payment Mode', ucfirst((string) ($order->payment_method ?: 'Cash'))],
+                ['Customer', (string) ($order->customer?->name ?: 'Walk-in')],
+                ['Phone', (string) ($order->customer?->phone ?: '-')],
+                ['Delivery', $order->delivery_due_at?->format('d/m/Y h:i A') ?: '-'],
+            ],
+        );
+
+        $receipt->line();
+
+        $document->table(
+            columns: $itemColumns,
+            rows: [['Sn', 'Item', 'Qty', 'Rate', 'Amt']],
+            rowStyles: [0 => ['bold' => true]],
+        );
+
+        $totalItems = 0;
+
+        foreach ($items as $index => $item) {
+            $isCustom = (string) $item->item_category === 'custom';
+            $garments = collect((array) data_get($item->custom_details, 'garments', []));
+            $fabricProduct = $isCustom
+                ? $customFabricProducts->get((int) data_get($item->custom_details, 'fabric_product_id', 0))
+                : null;
+            $itemName = $isCustom
+                ? ($fabricProduct?->name ?: 'Custom Fabric')
+                : ($item->product?->name ?: 'Product');
+            if ((string) $item->item_category === 'readymade' && filled(data_get($item->custom_details, 'size'))) {
+                $itemName .= ' (Size: '.data_get($item->custom_details, 'size').')';
+            }
+            $totalItems += $isCustom ? ($garments->isNotEmpty() ? $garments->count() : 1) : 1;
+
+            $document->table(
+                columns: $itemColumns,
+                rows: [[
+                    (string) ($index + 1),
+                    strtoupper($itemName),
+                    $isCustom ? '' : rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.'),
+                    $formatMoney($item->unit_price),
+                    $formatMoney((float) $item->line_total),
+                ]],
+            );
+
+            if ($isCustom && $garments->isNotEmpty()) {
+                foreach ($garments as $garment) {
+                    $garmentQty = (float) ($garment['quantity'] ?? 0);
+                    $tailoringAmount = (float) ($garment['tailoring_amount'] ?? 0);
+                    $label = strtoupper((string) ($garment['garment_title'] ?? 'Tailoring'));
+                    if (filled($garment['tailoring_package'] ?? null)) {
+                        $label .= ' ('.$garment['tailoring_package'].')';
+                    }
+
+                    $document->table(
+                        columns: $itemColumns,
+                        rows: [[
+                            '',
+                            $label,
+                            rtrim(rtrim(number_format($garmentQty, 2), '0'), '.'),
+                            $formatMoney($tailoringAmount),
+                            $formatMoney($garmentQty * $tailoringAmount),
+                        ]],
+                    );
+                }
+            }
+        }
+
+        $receipt->line();
+
+        $totalsColumns = [['width' => 30], ['width' => 13, 'align' => Alignment::Right]];
+
+        $breakdownRows = [
+            ['Subtotal', $formatMoney($data['subtotal'])],
+            ['Tailoring', $formatMoney($data['stitchingCharges'])],
+        ];
+        if ($data['discount'] > 0) {
+            $breakdownRows[] = ['Discount', '-'.$formatMoney($data['discount'])];
+        }
+        if ($data['taxAmount'] > 0) {
+            $breakdownRows[] = ['VAT', $formatMoney($data['taxAmount'])];
+        }
+        $document->table(columns: $totalsColumns, rows: $breakdownRows);
+
+        $receipt->line();
+        $document->table(
+            columns: $totalsColumns,
+            rows: [['Net Amount', $formatMoney($data['netPayable'])]],
+            rowStyles: [0 => ['bold' => true]],
+        );
+
+        $receipt->line();
+        $document->table(
+            columns: $totalsColumns,
+            rows: [
+                ['Advance Payment', $formatMoney($data['paidAmount'])],
+                ['Balance', $formatMoney($data['dueAmount'])],
+            ],
+        );
+
+        $receipt->line();
+        $document->table(columns: $totalsColumns, rows: [['Total Items', (string) $totalItems]]);
+
+        $receipt->line()
+            ->footer('THANK YOU FOR YOUR ORDER')
+            ->footer('PLEASE KEEP THIS INVOICE FOR DELIVERY');
+
+        if (filled($order->customer?->address)) {
+            $receipt->footer(strtoupper((string) $order->customer?->address));
+        }
+
+        $receipt->footer(strtoupper((string) config('app.name', 'SUIT LAND')))
+            ->feed(6)
+            ->cut();
+
+        return $receipt;
     }
 
     /**
