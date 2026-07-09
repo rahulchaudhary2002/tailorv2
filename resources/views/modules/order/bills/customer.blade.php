@@ -98,9 +98,10 @@
                 @foreach ($items as $index => $item)
                     @php
                         $isCustom = (string) $item->item_category === 'custom';
+                        $isFabric = (string) $item->item_category === 'fabric';
                         $quantityUnit = $isCustom
                             ? (string) data_get($item->custom_details, 'quantity_unit', 'pcs')
-                            : ((string) $item->item_category === 'fabric' ? 'm' : 'pcs');
+                            : ($isFabric ? 'm' : 'pcs');
                         $garments = collect((array) data_get($item->custom_details, 'garments', []));
                         $fabricProduct = $isCustom
                             ? $customFabricProducts->get((int) data_get($item->custom_details, 'fabric_product_id', 0))
@@ -119,7 +120,7 @@
                             <div>{{ strtoupper($itemName) }}</div>
                             <div class="bill-print-rate">RATE: {{ $formatMoney($item->unit_price) }}</div>
                         </td>
-                        <td class="bill-right">{{ $isCustom ? '' : rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }}</td>
+                        <td class="bill-right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }}{{ ($isCustom || $isFabric) ? ' '.$quantityUnit : '' }}</td>
                         <td class="bill-right">{{ $formatMoney($item->unit_price) }}</td>
                         <td class="bill-right">{{ $formatMoney($lineAmount) }}</td>
                     </tr>
