@@ -529,7 +529,7 @@ class OrderController extends Controller
         }
 
         $existingOrderStock = $existingOrder
-            ? $this->getOrderCommittedStockMap($existingOrder)
+            ? $this->inventoryService->getOrderCommittedStockMap($existingOrder)
             : [];
 
         $requiredBySku = [];
