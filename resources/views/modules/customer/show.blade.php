@@ -1051,15 +1051,16 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                                 style="width:120px;"
                                                                 required
                                                             >
-                                                            <input
-                                                                type="text"
+                                                            <select
                                                                 name="payment_method"
                                                                 class="outlet-input"
-                                                                value="{{ old('payment_method', $order->payment_method) }}"
-                                                                placeholder="Payment method"
                                                                 style="width:140px;"
                                                                 required
                                                             >
+                                                                @foreach (\App\Models\Order::paymentMethodLabels() as $methodValue => $methodLabel)
+                                                                    <option value="{{ $methodValue }}" @selected(old('payment_method', $order->payment_method ?: \App\Models\Order::PAYMENT_METHOD_CASH) === $methodValue)>{{ $methodLabel }}</option>
+                                                                @endforeach
+                                                            </select>
                                                             <button type="submit" class="btn btn-sm btn-secondary">Pay</button>
                                                             <button type="button" class="btn btn-sm btn-light" data-customer-order-payment-cancel>Cancel</button>
                                                         </form>
@@ -1141,7 +1142,7 @@ $measurementSetCount = $garmentMeasurementSets->count();
                                                 @endcanany
                                             </td>
                                             <td data-label="Payment Date">{{ $order->updated_at?->format('M d, Y h:i A') ?? ($order->ordered_at?->format('M d, Y h:i A') ?? '-') }}</td>
-                                            <td data-label="Method">{{ $order->payment_method ?: '-' }}</td>
+                                            <td data-label="Method">{{ $order->payment_method ? \App\Models\Order::paymentMethodLabel($order->payment_method) : '-' }}</td>
                                             <td data-label="Status">
                                                 <span class="app-badge {{ \App\Models\Order::paymentStatusBadgeClass((string) $order->payment_status) }}">
                                                     {{ \App\Models\Order::paymentStatusLabel((string) $order->payment_status) }}

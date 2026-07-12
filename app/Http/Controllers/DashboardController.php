@@ -237,7 +237,7 @@ class DashboardController extends Controller
             ->where('payment_status', Order::PAYMENT_STATUS_PAID)
             ->sum('advance_payment_amount');
         $cashCollected = (float) (clone $orderScope)
-            ->whereRaw('LOWER(payment_method) = ?', ['cash'])
+            ->where('payment_method', Order::PAYMENT_METHOD_CASH)
             ->sum('advance_payment_amount');
         $pendingPayments = (float) (clone $orderScope)
             ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
@@ -524,7 +524,7 @@ class DashboardController extends Controller
 
             $outletCashCollected = (float) (clone $outletBaseOrders)
                 ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
-                ->whereRaw('LOWER(payment_method) = ?', ['cash'])
+                ->where('payment_method', Order::PAYMENT_METHOD_CASH)
                 ->sum('advance_payment_amount');
 
             $outletOrdersToday = (int) (clone $outletBaseOrders)

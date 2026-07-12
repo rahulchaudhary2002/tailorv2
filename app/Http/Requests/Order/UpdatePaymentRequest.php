@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Order;
 
+use App\Models\Order;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdatePaymentRequest extends FormRequest
 {
@@ -18,7 +20,7 @@ class UpdatePaymentRequest extends FormRequest
     {
         return [
             'payment_amount' => ['required', 'numeric', 'gt:0'],
-            'payment_method' => ['required', 'string', 'max:100'],
+            'payment_method' => ['required', 'string', Rule::in(Order::availablePaymentMethods())],
         ];
     }
 }

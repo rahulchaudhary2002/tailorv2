@@ -53,7 +53,7 @@
             </div>
             <div class="bill-meta-row">
                 <span>Payment Mode</span>
-                <span>{{ ucfirst((string) ($order->payment_method ?: 'Cash')) }}</span>
+                <span>{{ \App\Models\Order::paymentMethodLabel($order->payment_method ?: \App\Models\Order::PAYMENT_METHOD_CASH) }}</span>
             </div>
             <div class="bill-meta-row">
                 <span>Customer</span>

@@ -29,7 +29,7 @@ class UpdateStatusRequest extends FormRequest
                 Rule::in(array_keys(Order::statusLabels())),
             ],
             'remaining_payment_amount' => ['nullable', 'numeric', 'min:0'],
-            'payment_method' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', 'string', Rule::in(Order::availablePaymentMethods())],
         ];
     }
 

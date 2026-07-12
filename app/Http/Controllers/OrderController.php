@@ -691,7 +691,7 @@ class OrderController extends Controller
                         : null,
                     'completed_at' => $status === Order::STATUS_COMPLETED ? ($order->completed_at ?? now()) : null,
                     'payment_status' => (string) $validated['payment_status'],
-                    'payment_method' => $validated['payment_method'] ?? null,
+                    'payment_method' => $validated['payment_method'] ?? Order::PAYMENT_METHOD_CASH,
                     'advance_payment_amount' => (float) ($validated['advance_payment_amount'] ?? 0),
                     'discount_amount' => (float) ($validated['discount_amount'] ?? 0),
                     'vat_enabled' => $vatEnabled,

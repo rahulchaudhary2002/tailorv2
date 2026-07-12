@@ -186,7 +186,7 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                 <label>Due Amount: <span style="font-weight: bold;">Rs. {{ \App\Support\AmountFormatter::format($remainingDue) }}</span></label>
             </div>
             <div class="outlet-form-group">
-                <label>Payment Method: <span style="font-weight: bold;">{{ $order->payment_method ?: '-' }}</span></label>
+                <label>Payment Method: <span style="font-weight: bold;">{{ $order->payment_method ? \App\Models\Order::paymentMethodLabel($order->payment_method) : '-' }}</span></label>
             </div>
         </div>
 
@@ -211,13 +211,11 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                 </div>
                 <div class="outlet-form-group">
                     <label for="payment_method">Payment Method</label>
-                    <input
-                        id="payment_method"
-                        type="text"
-                        name="payment_method"
-                        class="outlet-input"
-                        value="{{ old('payment_method', $order->payment_method ?: 'cash') }}"
-                        placeholder="Payment method">
+                    <select id="payment_method" name="payment_method" class="outlet-input">
+                        @foreach (\App\Models\Order::paymentMethodLabels() as $methodValue => $methodLabel)
+                            <option value="{{ $methodValue }}" @selected(old('payment_method', $order->payment_method ?: \App\Models\Order::PAYMENT_METHOD_CASH) === $methodValue)>{{ $methodLabel }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 

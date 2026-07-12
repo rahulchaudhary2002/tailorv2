@@ -33,7 +33,7 @@ class StoreRequest extends FormRequest
             'delivery_due_at' => ['nullable', 'date', 'after_or_equal:ordered_at'],
             'status' => ['required', 'string', Rule::in(Order::creatableStatuses())],
             'payment_status' => ['required', 'string', Rule::in(Order::availablePaymentStatuses())],
-            'payment_method' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', 'string', Rule::in(Order::availablePaymentMethods())],
             'advance_payment_amount' => ['nullable', 'numeric', 'min:0'],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'vat_enabled' => ['nullable', 'boolean'],

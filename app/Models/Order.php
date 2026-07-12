@@ -7,19 +7,38 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     public const DISPLAY_STATUS_UNASSIGNED = 'unassigned';
+
     public const DISPLAY_STATUS_PARTIAL_ASSIGNED = 'partial_assigned';
+
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_CONFIRMED = 'confirmed';
+
     public const STATUS_FABRIC_ISSUED = 'fabric_issued';
+
     public const STATUS_ASSIGNED = 'assigned';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_NEAR_COMPLETION = 'near_completion';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_DELIVERED = 'delivered';
+
     public const STATUS_CANCELLED = 'cancelled';
+
     public const PAYMENT_STATUS_UNPAID = 'unpaid';
+
     public const PAYMENT_STATUS_PARTIAL = 'partial';
+
     public const PAYMENT_STATUS_PAID = 'paid';
+
+    public const PAYMENT_METHOD_CASH = 'cash';
+
+    public const PAYMENT_METHOD_QR = 'qr';
+
+    public const PAYMENT_METHOD_POS = 'pos';
 
     protected $fillable = [
         'order_number',
@@ -186,7 +205,7 @@ class Order extends Model
     {
         $status = (string) $this->status;
 
-        if (!in_array($status, [self::STATUS_FABRIC_ISSUED, self::STATUS_ASSIGNED], true)) {
+        if (! in_array($status, [self::STATUS_FABRIC_ISSUED, self::STATUS_ASSIGNED], true)) {
             return $status;
         }
 
@@ -299,5 +318,34 @@ class Order extends Model
             self::PAYMENT_STATUS_PAID => 'app-badge--success',
             default => 'app-badge--muted',
         };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function availablePaymentMethods(): array
+    {
+        return [
+            self::PAYMENT_METHOD_CASH,
+            self::PAYMENT_METHOD_QR,
+            self::PAYMENT_METHOD_POS,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function paymentMethodLabels(): array
+    {
+        return [
+            self::PAYMENT_METHOD_CASH => 'Cash',
+            self::PAYMENT_METHOD_QR => 'QR',
+            self::PAYMENT_METHOD_POS => 'POS',
+        ];
+    }
+
+    public static function paymentMethodLabel(string $method): string
+    {
+        return static::paymentMethodLabels()[$method] ?? ucfirst(str_replace('_', ' ', $method));
     }
 }

@@ -87,7 +87,6 @@ $customerLookupPayload = $customers->map(function ($customer) {
     <input type="hidden" id="status" name="status" value="{{ old('status', $editingOrder?->status ?: \App\Models\Order::STATUS_CONFIRMED) }}">
     <input type="hidden" id="notes" name="notes" value="{{ old('notes', $editingOrder?->notes) }}">
     <input type="hidden" id="payment_status" name="payment_status" value="{{ old('payment_status', $editingOrder?->payment_status ?: \App\Models\Order::PAYMENT_STATUS_UNPAID) }}">
-    <input type="hidden" id="payment_method" name="payment_method" value="{{ old('payment_method', $editingOrder?->payment_method ?: 'cash') }}">
     <input type="hidden" id="advance_payment_amount" name="advance_payment_amount" value="{{ old('advance_payment_amount', (string) ($editingOrder?->advance_payment_amount ?? '0')) }}">
     <input type="hidden" id="discount_amount" name="discount_amount" value="{{ old('discount_amount', (string) ($editingOrder?->discount_amount ?? '0')) }}">
 
@@ -259,6 +258,14 @@ $customerLookupPayload = $customers->map(function ($customer) {
                     <div class="summary-row" id="vatRow" style="display:none;">
                         <span>VAT (13%):</span>
                         <span id="vatAmount">{{ \App\Support\AmountFormatter::raw(0) }}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Payment Mode:</span>
+                        <select id="payment_method" name="payment_method" class="tp-input tp-input-sm">
+                            @foreach (\App\Models\Order::paymentMethodLabels() as $methodValue => $methodLabel)
+                                <option value="{{ $methodValue }}" @selected(old('payment_method', $editingOrder?->payment_method ?: \App\Models\Order::PAYMENT_METHOD_CASH) === $methodValue)>{{ $methodLabel }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="summary-row">
                         <span>Advance Payment:</span>

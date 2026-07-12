@@ -259,13 +259,11 @@
                                         placeholder="Payment amount"
                                         required
                                     >
-                                    <input
-                                        type="text"
-                                        name="payment_method"
-                                        class="outlet-input"
-                                        placeholder="Payment method"
-                                        value="{{ old('payment_method', $order->payment_method ?: 'cash') }}"
-                                    >
+                                    <select name="payment_method" class="outlet-input">
+                                        @foreach (\App\Models\Order::paymentMethodLabels() as $methodValue => $methodLabel)
+                                            <option value="{{ $methodValue }}" @selected(old('payment_method', $order->payment_method ?: \App\Models\Order::PAYMENT_METHOD_CASH) === $methodValue)>{{ $methodLabel }}</option>
+                                        @endforeach
+                                    </select>
                                     <div class="order-payment-hint">
                                         Due: {{ \App\Support\AmountFormatter::format($remainingDue) }} | Paid: {{ \App\Support\AmountFormatter::format($paidAmount) }}
                                     </div>
@@ -309,12 +307,11 @@
                                                     placeholder="Remaining payment"
                                                     value="{{ \App\Support\AmountFormatter::raw($remainingDue) }}"
                                                 >
-                                                <input
-                                                    name="payment_method"
-                                                    type="text"
-                                                    class="outlet-input"
-                                                    placeholder="Payment method"
-                                                >
+                                                <select name="payment_method" class="outlet-input">
+                                                    @foreach (\App\Models\Order::paymentMethodLabels() as $methodValue => $methodLabel)
+                                                        <option value="{{ $methodValue }}" @selected($methodValue === \App\Models\Order::PAYMENT_METHOD_CASH)>{{ $methodLabel }}</option>
+                                                    @endforeach
+                                                </select>
                                             </div>
 
                                             <button type="submit" class="btn btn-sm btn-secondary">Update</button>
