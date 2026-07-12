@@ -238,39 +238,39 @@ $customerLookupPayload = $customers->map(function ($customer) {
                 <div class="bill-summary">
                     <div class="summary-row">
                         <span>Tailoring Charges:</span>
-                        <span id="tailoringTotal">0.00</span>
+                        <span id="tailoringTotal">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                     <div class="summary-row">
                         <span>Subtotal:</span>
-                        <span id="subtotal">0.00</span>
+                        <span id="subtotal">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                     <!-- <div class="summary-row">
                         <span>Subtotal (Fabric & Ready-made):</span>
-                        <span id="subtotalFabric">0.00</span>
+                        <span id="subtotalFabric">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                     <div class="summary-row">
                         <span>Subtotal (Custom Products):</span>
-                        <span id="subtotalCustom">0.00</span>
+                        <span id="subtotalCustom">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div> -->
                     <div class="summary-row">
                         <span>Discount:</span>
-                        <span id="discountTotal">0.00</span>
+                        <span id="discountTotal">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                     <div class="summary-row" id="vatRow" style="display:none;">
                         <span>VAT (13%):</span>
-                        <span id="vatAmount">0.00</span>
+                        <span id="vatAmount">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                     <div class="summary-row">
                         <span>Advance Payment:</span>
-                        <input type="number" id="advancePayment" class="tp-input tp-input-sm" value="{{ old('advance_payment_amount', (string) ($initialOrderState['advancePaymentAmount'] ?? 0)) }}" min="0" step="0.01">
+                        <input type="number" id="advancePayment" class="tp-input tp-input-sm" value="{{ old('advance_payment_amount', (string) ($initialOrderState['advancePaymentAmount'] ?? 0)) }}" min="0" step="{{ \App\Support\AmountFormatter::step() }}">
                     </div>
                     <div class="summary-row">
                         <span>Balance:</span>
-                        <span id="balanceDue">0.00</span>
+                        <span id="balanceDue">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                     <div class="summary-row total-row">
                         <span>Grand Total:</span>
-                        <span id="grandTotal">0.00</span>
+                        <span id="grandTotal">{{ \App\Support\AmountFormatter::raw(0) }}</span>
                     </div>
                 </div>
 
@@ -778,8 +778,19 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     const customersByPhone = new Map();
     const customersById = new Map();
 
+    const amountConfig = @json(\App\Support\AmountFormatter::jsConfig());
+
     function money(value) {
         return Number(value || 0).toFixed(2);
+    }
+
+    function currency(value) {
+        const amount = Number(value || 0);
+        if (amountConfig.decimals) {
+            return amount.toFixed(2);
+        }
+        const rounded = amountConfig.roundUp ? Math.ceil(amount) : Math.round(amount);
+        return String(rounded);
     }
 
     function normalizeUnitLabel(unitLabel) {
@@ -792,7 +803,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     }
 
     function formatFabricPrice(value, unitLabel = 'meter') {
-        return `NPR ${money(value)} per ${normalizeUnitLabel(unitLabel)}`;
+        return `NPR ${currency(value)} per ${normalizeUnitLabel(unitLabel)}`;
     }
 
     function escapeHtml(value) {
@@ -956,19 +967,19 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     function updatePaymentSummary(grandTotal, discountAmount) {
         const safeDiscount = Math.max(Number(discountAmount || 0), 0);
         if (discountAmountInputEl) {
-            discountAmountInputEl.value = money(safeDiscount);
+            discountAmountInputEl.value = currency(safeDiscount);
         }
 
         const payableAmount = Math.max(Number(grandTotal || 0), 0);
         if (advancePaymentEl) {
-            advancePaymentEl.max = money(payableAmount);
+            advancePaymentEl.max = currency(payableAmount);
         }
         let advanceAmount = Math.max(Number(advancePaymentEl?.value || 0), 0);
 
         if (advanceAmount > payableAmount) {
             advanceAmount = payableAmount;
             if (advancePaymentEl) {
-                advancePaymentEl.value = money(advanceAmount);
+                advancePaymentEl.value = currency(advanceAmount);
             }
         } else if (advancePaymentEl && typeof advancePaymentEl.setCustomValidity === 'function') {
             advancePaymentEl.setCustomValidity('');
@@ -979,12 +990,12 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         }
 
         if (advancePaymentAmountInputEl) {
-            advancePaymentAmountInputEl.value = money(advanceAmount);
+            advancePaymentAmountInputEl.value = currency(advanceAmount);
         }
 
         const balanceAmount = Math.max(payableAmount - advanceAmount, 0);
         if (balanceDueEl) {
-            balanceDueEl.textContent = `NPR ${money(balanceAmount)}`;
+            balanceDueEl.textContent = `NPR ${currency(balanceAmount)}`;
         }
 
         if (paymentStatusInputEl) {
@@ -1644,7 +1655,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                         data-package-name="${pkg.name}"
                         data-package-amount="${pkg.amount}"
                         ${String(selectedPackageId) === String(pkg.id) ? 'selected' : ''}>
-                        ${pkg.name} - NPR ${money(pkg.amount)}
+                        ${pkg.name} - NPR ${currency(pkg.amount)}
                     </option>
                 `;
             });
@@ -1868,9 +1879,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                         <div class="stitching-detail">
                             <div>
                                 <strong>${garment.title}</strong> x ${money(garment.quantity)}
-                                <div class="item-sub item-sub-amount">${garment.tailoring?.package || 'Tailoring'} - NPR ${money(garment.tailoring?.amount || 0)} each</div>
+                                <div class="item-sub item-sub-amount">${garment.tailoring?.package || 'Tailoring'} - NPR ${currency(garment.tailoring?.amount || 0)} each</div>
                             </div>
-                            <div><strong>NPR ${money(Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0))}</strong></div>
+                            <div><strong>NPR ${currency(Number(garment.quantity || 0) * Number(garment.tailoring?.amount || 0))}</strong></div>
                         </div>
                     `;
                 }).join('');
@@ -1887,7 +1898,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                         <div style="position:relative;">
                             ${item.name}
                             <span class="${chipClass}">${label}</span>
-                            <div class="item-sub">${money(item.qty)} ${item.unitLabel || ''} × NPR ${money(item.unitPrice)}</div>
+                            <div class="item-sub">${money(item.qty)} ${item.unitLabel || ''} × NPR ${currency(item.unitPrice)}</div>
                             ${sizeSummary}
                         </div>
                         <div class="product-actions">
@@ -1895,7 +1906,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
                             <button type="button" class="btn-danger" data-action="remove" data-id="${item.id}">Remove</button>
                         </div>
                     </div>
-                    <div class="item-price"><strong>NPR ${money(lineTotal)}</strong></div>
+                    <div class="item-price"><strong>NPR ${currency(lineTotal)}</strong></div>
                 </div>
                 ${customSummary}
             `;
@@ -1909,9 +1920,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
             tailoringBreakdownEl.style.display = '';
             let html = '<h5><i class="fas fa-cut"></i> Tailoring Charges Breakdown</h5>';
             tailoringLines.forEach((line) => {
-                html += `<div class="tailoring-item"><span>${line.label}</span><span class="tailoring-item-amount">NPR ${money(line.amount)}</span></div>`;
+                html += `<div class="tailoring-item"><span>${line.label}</span><span class="tailoring-item-amount">NPR ${currency(line.amount)}</span></div>`;
             });
-            html += `<div class="tailoring-item tailoring-total"><span>Total Tailoring Charges</span><span class="tailoring-item-amount">NPR ${money(totalTailoring)}</span></div>`;
+            html += `<div class="tailoring-item tailoring-total"><span>Total Tailoring Charges</span><span class="tailoring-item-amount">NPR ${currency(totalTailoring)}</span></div>`;
             tailoringBreakdownEl.innerHTML = html;
         }
 
@@ -1925,13 +1936,13 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         const grandTotal = taxableTotal + vatAmount;
         const subtotal = subtotalFabric + subtotalCustom + totalTailoring;
 
-        subtotalEl.textContent = `NPR ${money(subtotal)}`;
-        // subtotalFabricEl.textContent = `NPR ${money(subtotalFabric)}`;
-        // subtotalCustomEl.textContent = `NPR ${money(subtotalCustom)}`;
-        tailoringTotalEl.textContent = `NPR ${money(totalTailoring)}`;
-        discountTotalEl.textContent = `NPR ${money(discountAmount)}`;
-        vatAmountEl.textContent = `NPR ${money(vatAmount)}`;
-        grandTotalEl.textContent = `NPR ${money(grandTotal)}`;
+        subtotalEl.textContent = `NPR ${currency(subtotal)}`;
+        // subtotalFabricEl.textContent = `NPR ${currency(subtotalFabric)}`;
+        // subtotalCustomEl.textContent = `NPR ${currency(subtotalCustom)}`;
+        tailoringTotalEl.textContent = `NPR ${currency(totalTailoring)}`;
+        discountTotalEl.textContent = `NPR ${currency(discountAmount)}`;
+        vatAmountEl.textContent = `NPR ${currency(vatAmount)}`;
+        grandTotalEl.textContent = `NPR ${currency(grandTotal)}`;
         vatRow.style.display = vatEnabled ? '' : 'none';
 
         updatePaymentSummary(grandTotal, discountAmount);
@@ -2404,9 +2415,9 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
         
         if (type === 'flat') {
             if (value > 0 && value <= maxDiscount) {
-            discountDisplayEl.textContent = `Flat discount: NPR ${money(value)}`;
+            discountDisplayEl.textContent = `Flat discount: NPR ${currency(value)}`;
             } else if (value > maxDiscount) {
-            discountDisplayEl.textContent = `⚠️ Discount is not applicable (Max: NPR ${money(maxDiscount)})`;
+            discountDisplayEl.textContent = `⚠️ Discount is not applicable (Max: NPR ${currency(maxDiscount)})`;
             } else {
             discountDisplayEl.textContent = '';
             }
@@ -2554,7 +2565,7 @@ button:hover,.tp-btn:hover{background:var(--secondary);}
     discountTypeEl.value = discount.type || 'none';
     discountValueEl.value = discount.type === 'none' ? '' : Number(discount.value || 0);
     discountValueEl.disabled = discount.type === 'none';
-    if (discount.type === 'flat') discountDisplayEl.textContent = `Flat discount: NPR ${money(discount.value)}`;
+    if (discount.type === 'flat') discountDisplayEl.textContent = `Flat discount: NPR ${currency(discount.value)}`;
     if (discount.type === 'percent') discountDisplayEl.textContent = `Percent discount: ${money(discount.value)}%`;
     updateCustomerDisplay();
     rebuildProductSelect(categorySelect.value);

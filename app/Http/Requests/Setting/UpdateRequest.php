@@ -23,6 +23,8 @@ class UpdateRequest extends FormRequest
     {
         return [
             'printer_phone_number' => ['nullable', 'string', 'max:50'],
+            'amount_decimals_enabled' => ['nullable', 'boolean'],
+            'amount_round_up' => ['nullable', 'boolean'],
         ];
     }
 }

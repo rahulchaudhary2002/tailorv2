@@ -836,7 +836,7 @@
 
 @section('content')
 @php
-    $formatMoney = fn ($value) => number_format((float) $value, 2);
+    $formatMoney = fn ($value) => \App\Support\AmountFormatter::format($value);
     $formatQty = fn ($value) => number_format((float) $value, 2);
     $dashboardUser = auth()->user();
     $canViewOrdersBoard = $dashboardUser?->hasPermission('view-orders') || $dashboardUser?->hasPermission('manage-orders');
@@ -1830,7 +1830,15 @@
         let trendChartInstance = null;
         let outletChartInstance = null;
 
-        const formatMoney = (value) => `Rs ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const amountConfig = @json(\App\Support\AmountFormatter::jsConfig());
+        const formatMoney = (value) => {
+            const amount = Number(value || 0);
+            if (amountConfig.decimals) {
+                return `Rs ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            const rounded = amountConfig.roundUp ? Math.ceil(amount) : Math.round(amount);
+            return `Rs ${rounded.toLocaleString()}`;
+        };
         const formatCount = (value) => Number(value || 0).toLocaleString();
 
         if (dateRangeInput && fromDateInput && toDateInput && window.jQuery && window.jQuery.fn?.daterangepicker) {

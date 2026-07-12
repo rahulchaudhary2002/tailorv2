@@ -177,13 +177,13 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
         </div>
         <div class="flex flex-wrap gap-6" style="padding: 16px;">
             <div class="outlet-form-group">
-                <label>Payable Amount: <span style="font-weight: bold;">Rs. {{ number_format($netPayable, 2) }}</span></label>
+                <label>Payable Amount: <span style="font-weight: bold;">Rs. {{ \App\Support\AmountFormatter::format($netPayable) }}</span></label>
             </div>
             <div class="outlet-form-group">
-                <label>Paid Amount: <span style="font-weight: bold;">Rs. {{ number_format($paidAmount, 2) }}</span></label>
+                <label>Paid Amount: <span style="font-weight: bold;">Rs. {{ \App\Support\AmountFormatter::format($paidAmount) }}</span></label>
             </div>
             <div class="outlet-form-group">
-                <label>Due Amount: <span style="font-weight: bold;">Rs. {{ number_format($remainingDue, 2) }}</span></label>
+                <label>Due Amount: <span style="font-weight: bold;">Rs. {{ \App\Support\AmountFormatter::format($remainingDue) }}</span></label>
             </div>
             <div class="outlet-form-group">
                 <label>Payment Method: <span style="font-weight: bold;">{{ $order->payment_method ?: '-' }}</span></label>
@@ -203,10 +203,10 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                         type="number"
                         name="payment_amount"
                         class="outlet-input"
-                        min="0.01"
-                        max="{{ number_format($remainingDue, 2, '.', '') }}"
-                        step="0.01"
-                        value="{{ number_format($remainingDue, 2, '.', '') }}"
+                        min="{{ \App\Support\AmountFormatter::min() }}"
+                        max="{{ \App\Support\AmountFormatter::raw($remainingDue) }}"
+                        step="{{ \App\Support\AmountFormatter::step() }}"
+                        value="{{ \App\Support\AmountFormatter::raw($remainingDue) }}"
                         required>
                 </div>
                 <div class="outlet-form-group">
@@ -595,8 +595,8 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                         <td>{{ $displayCode }}</td>
                         <td>{{ number_format((float) $item->quantity, 2) }}</td>
                         <td>{{ $displayUnit }}</td>
-                        <td>{{ number_format((float) $item->unit_price, 2) }}</td>
-                        <td>{{ number_format((float) $item->line_total, 2) }}</td>
+                        <td>{{ \App\Support\AmountFormatter::format($item->unit_price) }}</td>
+                        <td>{{ \App\Support\AmountFormatter::format($item->line_total) }}</td>
                     </tr>
                     @if ($isCustom)
                     <tr>
@@ -604,7 +604,7 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                             <div class="order-custom-block">
                                 <div class="order-custom-title">Custom Garment Details</div>
                                 <div class="order-item-meta">
-                                    Tailoring Total: {{ number_format((float) data_get($customDetails, 'tailoring_total_price', 0), 2) }}
+                                    Tailoring Total: {{ \App\Support\AmountFormatter::format(data_get($customDetails, 'tailoring_total_price', 0)) }}
                                 </div>
                                 @if ($garments->isNotEmpty())
                                 <div class="order-custom-grid">
@@ -632,7 +632,7 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                                     {{ $garment['garment_title'] ?? 'Garment' }} x {{ number_format((float) ($garment['quantity'] ?? 1), 2) }}
                                                 </div>
                                                 <div class="order-custom-card-meta">
-                                                    {{ $garment['tailoring_package'] ?? 'Tailoring' }} | NPR {{ number_format((float) ($garment['tailoring_amount'] ?? 0), 2) }}
+                                                    {{ $garment['tailoring_package'] ?? 'Tailoring' }} | NPR {{ \App\Support\AmountFormatter::format($garment['tailoring_amount'] ?? 0) }}
                                                 </div>
                                                 <div class="order-custom-card-meta">
                                                     <strong>Worker:</strong>
@@ -664,7 +664,7 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                                                 </div>
                                             </div>
                                             <div style="font-weight:700;color:#1f3d5a;">
-                                                NPR {{ number_format((float) ($garment['tailoring_total_amount'] ?? 0), 2) }}
+                                                NPR {{ \App\Support\AmountFormatter::format($garment['tailoring_total_amount'] ?? 0) }}
                                             </div>
                                         </div>
                                         @if ($garmentTask)
@@ -745,31 +745,31 @@ $canEditDeliveryDate = ($canManageOrders || $authUser?->hasPermission('create-or
                 <tfoot>
                     <tr>
                         <th colspan="5" style="text-align: right;">Subtotal</th>
-                        <th>{{ number_format((float) ($order->subtotal_amount ?? 0), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->subtotal_amount ?? 0) }}</th>
                     </tr>
                     <tr>
                         <th colspan="5" style="text-align: right;">Discount</th>
-                        <th>{{ number_format((float) ($order->discount_amount ?? 0), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->discount_amount ?? 0) }}</th>
                     </tr>
                     <tr>
                         <th colspan="5" style="text-align: right;">Tailoring Amount</th>
-                        <th>{{ number_format((float) ($order->tailoring_amount ?? 0), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->tailoring_amount ?? 0) }}</th>
                     </tr>
                     <tr>
                         <th colspan="5" style="text-align: right;">VAT {{ $order->vat_enabled ? '(13%)' : '' }}</th>
-                        <th>{{ number_format((float) ($order->vat_enabled ? ($order->vat_amount ?? 0) : 0), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->vat_enabled ? ($order->vat_amount ?? 0) : 0) }}</th>
                     </tr>
                     <tr>
                         <th colspan="5" style="text-align: right;">Payable Amount</th>
-                        <th>{{ number_format($order->payableAmount(), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->payableAmount()) }}</th>
                     </tr>
                     <tr>
                         <th colspan="5" style="text-align: right;">Advance Paid</th>
-                        <th>{{ number_format($order->paidAmount(), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->paidAmount()) }}</th>
                     </tr>
                     <tr>
                         <th colspan="5" style="text-align: right;">Due Amount</th>
-                        <th>{{ number_format($order->dueAmount(), 2) }}</th>
+                        <th>{{ \App\Support\AmountFormatter::format($order->dueAmount()) }}</th>
                     </tr>
                 </tfoot>
             </table>

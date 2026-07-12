@@ -54,7 +54,7 @@
             <div class="bill-grid-item"><span class="bill-grid-label">Deadline:</span> {{ $taskDeadline?->format('M d, Y h:i A') ?: '-' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Fabric Issued:</span> {{ $order->fabric_issued_at?->format('M d, Y h:i A') ?: '-' }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Work Type:</span> {{ $workTypes->isNotEmpty() ? $workTypes->implode(', ') : 'General Tailoring' }}</div>
-            <div class="bill-grid-item"><span class="bill-grid-label">Payment Amount:</span> {{ number_format($workerPayment, 2) }}</div>
+            <div class="bill-grid-item"><span class="bill-grid-label">Payment Amount:</span> {{ \App\Support\AmountFormatter::format($workerPayment) }}</div>
             <div class="bill-grid-item"><span class="bill-grid-label">Status:</span> {{ \App\Models\Order::statusLabel((string) $order->status) }}</div>
         </div>
     </div>

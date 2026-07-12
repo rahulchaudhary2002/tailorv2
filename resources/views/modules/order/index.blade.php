@@ -252,10 +252,10 @@
                                         type="number"
                                         name="payment_amount"
                                         class="outlet-input"
-                                        min="0.01"
-                                        max="{{ number_format($remainingDue, 2, '.', '') }}"
-                                        step="0.01"
-                                        value="{{ number_format($remainingDue, 2, '.', '') }}"
+                                        min="{{ \App\Support\AmountFormatter::min() }}"
+                                        max="{{ \App\Support\AmountFormatter::raw($remainingDue) }}"
+                                        step="{{ \App\Support\AmountFormatter::step() }}"
+                                        value="{{ \App\Support\AmountFormatter::raw($remainingDue) }}"
                                         placeholder="Payment amount"
                                         required
                                     >
@@ -267,17 +267,17 @@
                                         value="{{ old('payment_method', $order->payment_method ?: 'cash') }}"
                                     >
                                     <div class="order-payment-hint">
-                                        Due: {{ number_format($remainingDue, 2) }} | Paid: {{ number_format($paidAmount, 2) }}
+                                        Due: {{ \App\Support\AmountFormatter::format($remainingDue) }} | Paid: {{ \App\Support\AmountFormatter::format($paidAmount) }}
                                     </div>
                                     <div class="order-payment-actions">
                                         <button type="submit" class="btn btn-sm btn-secondary">Pay</button>
-                                        <button type="button" class="btn btn-sm btn-light" data-payment-full data-full-amount="{{ number_format($remainingDue, 2, '.', '') }}">Full</button>
+                                        <button type="button" class="btn btn-sm btn-light" data-payment-full data-full-amount="{{ \App\Support\AmountFormatter::raw($remainingDue) }}">Full</button>
                                         <button type="button" class="btn btn-sm btn-light" data-payment-cancel>Cancel</button>
                                     </div>
                                 </form>
                             @endif
                         </td>
-                        <td>{{ number_format($netPayable, 2) }}</td>
+                        <td>{{ \App\Support\AmountFormatter::format($netPayable) }}</td>
                         <td>
                             <details class="order-actions-menu">
                                 <summary class="order-actions-toggle" aria-label="Open order actions">
@@ -297,17 +297,17 @@
                                                 @endforeach
                                             </select>
 
-                                            <input type="hidden" class="remaining-due-value" value="{{ number_format($remainingDue, 2, '.', '') }}">
+                                            <input type="hidden" class="remaining-due-value" value="{{ \App\Support\AmountFormatter::raw($remainingDue) }}">
 
                                             <div class="remaining-payment-wrap order-actions-hidden-row">
                                                 <input
                                                     name="remaining_payment_amount"
                                                     type="number"
                                                     min="0"
-                                                    step="0.01"
+                                                    step="{{ \App\Support\AmountFormatter::step() }}"
                                                     class="outlet-input remaining-payment-input"
                                                     placeholder="Remaining payment"
-                                                    value="{{ number_format($remainingDue, 2, '.', '') }}"
+                                                    value="{{ \App\Support\AmountFormatter::raw($remainingDue) }}"
                                                 >
                                                 <input
                                                     name="payment_method"
@@ -721,7 +721,7 @@
                     remainingWrap.style.display = requiresPayment ? 'flex' : 'none';
                     remainingInput.required = requiresPayment;
                     if (requiresPayment && !remainingInput.value) {
-                        remainingInput.value = dueInput.value || '0.00';
+                        remainingInput.value = dueInput.value || '0';
                     }
                 }
             };
@@ -764,7 +764,7 @@
                 const amountInput = form?.querySelector('input[name="payment_amount"]');
 
                 if (amountInput) {
-                    amountInput.value = button.getAttribute('data-full-amount') || '0.00';
+                    amountInput.value = button.getAttribute('data-full-amount') || '0';
                     amountInput.focus();
                 }
             });

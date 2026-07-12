@@ -1098,7 +1098,7 @@ class OrderController extends Controller
         $this->notifyOrderRecipients(
             $order,
             'Order payment recorded',
-            'Payment of NPR '.number_format($paymentAmount, 2).' was recorded for order '.$order->order_number.'.'
+            'Payment of NPR '.\App\Support\AmountFormatter::format($paymentAmount).' was recorded for order '.$order->order_number.'.'
         );
 
         return back()

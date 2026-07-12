@@ -18,12 +18,7 @@
     @php
         $printerPhoneNumber = \App\Models\Setting::valueFor('printer_phone_number', '');
         $taskWorkers = $order->tasks->pluck('worker.name')->filter()->unique()->values();
-        $formatMoney = function ($amount): string {
-            $amount = (float) $amount;
-            return abs($amount - round($amount)) < 0.005
-                ? number_format($amount, 0)
-                : number_format($amount, 2);
-        };
+        $formatMoney = fn ($amount): string => \App\Support\AmountFormatter::format($amount);
     @endphp
 
     <div class="bill-card bill-receipt">

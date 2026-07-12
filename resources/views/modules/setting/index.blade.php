@@ -48,6 +48,35 @@
             </div>
         </div>
 
+        <div class="outlet-form-grid" style="margin-top: 16px;">
+            <div class="outlet-form-group outlet-form-group--checkbox">
+                <label for="amount_decimals_enabled">
+                    <input
+                        id="amount_decimals_enabled"
+                        name="amount_decimals_enabled"
+                        type="checkbox"
+                        value="1"
+                        @checked(old('amount_decimals_enabled', $settings['amount_decimals_enabled'] ?? false))
+                    >
+                    Show decimal amounts (e.g. Rs 120.50)
+                </label>
+                <small>When off, amounts are shown as whole numbers everywhere (POS, orders, bills).</small>
+            </div>
+            <div class="outlet-form-group outlet-form-group--checkbox">
+                <label for="amount_round_up">
+                    <input
+                        id="amount_round_up"
+                        name="amount_round_up"
+                        type="checkbox"
+                        value="1"
+                        @checked(old('amount_round_up', $settings['amount_round_up'] ?? false))
+                    >
+                    Round up whole amounts
+                </label>
+                <small>Only applies when decimal amounts are off. When off, amounts round to the nearest whole number.</small>
+            </div>
+        </div>
+
         <div class="outlet-form-actions">
             @can('manage-settings')
                 <button type="submit" class="btn btn-primary">Save Settings</button>
