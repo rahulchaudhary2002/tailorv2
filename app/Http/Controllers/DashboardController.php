@@ -236,6 +236,9 @@ class DashboardController extends Controller
         $totalPaid = (float) (clone $orderScope)
             ->where('payment_status', Order::PAYMENT_STATUS_PAID)
             ->sum('advance_payment_amount');
+        $cashCollected = (float) (clone $orderScope)
+            ->whereRaw('LOWER(payment_method) = ?', ['cash'])
+            ->sum('advance_payment_amount');
         $pendingPayments = (float) (clone $orderScope)
             ->where('payment_status', '!=', Order::PAYMENT_STATUS_PAID)
             ->selectRaw(
@@ -483,6 +486,7 @@ class DashboardController extends Controller
         $outletSalesToday = 0.0;
         $outletRevenueToday = 0.0;
         $outletTotalPaidToday = 0.0;
+        $outletCashCollected = 0.0;
         $outletOrdersToday = 0;
         $dueTodayCount = 0;
         $overdueOutletCount = 0;
@@ -516,6 +520,11 @@ class DashboardController extends Controller
             $outletTotalPaidToday = (float) (clone $outletBaseOrders)
                 ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
                 ->where('payment_status', Order::PAYMENT_STATUS_PAID)
+                ->sum('advance_payment_amount');
+
+            $outletCashCollected = (float) (clone $outletBaseOrders)
+                ->whereBetween('ordered_at', [$rangeStart, $rangeEnd])
+                ->whereRaw('LOWER(payment_method) = ?', ['cash'])
                 ->sum('advance_payment_amount');
 
             $outletOrdersToday = (int) (clone $outletBaseOrders)
@@ -820,6 +829,7 @@ class DashboardController extends Controller
                 'ordersCount' => $ordersCount,
                 'advanceCollected' => $advanceCollected,
                 'totalPaid' => $totalPaid,
+                'cashCollected' => $cashCollected,
                 'pendingPayments' => $pendingPayments,
                 'deliveredOrders' => $deliveredOrders,
                 'inventoryValue' => $inventoryValue,
@@ -840,6 +850,7 @@ class DashboardController extends Controller
                 'outletSalesToday' => $outletSalesToday,
                 'outletRevenueToday' => $outletRevenueToday,
                 'outletTotalPaidToday' => $outletTotalPaidToday,
+                'outletCashCollected' => $outletCashCollected,
                 'outletOrdersToday' => $outletOrdersToday,
                 'dueTodayCount' => $dueTodayCount,
                 'overdueOutletCount' => $overdueOutletCount,

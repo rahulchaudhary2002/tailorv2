@@ -281,7 +281,7 @@
     .atelier-stats {
         display: grid;
         grid-column: span 12;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 18px;
     }
 
@@ -883,12 +883,14 @@
             ['label' => 'Active Orders', 'value' => number_format($kpis['ordersCount'] ?? 0), 'icon' => 'fa-solid fa-scissors', 'tone' => 'color:#8a5a44;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
             ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($kpis['advanceCollected'] ?? 0), 'icon' => 'fa-solid fa-hand-holding-dollar', 'tone' => 'color:#2e7d32;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
             ['label' => 'Total Paid', 'value' => 'Rs ' . $formatMoney($kpis['totalPaid'] ?? 0), 'icon' => 'fa-solid fa-circle-check', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Cash Collected', 'value' => 'Rs ' . $formatMoney($kpis['cashCollected'] ?? 0), 'icon' => 'fa-solid fa-sack-dollar', 'tone' => 'color:#1b6ec2;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
             ['label' => 'Pending Payments', 'value' => 'Rs ' . $formatMoney($kpis['pendingPayments'] ?? 0), 'icon' => 'fa-regular fa-clock', 'tone' => 'color:#c1362b;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
         ],
         'outlet_manager' => [
             ['label' => 'Orders', 'value' => number_format($outletKpis['outletOrdersToday'] ?? 0), 'icon' => 'fa-solid fa-bag-shopping', 'tone' => 'color:#8a5a44;', 'href' => $canViewOrdersBoard ? route('order.index') : null],
             ['label' => 'Advance Collected', 'value' => 'Rs ' . $formatMoney($outletKpis['outletRevenueToday'] ?? 0), 'icon' => 'fa-solid fa-hand-holding-dollar', 'tone' => 'color:#2e7d32;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
             ['label' => 'Total Paid', 'value' => 'Rs ' . $formatMoney($outletKpis['outletTotalPaidToday'] ?? 0), 'icon' => 'fa-solid fa-circle-check', 'tone' => 'color:#0d6e69;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
+            ['label' => 'Cash Collected', 'value' => 'Rs ' . $formatMoney($outletKpis['outletCashCollected'] ?? 0), 'icon' => 'fa-solid fa-sack-dollar', 'tone' => 'color:#1b6ec2;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
             ['label' => 'Pending Payment', 'value' => 'Rs ' . $formatMoney($outletKpis['outletPendingPayments'] ?? 0), 'icon' => 'fa-solid fa-money-bill-wave', 'tone' => 'color:#c1362b;', 'href' => $canViewPaymentBoard ? route('paymentManagement.index') : null],
         ],
         default => [
