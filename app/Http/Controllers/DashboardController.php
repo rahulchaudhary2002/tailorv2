@@ -582,6 +582,30 @@ class DashboardController extends Controller
                 ->get();
         }
 
+        $dailyCollectionScope = Order::query()
+            ->whereBetween('ordered_at', [$todayStart, $todayEnd])
+            ->where('status', '!=', Order::STATUS_CANCELLED);
+
+        if ($outletContextId > 0) {
+            $dailyCollectionScope->where('outlet_id', $outletContextId);
+        } elseif ($scopeOutletIds->isNotEmpty()) {
+            $dailyCollectionScope->whereIn('outlet_id', $scopeOutletIds);
+        } elseif (! $isOwnerAdmin) {
+            $dailyCollectionScope->whereRaw('1=0');
+        }
+
+        $dailyCashCollected = (float) (clone $dailyCollectionScope)
+            ->where('payment_method', Order::PAYMENT_METHOD_CASH)
+            ->sum('advance_payment_amount');
+
+        $dailyQrCollected = (float) (clone $dailyCollectionScope)
+            ->where('payment_method', Order::PAYMENT_METHOD_QR)
+            ->sum('advance_payment_amount');
+
+        $dailyPosCollected = (float) (clone $dailyCollectionScope)
+            ->where('payment_method', Order::PAYMENT_METHOD_POS)
+            ->sum('advance_payment_amount');
+
         $workerAssignedCount = 0;
         $workerDueToday = 0;
         $workerOverdue = 0;
@@ -870,6 +894,11 @@ class DashboardController extends Controller
             'workerQueue' => $workerQueue,
             'workerRecentlyCompleted' => $workerRecentlyCompleted,
             'workerTaskRouteWorkerId' => (int) $user->id,
+            'dailyCollection' => [
+                'cash' => $dailyCashCollected,
+                'qr' => $dailyQrCollected,
+                'pos' => $dailyPosCollected,
+            ],
             'smartWidgets' => [
                 'newCustomersThisMonth' => $newCustomersThisMonth,
                 'topCustomers' => $topCustomers,

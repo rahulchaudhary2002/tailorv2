@@ -267,15 +267,215 @@
 
     .atelier-card__value {
         margin: 0;
-        font-size: clamp(2rem, 3vw, 3.1rem);
+        font-size: clamp(1.5rem, 3vw, 3.1rem);
         line-height: 1;
         letter-spacing: -0.05em;
+        overflow-wrap: anywhere;
     }
 
     .atelier-card__meta {
         margin: 12px 0 0;
         color: #6b5a4f;
         font-size: 0.95rem;
+    }
+
+    .atelier-hero-body {
+        display: grid;
+        grid-template-columns: minmax(160px, 220px) 1fr;
+        align-items: stretch;
+        gap: 22px;
+    }
+
+    .atelier-hero-main {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .atelier-daily-collection {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        padding: 16px 18px;
+        border-radius: 20px;
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.75) 0%, rgba(246, 239, 232, 0.55) 100%);
+        border: 1px solid rgba(138, 90, 68, 0.1);
+    }
+
+    .atelier-daily-collection__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .atelier-daily-collection__title {
+        margin: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #9a8676;
+    }
+
+    .atelier-daily-collection__total {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #0d6e69;
+        background: rgba(13, 110, 105, 0.1);
+        padding: 4px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+
+    .atelier-daily-collection__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        flex: 1;
+    }
+
+    .atelier-collection-chip {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 13px 15px;
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 6px 16px rgba(24, 18, 13, 0.05);
+        border: 1px solid transparent;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        overflow: hidden;
+        min-width: 0;
+    }
+
+    .atelier-collection-chip--wide {
+        grid-column: span 2;
+    }
+
+    .atelier-collection-chip:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 26px rgba(24, 18, 13, 0.1);
+    }
+
+    .atelier-collection-chip__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .atelier-collection-chip__icon {
+        width: 30px;
+        height: 30px;
+        flex-shrink: 0;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.82rem;
+        color: #fff;
+        box-shadow: 0 6px 14px -4px rgba(24, 18, 13, 0.35);
+    }
+
+    .atelier-collection-chip__label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9a8676;
+    }
+
+    .atelier-collection-chip__pct {
+        margin-left: auto;
+        flex-shrink: 0;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #9a8676;
+    }
+
+    .atelier-collection-chip__value {
+        font-size: clamp(0.95rem, 1.6vw, 1.2rem);
+        font-weight: 800;
+        color: #2f2620;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .atelier-collection-chip__bar {
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(125, 101, 86, 0.12);
+        overflow: hidden;
+    }
+
+    .atelier-collection-chip__bar span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.4s ease;
+    }
+
+    .atelier-collection-chip--cash {
+        background: linear-gradient(180deg, rgba(52, 180, 103, 0.08) 0%, #fff 60%);
+    }
+
+    .atelier-collection-chip--cash:hover {
+        border-color: rgba(31, 138, 76, 0.25);
+    }
+
+    .atelier-collection-chip--cash .atelier-collection-chip__icon {
+        background: linear-gradient(135deg, #34b467 0%, #1f8a4c 100%);
+    }
+
+    .atelier-collection-chip--cash .atelier-collection-chip__bar span {
+        background: linear-gradient(90deg, #34b467, #1f8a4c);
+    }
+
+    .atelier-collection-chip--qr {
+        background: linear-gradient(180deg, rgba(63, 155, 255, 0.08) 0%, #fff 60%);
+    }
+
+    .atelier-collection-chip--qr:hover {
+        border-color: rgba(27, 110, 194, 0.25);
+    }
+
+    .atelier-collection-chip--qr .atelier-collection-chip__icon {
+        background: linear-gradient(135deg, #3f9bff 0%, #1b6ec2 100%);
+    }
+
+    .atelier-collection-chip--qr .atelier-collection-chip__bar span {
+        background: linear-gradient(90deg, #3f9bff, #1b6ec2);
+    }
+
+    .atelier-collection-chip--pos {
+        background: linear-gradient(180deg, rgba(168, 116, 232, 0.08) 0%, #fff 60%);
+    }
+
+    .atelier-collection-chip--pos:hover {
+        border-color: rgba(124, 70, 201, 0.25);
+    }
+
+    .atelier-collection-chip--pos .atelier-collection-chip__icon {
+        background: linear-gradient(135deg, #a874e8 0%, #7c46c9 100%);
+    }
+
+    .atelier-collection-chip--pos .atelier-collection-chip__bar span {
+        background: linear-gradient(90deg, #a874e8, #7c46c9);
+    }
+
+    @media (max-width: 720px) {
+        .atelier-hero-body {
+            grid-template-columns: 1fr;
+        }
     }
 
     .atelier-stats {
@@ -1133,9 +1333,47 @@
                     <span>{{ $primaryGrowth }}</span>
                 </span>
             </div>
-            <p class="atelier-card__eyebrow">{{ $primaryLabel }}</p>
-            <h2 class="atelier-card__value">{{ $primaryValue }}</h2>
-            <p class="atelier-card__meta">{{ $primaryMeta }}</p>
+            <div class="atelier-hero-body">
+                <div class="atelier-hero-main">
+                    <p class="atelier-card__eyebrow">{{ $primaryLabel }}</p>
+                    <h2 class="atelier-card__value">{{ $primaryValue }}</h2>
+                    <p class="atelier-card__meta">{{ $primaryMeta }}</p>
+                </div>
+                @if ($roleScope !== 'worker')
+                    @php
+                        $dailyTotal = (float) (($dailyCollection['cash'] ?? 0) + ($dailyCollection['qr'] ?? 0) + ($dailyCollection['pos'] ?? 0));
+                        $pctOf = fn ($amount) => $dailyTotal > 0 ? round(((float) $amount / $dailyTotal) * 100) : 0;
+                        $collectionMethods = [
+                            ['key' => 'cash', 'label' => 'Cash', 'icon' => 'fa-solid fa-money-bill-wave', 'tone' => 'cash'],
+                            ['key' => 'qr', 'label' => 'QR', 'icon' => 'fa-solid fa-qrcode', 'tone' => 'qr'],
+                            ['key' => 'pos', 'label' => 'POS', 'icon' => 'fa-solid fa-credit-card', 'tone' => 'pos'],
+                        ];
+                    @endphp
+                    <div class="atelier-daily-collection">
+                        <div class="atelier-daily-collection__head">
+                            <p class="atelier-daily-collection__title">
+                                <i class="fa-solid fa-wallet"></i> Daily Collection
+                            </p>
+                            <span class="atelier-daily-collection__total">Rs {{ $formatMoney($dailyTotal) }} today</span>
+                        </div>
+                        <div class="atelier-daily-collection__grid">
+                            @foreach ($collectionMethods as $index => $method)
+                                <div class="atelier-collection-chip atelier-collection-chip--{{ $method['tone'] }} @if ($index === 2) atelier-collection-chip--wide @endif">
+                                    <div class="atelier-collection-chip__head">
+                                        <span class="atelier-collection-chip__icon"><i class="{{ $method['icon'] }}"></i></span>
+                                        <span class="atelier-collection-chip__label">{{ $method['label'] }}</span>
+                                        <span class="atelier-collection-chip__pct">{{ $pctOf($dailyCollection[$method['key']] ?? 0) }}%</span>
+                                    </div>
+                                    <span class="atelier-collection-chip__value">Rs {{ $formatMoney($dailyCollection[$method['key']] ?? 0) }}</span>
+                                    <div class="atelier-collection-chip__bar">
+                                        <span style="width: {{ $pctOf($dailyCollection[$method['key']] ?? 0) }}%;"></span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            </div>
         </article>
 
         <article class="atelier-card atelier-card--side">
