@@ -3,18 +3,19 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Support\AmountFormatter;
 
 class OrderWorkflowService
 {
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function transition(Order $order, array $payload): void
     {
 
         $toStatus = (string) ($payload['status'] ?? '');
 
-        if (!array_key_exists($toStatus, Order::statusLabels())) {
+        if (! array_key_exists($toStatus, Order::statusLabels())) {
             throw new \RuntimeException('Invalid order status transition.');
         }
 
@@ -28,7 +29,7 @@ class OrderWorkflowService
             Order::STATUS_DELIVERED,
         ];
 
-        if (in_array($toStatus, $fabricIssuedOrLaterStatuses, true) && !$order->fabric_issued_at) {
+        if (in_array($toStatus, $fabricIssuedOrLaterStatuses, true) && ! $order->fabric_issued_at) {
             $order->fabric_issued_at = $now;
         }
 
@@ -37,7 +38,7 @@ class OrderWorkflowService
             : null;
 
         if ($toStatus === Order::STATUS_DELIVERED) {
-            $remainingDue = $order->dueAmount();
+            $remainingDue = AmountFormatter::displayValue($order->dueAmount());
 
             $remainingPayment = (float) ($payload['remaining_payment_amount'] ?? 0);
             if ($remainingPayment + 0.0001 < $remainingDue) {
@@ -53,7 +54,7 @@ class OrderWorkflowService
             $order->delivered_at = $payload['delivered_at'] ?? $now;
             $order->closed_at = $payload['closed_at'] ?? $now;
 
-            if (!empty($payload['payment_method'])) {
+            if (! empty($payload['payment_method'])) {
                 $order->payment_method = (string) $payload['payment_method'];
             }
         }
@@ -62,7 +63,7 @@ class OrderWorkflowService
             $order->closed_at = $payload['closed_at'] ?? $now;
         }
 
-        if (!in_array($toStatus, $fabricIssuedOrLaterStatuses, true)) {
+        if (! in_array($toStatus, $fabricIssuedOrLaterStatuses, true)) {
             $order->fabric_issued_at = null;
             $order->delivered_at = null;
             $order->closed_at = null;

@@ -83,6 +83,20 @@ class AmountFormatter
         ];
     }
 
+    /**
+     * The amount as actually shown/pre-filled to the user, honoring the decimals/round-up
+     * settings. Use this (not the raw model value) when validating a user-entered amount
+     * against a due amount, since the user only ever sees this rounded value.
+     */
+    public static function displayValue(float|int|string|null $amount): float
+    {
+        if (self::decimalsEnabled()) {
+            return round((float) $amount, 2);
+        }
+
+        return self::round((float) $amount);
+    }
+
     private static function round(float $amount): float
     {
         return self::roundUpEnabled() ? ceil($amount) : round($amount);

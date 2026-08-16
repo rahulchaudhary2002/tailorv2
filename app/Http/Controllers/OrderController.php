@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\OrderInventoryService;
 use App\Services\OrderWorkflowService;
+use App\Support\AmountFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
@@ -1073,7 +1074,7 @@ class OrderController extends Controller
         $paymentAmount = (float) $validated['payment_amount'];
         $currentPaid = (float) ($order->advance_payment_amount ?? 0);
         $payableAmount = $order->payableAmount();
-        $dueAmount = max(0.0, $payableAmount - $currentPaid);
+        $dueAmount = max(0.0, AmountFormatter::displayValue($payableAmount - $currentPaid));
 
         if ($paymentAmount - 0.0001 > $dueAmount) {
             return back()
